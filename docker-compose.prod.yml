@@ -1,0 +1,44 @@
+services:
+  mysql:
+    image: mysql:8.4
+    restart: unless-stopped
+    environment:
+      MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-this-root-password}
+      MYSQL_DATABASE: edusim
+      MYSQL_USER: ${EDUSIM_DB_USER:-edusim}
+      MYSQL_PASSWORD: ${EDUSIM_DB_PASSWORD:-1234}
+    volumes:
+      - edusim_mysql_data:/var/lib/mysql
+    healthcheck:
+      test: ["CMD-SHELL", "mysqladmin ping -h localhost -uroot -p$${MYSQL_ROOT_PASSWORD} --silent"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 20s
+
+  backend:
+    build:
+      context: ./backend
+    restart: unless-stopped
+    depends_on:
+      mysql:
+        condition: service_healthy
+    environment:
+      EDUSIM_DB_HOST: mysql
+      EDUSIM_DB_PORT: 3306
+      EDUSIM_DB_USER: ${EDUSIM_DB_USER:-edusim}
+      EDUSIM_DB_PASSWORD: ${EDUSIM_DB_PASSWORD:-1234}
+      EDUSIM_JWT_SECRET: ${EDUSIM_JWT_SECRET:-change-this-to-a-very-long-secure-key-for-edusim-app}
+      EDUSIM_ALLOWED_ORIGIN_PATTERNS: ${EDUSIM_ALLOWED_ORIGIN_PATTERNS:-http://localhost:4200,http://127.0.0.1:4200,http://*:4200}
+
+  frontend:
+    build:
+      context: ./frontend
+    restart: unless-stopped
+    depends_on:
+      - backend
+    ports:
+      - "80:80"
+
+volumes:
+  edusim_mysql_data:

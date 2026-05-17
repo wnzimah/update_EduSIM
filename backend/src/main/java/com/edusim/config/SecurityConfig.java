@@ -2,7 +2,9 @@ package com.edusim.config;
 
 import com.edusim.security.JwtAuthenticationFilter;
 import jakarta.servlet.http.HttpServletResponse;
+import java.util.Arrays;
 import java.util.List;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.http.HttpMethod;
@@ -50,13 +52,15 @@ public class SecurityConfig {
     }
 
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(
+        @Value("${app.cors.allowed-origin-patterns}") String allowedOriginPatterns
+    ) {
         CorsConfiguration config = new CorsConfiguration();
-        config.setAllowedOriginPatterns(List.of(
-            "http://localhost:4200",
-            "http://127.0.0.1:4200",
-            "http://*:4200"
-        ));
+        List<String> patterns = Arrays.stream(allowedOriginPatterns.split(","))
+            .map(String::trim)
+            .filter(pattern -> !pattern.isEmpty())
+            .toList();
+        config.setAllowedOriginPatterns(patterns);
         config.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"));
         config.setAllowedHeaders(List.of("*"));
         config.setAllowCredentials(true);
