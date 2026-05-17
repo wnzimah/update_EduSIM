@@ -1,0 +1,412 @@
+<div class="container manage-page">
+  <section class="panel quiz-mini-list">
+    <nav class="assessment-tabs" aria-label="Assessment Tools">
+      <a
+        class="assessment-tab"
+        [routerLink]="['/lecturer/manage']"
+        [queryParams]="{ courseId: selectedCourseId ?? null }"
+        routerLinkActive="active"
+        [routerLinkActiveOptions]="{ exact: true }">
+        My Course
+      </a>
+      <a
+        class="assessment-tab"
+        [routerLink]="['/lecturer/quiz-overview']"
+        [queryParams]="{ courseId: selectedCourseId ?? null }"
+        routerLinkActive="active">
+        Quiz
+      </a>
+      <a
+        class="assessment-tab"
+        [routerLink]="['/lecturer/quiz-settings']"
+        [queryParams]="{ courseId: selectedCourseId ?? null }"
+        routerLinkActive="active">
+        Settings
+      </a>
+      <a
+        class="assessment-tab"
+        [routerLink]="['/lecturer/quiz-builder']"
+        [queryParams]="{ courseId: selectedCourseId ?? null }"
+        routerLinkActive="active">
+        Questions
+      </a>
+      <a
+        class="assessment-tab"
+        [routerLink]="['/lecturer/question-bank']"
+        [queryParams]="{ courseId: selectedCourseId ?? null }"
+        routerLinkActive="active">
+        Question Bank
+      </a>
+    </nav>
+  </section>
+
+  @if (statusMessage) {
+    <p class="ok">{{ statusMessage }}</p>
+  }
+  @if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+  }
+
+  <section class="panel manage-unified-card">
+    <header class="manage-header">
+      <div>
+        <h1>{{ currentCourse?.title || "Course Content Management" }}</h1>
+        <p class="muted">
+          {{ currentCourse ? ("Manage lessons, resources, and quiz flow for " + currentCourse.title + ".") : "Manage lessons and resources with a clear content workflow." }}
+        </p>
+      </div>
+    </header>
+
+    <section class="workflow-panel">
+      <h2>Course Management Flow</h2>
+      <p class="muted">
+        Follow this order: create course first, then edit course details, then manage course content and update lesson video.
+      </p>
+      <div class="flow-tabs">
+        <button class="flow-tab" type="button" [class.active]="manageTab === 'CREATE'" (click)="setManageTab('CREATE')">
+          1. Create New Course
+        </button>
+        <button
+          class="flow-tab"
+          type="button"
+          [class.active]="manageTab === 'EDIT'"
+          [disabled]="!currentCourse"
+          (click)="setManageTab('EDIT')">
+          2. Edit Course
+        </button>
+        <button
+          class="flow-tab"
+          type="button"
+          [class.active]="manageTab === 'CONTENT'"
+          [disabled]="!currentCourse"
+          (click)="setManageTab('CONTENT')">
+          3. Course Content &amp; Updating Lesson Video
+        </button>
+      </div>
+    </section>
+
+    <section class="toolbar-panel" id="course-editor-anchor">
+      @if (manageTab !== "CREATE") {
+        <div class="toolbar-top">
+          <div class="field course-select-field">
+            <label for="courseSelect">Select Course</label>
+            <select id="courseSelect" [ngModel]="selectedCourseId ?? ''" (ngModelChange)="onCourseChange($event)" name="courseSelect">
+              <option value="">-- Select Course --</option>
+              @for (course of courses; track course.courseId) {
+                <option [value]="course.courseId">{{ course.title }}</option>
+              }
+            </select>
+            @if (selectedCourseId && currentCourse) {
+              <p class="selected-course-pill">
+                Selected course:
+                <strong>{{ currentCourse.title }}</strong>
+              </p>
+            }
+          </div>
+        </div>
+      }
+
+      @if (manageTab === "CREATE") {
+        <form class="create-course-form" (ngSubmit)="createCourse()">
+          <div class="field">
+            <label for="newCourseTitle">New Course Title</label>
+            <input id="newCourseTitle" name="newCourseTitle" placeholder="e.g. Data Management and Integration" [(ngModel)]="courseForm.title" required>
+          </div>
+          <div class="field">
+            <label for="newCourseDescription">Description</label>
+            <input id="newCourseDescription" name="newCourseDescription" placeholder="Brief course description" [(ngModel)]="courseForm.description" required>
+          </div>
+          <div class="form-actions">
+            <button class="btn" type="submit">Create Course</button>
+          </div>
+        </form>
+      }
+
+      @if (manageTab === "EDIT") {
+        @if (currentCourse) {
+          <form class="course-edit-form" (ngSubmit)="updateSelectedCourse()">
+            <div class="field">
+              <label for="courseTitle">Course Title</label>
+              <input id="courseTitle" name="courseTitle" [(ngModel)]="courseEditForm.title" required>
+            </div>
+            <div class="field">
+              <label for="courseDescription">Course Description</label>
+              <input id="courseDescription" name="courseDescription" [(ngModel)]="courseEditForm.description" required>
+            </div>
+            <div class="form-actions">
+              <button class="btn" type="submit">Update Course</button>
+              <button class="btn btn-danger" type="button" (click)="deleteSelectedCourse()">Delete Course</button>
+            </div>
+          </form>
+        } @else {
+          <p class="warning">Select a course first before editing.</p>
+        }
+      }
+
+      @if (manageTab === "CONTENT") {
+        @if (currentCourse) {
+          <div class="content-entry-note">
+            <h3>{{ currentCourse.title }} - Course Content Workspace</h3>
+            <p class="muted">Now you can add/update video, material, and edit lesson settings below.</p>
+            <button class="btn btn-outline" type="button" (click)="jumpToSection('content')">Open Content Section</button>
+          </div>
+        } @else {
+          <p class="warning">Select a course first before managing course content.</p>
+        }
+      }
+    </section>
+  </section>
+
+  @if (manageTab === "CONTENT") {
+    <section class="workspace-grid" id="content-editor-anchor">
+      <aside class="panel content-panel">
+      <header class="content-panel-head">
+        <h2>Course Content</h2>
+        <p class="muted">Add and organize lesson videos and learning materials.</p>
+      </header>
+
+      @if (!selectedCourseId) {
+        <p class="warning">Select a course first before adding content.</p>
+      } @else {
+        <div class="add-toggle">
+          <button class="btn" type="button" [class.btn-outline]="addMode !== 'VIDEO'" (click)="setAddMode('VIDEO')">
+            Add Video
+          </button>
+          <button class="btn" type="button" [class.btn-outline]="addMode !== 'MATERIAL'" (click)="setAddMode('MATERIAL')">
+            Add Material
+          </button>
+        </div>
+
+        @if (addMode === "VIDEO") {
+          <form class="content-form compact-form-card" (ngSubmit)="addVideo()">
+            <div class="field">
+              <label for="videoTitle">Video Title</label>
+              <input id="videoTitle" name="videoTitle" placeholder="A lesson about dogs" [(ngModel)]="videoForm.title" required>
+            </div>
+
+            <div class="field">
+              <label for="videoDescription">Description</label>
+              <textarea id="videoDescription" name="videoDescription" rows="3" [(ngModel)]="videoForm.description" required></textarea>
+            </div>
+
+            <div class="field">
+              <label for="videoUrl">Video URL</label>
+              <input id="videoUrl" name="videoUrl" placeholder="https://youtu.be/..." [(ngModel)]="videoForm.videoUrl" required>
+            </div>
+
+            <div class="meta-grid">
+              <div class="field">
+                <label for="videoDuration">Duration (Minutes)</label>
+                <input id="videoDuration" name="videoDuration" type="number" min="1" [(ngModel)]="videoForm.durationMinutes" required>
+              </div>
+
+              <div class="field">
+                <label for="videoOrder">Order</label>
+                <input id="videoOrder" name="videoOrder" type="number" min="1" [(ngModel)]="videoForm.sortOrder" required>
+              </div>
+
+              <div class="field">
+                <label for="videoMandatory">Requirement</label>
+                <select id="videoMandatory" name="videoMandatory" [(ngModel)]="videoForm.mandatory">
+                  <option [ngValue]="true">Mandatory</option>
+                  <option [ngValue]="false">Optional</option>
+                </select>
+              </div>
+            </div>
+
+            <button class="btn" type="submit">Add Video</button>
+          </form>
+        } @else {
+          <form class="content-form compact-form-card" (ngSubmit)="addMaterial()">
+            <div class="field">
+              <label for="materialTitle">Material Title</label>
+              <input id="materialTitle" name="materialTitle" placeholder="Lesson slide / reading material" [(ngModel)]="materialForm.title" required>
+            </div>
+
+            <div class="field">
+              <label for="materialType">Material Type</label>
+              <select id="materialType" name="materialType" [(ngModel)]="materialForm.materialType">
+                <option value="PDF">PDF</option>
+                <option value="SLIDE">SLIDE</option>
+                <option value="REFERENCE">REFERENCE</option>
+                <option value="LINK">LINK</option>
+              </select>
+            </div>
+
+            <div class="field">
+              <label for="materialUrl">Resource URL</label>
+              <input id="materialUrl" name="materialUrl" placeholder="https://..." [(ngModel)]="materialForm.resourceUrl" required>
+            </div>
+
+            <button class="btn" type="submit">Add Material</button>
+          </form>
+        }
+      }
+
+      <div class="content-list-wrap">
+        <h3>Lessons / Resources</h3>
+        @if (orderedContentItems.length === 0) {
+          <p class="muted">No content yet for this course.</p>
+        } @else {
+          <ul class="content-list">
+            @for (item of orderedContentItems; track contentKey(item)) {
+              <li class="content-row" [class.active]="isSelectedItem(item)">
+                <button type="button" class="item-main" (click)="selectContentItem(item)">
+                  <span class="item-tag">{{ item.itemType === "VIDEO" ? "VIDEO" : (item.materialType ?? "MATERIAL") }}</span>
+                  <span class="item-title">{{ item.title }}</span>
+                  <span class="item-meta">{{ itemSubtitle(item) }}</span>
+                </button>
+
+                <div class="row-actions">
+                  <button type="button" class="menu-btn" (click)="selectContentItem(item); $event.stopPropagation()">Edit</button>
+                  <button type="button" class="menu-btn more-btn" (click)="toggleActions(item, $event)" aria-label="More actions">&#8942;</button>
+
+                  @if (actionMenuKey === contentKey(item)) {
+                    <div class="action-menu" (click)="$event.stopPropagation()">
+                      <button type="button" (click)="selectContentItem(item); actionMenuKey = null;">Edit settings</button>
+                      @if (item.itemType === "VIDEO") {
+                        <button type="button" [disabled]="!canMoveVideo(item, -1)" (click)="moveVideo(item, -1)">Move up</button>
+                        <button type="button" [disabled]="!canMoveVideo(item, 1)" (click)="moveVideo(item, 1)">Move down</button>
+                      }
+                      <button type="button" (click)="duplicateItem(item)">Duplicate</button>
+                      <button type="button" class="danger" (click)="deleteItem(item)">Delete</button>
+                    </div>
+                  }
+                </div>
+              </li>
+            }
+          </ul>
+        }
+      </div>
+      </aside>
+
+      <section class="panel settings-panel">
+      @if (selectedContentItem) {
+        <p class="crumbs">
+          Courses &rsaquo; {{ currentCourse?.title ?? "Course" }} &rsaquo; {{ selectedContentItem.title }} &rsaquo; Edit settings
+        </p>
+        <h2>Updating {{ selectedContentItem.itemType === "VIDEO" ? "Lesson Video" : "Learning Material" }}</h2>
+
+        @if (selectedContentItem.itemType === "VIDEO") {
+          <form class="edit-form" (ngSubmit)="saveSelectedItem()">
+            <div class="form-sections-menu">
+              @for (section of settingsSections; track section.key) {
+                <button class="section-trigger" type="button" (click)="toggleSettingsSection(section.key)">
+                  <span class="section-icon" [class.open]="isSettingsSectionOpen(section.key)" aria-hidden="true"></span>
+                  <span>{{ section.label }}</span>
+                </button>
+              }
+            </div>
+
+            @if (isSettingsSectionOpen("COURSE_CONTENT")) {
+              <div class="form-section-block">
+                <div class="field">
+                  <label for="editVideoTitle">Name</label>
+                  <input id="editVideoTitle" name="editVideoTitle" [(ngModel)]="editVideoForm.title" required>
+                </div>
+
+                <div class="field">
+                  <label for="editVideoDescription">Description</label>
+                  <textarea id="editVideoDescription" name="editVideoDescription" rows="4" [(ngModel)]="editVideoForm.description" required></textarea>
+                </div>
+              </div>
+            }
+
+            @if (isSettingsSectionOpen("LEARNING_RESOURCES")) {
+              <div class="form-section-block">
+                <div class="field">
+                  <label for="editVideoUrl">Page Content URL</label>
+                  <input id="editVideoUrl" name="editVideoUrl" [(ngModel)]="editVideoForm.videoUrl" required>
+                </div>
+              </div>
+            }
+
+            @if (isSettingsSectionOpen("UPDATING_VIDEO")) {
+              <div class="form-section-block">
+                <div class="meta-grid">
+                  <div class="field">
+                    <label for="editVideoDuration">Duration (Minutes)</label>
+                    <input id="editVideoDuration" name="editVideoDuration" type="number" min="1" [(ngModel)]="editVideoForm.durationMinutes" required>
+                  </div>
+                  <div class="field">
+                    <label for="editVideoOrder">Order</label>
+                    <input id="editVideoOrder" name="editVideoOrder" type="number" min="1" [(ngModel)]="editVideoForm.sortOrder" required>
+                  </div>
+                  <div class="field">
+                    <label for="editVideoMandatory">Requirement</label>
+                    <select id="editVideoMandatory" name="editVideoMandatory" [(ngModel)]="editVideoForm.mandatory">
+                      <option [ngValue]="true">Mandatory</option>
+                      <option [ngValue]="false">Optional</option>
+                    </select>
+                  </div>
+                </div>
+              </div>
+            }
+
+            <div class="edit-actions">
+              <button class="btn" type="submit">Save Changes</button>
+              <button class="btn btn-outline" type="button" (click)="openLink(editVideoForm.videoUrl)">Open Link</button>
+            </div>
+          </form>
+        } @else {
+          <form class="edit-form" (ngSubmit)="saveSelectedItem()">
+            <div class="form-sections-menu">
+              @for (section of settingsSections; track section.key) {
+                <button class="section-trigger" type="button" (click)="toggleSettingsSection(section.key)">
+                  <span class="section-icon" [class.open]="isSettingsSectionOpen(section.key)" aria-hidden="true"></span>
+                  <span>{{ section.label }}</span>
+                </button>
+              }
+            </div>
+
+            @if (isSettingsSectionOpen("COURSE_CONTENT")) {
+              <div class="form-section-block">
+                <div class="field">
+                  <label for="editMaterialTitle">Name</label>
+                  <input id="editMaterialTitle" name="editMaterialTitle" [(ngModel)]="editMaterialForm.title" required>
+                </div>
+
+                <div class="field">
+                  <label for="editMaterialType">Material Type</label>
+                  <select id="editMaterialType" name="editMaterialType" [(ngModel)]="editMaterialForm.materialType">
+                    <option value="PDF">PDF</option>
+                    <option value="SLIDE">SLIDE</option>
+                    <option value="REFERENCE">REFERENCE</option>
+                    <option value="LINK">LINK</option>
+                  </select>
+                </div>
+              </div>
+            }
+
+            @if (isSettingsSectionOpen("LEARNING_RESOURCES")) {
+              <div class="form-section-block">
+                <div class="field">
+                  <label for="editMaterialUrl">Resource URL</label>
+                  <input id="editMaterialUrl" name="editMaterialUrl" [(ngModel)]="editMaterialForm.resourceUrl" required>
+                </div>
+              </div>
+            }
+
+            @if (isSettingsSectionOpen("UPDATING_VIDEO")) {
+              <div class="form-section-block section-empty">
+                <p class="muted">Updating Video section is not applicable for learning materials.</p>
+              </div>
+            }
+
+            <div class="edit-actions">
+              <button class="btn" type="submit">Save Changes</button>
+              <button class="btn btn-outline" type="button" (click)="openLink(editMaterialForm.resourceUrl)">Open Link</button>
+            </div>
+          </form>
+        }
+      } @else {
+        <div class="empty-edit">
+          <h2>Select an item to edit</h2>
+          <p class="muted">Click any lesson or material from the left panel.</p>
+        </div>
+      }
+      </section>
+    </section>
+  }
+
+</div>

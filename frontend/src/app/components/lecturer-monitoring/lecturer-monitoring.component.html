@@ -1,0 +1,203 @@
+<div class="container monitoring-page">
+  <header class="panel monitoring-head">
+    <div>
+      <h1>Student Result Monitoring</h1>
+      <p class="muted">Review attempts, scores, and submitted answers in one dedicated page.</p>
+      <div class="head-metrics">
+        <article class="metric-pill">
+          <span>Total Attempts</span>
+          <strong>{{ displayedAttemptsCount() }}</strong>
+        </article>
+        <article class="metric-pill pass-pill">
+          <span>Pass</span>
+          <strong>{{ displayedPassCount() }}</strong>
+        </article>
+        <article class="metric-pill fail-pill">
+          <span>Fail</span>
+          <strong>{{ displayedFailCount() }}</strong>
+        </article>
+        <article class="metric-pill">
+          <span>Average Score</span>
+          <strong>{{ displayedAverageScore() }}</strong>
+        </article>
+      </div>
+      @if (scopedCourseId) {
+        <p class="scope-note">
+          Showing course only:
+          <strong>{{ scopedCourseTitle || ('Course ID ' + scopedCourseId) }}</strong>
+        </p>
+      }
+    </div>
+    <div class="head-actions">
+      @if (scopedCourseId) {
+        <button class="btn btn-outline" type="button" (click)="clearCourseScope()">Show All Courses</button>
+      }
+    </div>
+  </header>
+
+  @if (statusMessage) {
+    <p class="ok">{{ statusMessage }}</p>
+  }
+  @if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+  }
+
+  <section class="panel monitoring-table">
+    <div class="result-head">
+      <div class="result-title">
+        <h2>Attempts</h2>
+        <p class="muted">
+          {{ displayedAttemptsCount() }} records | {{ displayedPassRate() }}% pass rate
+        </p>
+      </div>
+      <div class="result-controls">
+        <div class="result-filters">
+          <select [ngModel]="resultQuizId ?? ''" (ngModelChange)="onResultQuizFilter($event)" name="resultQuizFilter">
+            <option value="">All Quiz</option>
+            @for (quiz of quizzes; track quiz.quizId) {
+              <option [value]="quiz.quizId">{{ quiz.title }}</option>
+            }
+          </select>
+          <select [ngModel]="studentFilter" (ngModelChange)="onStudentFilterChange($event)" name="resultStudentFilter">
+            <option value="">All Students</option>
+            @for (studentName of availableStudents(); track studentName) {
+              <option [value]="studentName">{{ studentName }}</option>
+            }
+          </select>
+        </div>
+        <button
+          class="btn btn-outline report-btn"
+          type="button"
+          [disabled]="loading || filteredResults().length === 0"
+          (click)="downloadScoreReport()">
+          Download Score Report
+        </button>
+      </div>
+    </div>
+
+    @if (loading) {
+      <p class="muted">Loading results...</p>
+    } @else if (filteredResults().length === 0) {
+      <p class="muted">No attempt records yet.</p>
+    } @else {
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Student</th>
+              <th>Quiz</th>
+              <th>Attempt</th>
+              <th>Score</th>
+              <th>Status</th>
+              <th>Time Taken</th>
+              <th>Date</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of filteredResults(); track item.attemptId) {
+              <tr>
+                <td>
+                  <p class="student-name">{{ item.studentName }}</p>
+                </td>
+                <td>
+                  <p class="quiz-title">{{ item.quizTitle }}</p>
+                </td>
+                <td>#{{ item.attemptNumber }}</td>
+                <td>{{ item.score }}%</td>
+                <td>
+                  <span class="badge" [class.pass]="item.passed" [class.fail]="!item.passed">
+                    {{ item.passed ? "PASS" : "FAIL" }}
+                  </span>
+                </td>
+                <td>{{ item.durationSeconds || 0 }}s</td>
+                <td>{{ item.submittedAt | date: "medium" }}</td>
+                <td>
+                  <button class="btn btn-outline result-action-btn" type="button" (click)="openResultDetail(item.attemptId)">
+                    View Answers
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+
+  @if (showResultDetailModal && resultDetail) {
+    <div class="modal-backdrop" (click)="closeResultDetail()">
+      <section class="modal-shell result-detail-modal" (click)="$event.stopPropagation()">
+        <header class="modal-head">
+          <h2>Attempt Detail - {{ resultDetail.attempt.studentName }}</h2>
+          <button type="button" class="close-btn" (click)="closeResultDetail()">&#10005;</button>
+        </header>
+        <div class="modal-body">
+          <p>
+            <strong>{{ resultDetail.attempt.quizTitle }}</strong> |
+            Score: {{ resultDetail.attempt.score }}% |
+            {{ resultDetail.attempt.passed ? "PASS" : "FAIL" }}
+          </p>
+          <p class="muted">
+            Attempt #{{ resultDetail.attempt.attemptNumber }} |
+            Submitted: {{ resultDetail.attempt.submittedAt | date: "medium" }} |
+            Time taken: {{ resultDetail.attempt.durationSeconds || 0 }}s
+          </p>
+          <table>
+            <thead>
+              <tr>
+                <th>Question</th>
+                <th>Type</th>
+                <th>Student Answer</th>
+                <th>Correct Answer</th>
+                <th>Auto Result</th>
+                <th>Explanation</th>
+                <th>Points</th>
+                <th>Adjust</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (answer of resultDetail.answers; track answer.answerId) {
+                <tr>
+                  <td>{{ answer.prompt }}</td>
+                  <td>{{ answer.questionType }}</td>
+                  <td>{{ formatAnswer(answer.studentAnswer) }}</td>
+                  <td>{{ formatAnswer(answer.correctAnswer) }}</td>
+                  <td>
+                    <span class="badge" [class.fail]="!answer.correct">
+                      {{ answer.correct ? "Correct" : "Incorrect" }}
+                    </span>
+                  </td>
+                  <td>{{ answer.explanation || "-" }}</td>
+                  <td>{{ answer.awardedPoints }} / {{ answer.maxPoints }}</td>
+                  <td>
+                    <input
+                      type="number"
+                      min="0"
+                      [max]="answer.maxPoints"
+                      [ngModel]="getAdjustScore(answer)"
+                      (ngModelChange)="setAdjustScore(answer.answerId, $event)"
+                      [name]="'adjust-score-' + answer.answerId">
+                    <input
+                      type="text"
+                      [ngModel]="getAdjustReason(answer)"
+                      (ngModelChange)="setAdjustReason(answer.answerId, $event)"
+                      [name]="'adjust-reason-' + answer.answerId"
+                      placeholder="Reason (optional)">
+                    <button
+                      class="btn btn-outline"
+                      type="button"
+                      [disabled]="adjustingAnswerId === answer.answerId"
+                      (click)="adjustAnswerScore(answer)">
+                      {{ adjustingAnswerId === answer.answerId ? "Saving..." : "Adjust" }}
+                    </button>
+                  </td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </div>
+  }
+</div>

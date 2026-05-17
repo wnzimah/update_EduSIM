@@ -1,0 +1,291 @@
+<section class="tracker-shell">
+  <div class="bg-shape shape-1"></div>
+  <div class="bg-shape shape-2"></div>
+
+  <header class="hero">
+    <p class="eyebrow">Personal Dashboard</p>
+    <h1>Planner, Cashflow & Profit Bisnes</h1>
+    <p class="subtext">Rekod tugasan harian, duit keluar masuk, dan kira untung bisnes automatik.</p>
+    <div class="hero-meta">
+      <span>Hari ini: {{ todayLabel() }}</span>
+      <span>Tugasan esok: {{ dashboard?.tomorrowTaskCount ?? 0 }}</span>
+    </div>
+  </header>
+
+  @if (loading) {
+    <p class="status">Sedang load data...</p>
+  } @else {
+    @if (errorMessage) {
+      <p class="status error">{{ errorMessage }}</p>
+    }
+
+    @if (mutationError) {
+      <p class="status error">{{ mutationError }}</p>
+    }
+
+    <main class="dashboard-grid">
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Schedule</h2>
+        </div>
+
+        <form class="form-grid" (ngSubmit)="addSchedule()">
+          <label>
+            Tugasan
+            <input
+              type="text"
+              name="scheduleTitle"
+              [(ngModel)]="scheduleForm.title"
+              placeholder="Contoh: Buat kira-kira stok"
+              required>
+          </label>
+          <label>
+            Tarikh
+            <input
+              type="date"
+              name="scheduleDueDate"
+              [(ngModel)]="scheduleForm.dueDate"
+              required>
+          </label>
+          <label>
+            Keutamaan
+            <select
+              name="schedulePriority"
+              [(ngModel)]="scheduleForm.priority">
+              <option value="HIGH">Tinggi</option>
+              <option value="MEDIUM">Sederhana</option>
+              <option value="LOW">Rendah</option>
+            </select>
+          </label>
+          <button type="submit" [disabled]="saving">Tambah Tugasan</button>
+        </form>
+
+        @if (scheduleRows().length === 0) {
+          <p class="empty">Belum ada tugasan.</p>
+        } @else {
+          <ul class="list">
+            @for (task of scheduleRows(); track task.id) {
+              <li class="task-item" [class.done]="task.done">
+                <div class="task-main">
+                  <input
+                    type="checkbox"
+                    [checked]="task.done"
+                    (change)="onScheduleDoneChange(task, $event)">
+                  <div>
+                    <div class="task-text">{{ task.title }}</div>
+                    <div class="task-meta">
+                      Tarikh: {{ formatDate(task.dueDate) }}
+                      <span class="tag" [ngClass]="priorityClass(task.priority)">
+                        {{ priorityLabel(task.priority) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+                <button class="danger-btn" type="button" [disabled]="saving" (click)="deleteSchedule(task)">Padam</button>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Duit Masuk / Keluar</h2>
+        </div>
+
+        <div class="summary-grid">
+          <article class="metric">
+            <span>Jumlah Masuk</span>
+            <strong>{{ formatMoney(dashboard?.summary?.cashInTotal) }}</strong>
+          </article>
+          <article class="metric">
+            <span>Jumlah Keluar</span>
+            <strong>{{ formatMoney(dashboard?.summary?.cashOutTotal) }}</strong>
+          </article>
+          <article class="metric">
+            <span>Baki Semasa</span>
+            <strong [class.amount-negative]="(dashboard?.summary?.cashBalance ?? 0) < 0" [class.amount-positive]="(dashboard?.summary?.cashBalance ?? 0) >= 0">
+              {{ formatMoney(dashboard?.summary?.cashBalance) }}
+            </strong>
+          </article>
+        </div>
+
+        <form class="form-grid" (ngSubmit)="addCashflow()">
+          <label>
+            Tarikh
+            <input
+              type="date"
+              name="cashflowDate"
+              [(ngModel)]="cashflowForm.entryDate"
+              required>
+          </label>
+          <label>
+            Jenis
+            <select
+              name="cashflowType"
+              [(ngModel)]="cashflowForm.type">
+              <option value="IN">Masuk</option>
+              <option value="OUT">Keluar</option>
+            </select>
+          </label>
+          <label>
+            Amaun (RM)
+            <input
+              type="number"
+              name="cashflowAmount"
+              [(ngModel)]="cashflowForm.amount"
+              min="0.01"
+              step="0.01"
+              required>
+          </label>
+          <label class="full">
+            Catatan
+            <input
+              type="text"
+              name="cashflowNote"
+              [(ngModel)]="cashflowForm.note"
+              placeholder="Contoh: Bayaran customer / Bil utiliti">
+          </label>
+          <button type="submit" [disabled]="saving">Tambah Rekod Duit</button>
+        </form>
+
+        @if (cashflowRows().length === 0) {
+          <p class="empty">Belum ada transaksi duit.</p>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tarikh</th>
+                  <th>Jenis</th>
+                  <th>Amaun</th>
+                  <th>Catatan</th>
+                  <th>Tindakan</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of cashflowRows(); track row.id) {
+                  <tr>
+                    <td>{{ formatDate(row.entryDate) }}</td>
+                    <td>
+                      <span class="pill" [class.pill-in]="row.type === 'IN'" [class.pill-out]="row.type === 'OUT'">
+                        {{ cashflowTypeLabel(row.type) }}
+                      </span>
+                    </td>
+                    <td [class.amount-positive]="row.type === 'IN'" [class.amount-negative]="row.type === 'OUT'">
+                      {{ row.type === "IN" ? "+" : "-" }}{{ formatMoney(row.amount) }}
+                    </td>
+                    <td>{{ row.note || "-" }}</td>
+                    <td>
+                      <button class="danger-btn" type="button" [disabled]="saving" (click)="deleteCashflow(row)">Padam</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+
+      <section class="panel">
+        <div class="panel-head">
+          <h2>Business: Kos & Untung</h2>
+        </div>
+
+        <div class="summary-grid">
+          <article class="metric">
+            <span>Total Kos Pembelian</span>
+            <strong>{{ formatMoney(dashboard?.summary?.businessCostTotal) }}</strong>
+          </article>
+          <article class="metric">
+            <span>Total Jualan</span>
+            <strong>{{ formatMoney(dashboard?.summary?.businessRevenueTotal) }}</strong>
+          </article>
+          <article class="metric">
+            <span>Untung Bersih</span>
+            <strong [class.amount-negative]="(dashboard?.summary?.businessProfit ?? 0) < 0" [class.amount-positive]="(dashboard?.summary?.businessProfit ?? 0) >= 0">
+              {{ formatMoney(dashboard?.summary?.businessProfit) }}
+            </strong>
+          </article>
+        </div>
+
+        <form class="form-grid" (ngSubmit)="addBusiness()">
+          <label>
+            Tarikh
+            <input
+              type="date"
+              name="businessDate"
+              [(ngModel)]="businessForm.entryDate"
+              required>
+          </label>
+          <label>
+            Jenis
+            <select
+              name="businessType"
+              [(ngModel)]="businessForm.type">
+              <option value="PURCHASE">Kos Pembelian</option>
+              <option value="SALE">Jualan</option>
+            </select>
+          </label>
+          <label>
+            Item
+            <input
+              type="text"
+              name="businessItem"
+              [(ngModel)]="businessForm.item"
+              placeholder="Contoh: Bahan mentah / Jualan produk A"
+              required>
+          </label>
+          <label>
+            Amaun (RM)
+            <input
+              type="number"
+              name="businessAmount"
+              [(ngModel)]="businessForm.amount"
+              min="0.01"
+              step="0.01"
+              required>
+          </label>
+          <button type="submit" [disabled]="saving">Tambah Rekod Bisnes</button>
+        </form>
+
+        @if (businessRows().length === 0) {
+          <p class="empty">Belum ada rekod bisnes.</p>
+        } @else {
+          <div class="table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Tarikh</th>
+                  <th>Jenis</th>
+                  <th>Item</th>
+                  <th>Amaun</th>
+                  <th>Tindakan</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (row of businessRows(); track row.id) {
+                  <tr>
+                    <td>{{ formatDate(row.entryDate) }}</td>
+                    <td>
+                      <span class="pill" [class.pill-sale]="row.type === 'SALE'" [class.pill-purchase]="row.type === 'PURCHASE'">
+                        {{ businessTypeLabel(row.type) }}
+                      </span>
+                    </td>
+                    <td>{{ row.item }}</td>
+                    <td [class.amount-positive]="row.type === 'SALE'" [class.amount-negative]="row.type === 'PURCHASE'">
+                      {{ row.type === "SALE" ? "+" : "-" }}{{ formatMoney(row.amount) }}
+                    </td>
+                    <td>
+                      <button class="danger-btn" type="button" [disabled]="saving" (click)="deleteBusiness(row)">Padam</button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </div>
+        }
+      </section>
+    </main>
+  }
+</section>

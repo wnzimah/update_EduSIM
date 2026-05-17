@@ -1,0 +1,373 @@
+package com.edusim.config;
+
+import com.edusim.model.Course;
+import com.edusim.model.CourseMaterial;
+import com.edusim.model.DifficultyLevel;
+import com.edusim.model.Enrollment;
+import com.edusim.model.LessonVideo;
+import com.edusim.model.Question;
+import com.edusim.model.QuestionBankItem;
+import com.edusim.model.QuestionType;
+import com.edusim.model.Quiz;
+import com.edusim.model.QuizDisplayMode;
+import com.edusim.model.Role;
+import com.edusim.model.UserAccount;
+import com.edusim.repo.CourseMaterialRepository;
+import com.edusim.repo.CourseRepository;
+import com.edusim.repo.EnrollmentRepository;
+import com.edusim.repo.LessonVideoRepository;
+import com.edusim.repo.QuestionBankItemRepository;
+import com.edusim.repo.QuestionRepository;
+import com.edusim.repo.QuizRepository;
+import com.edusim.repo.UserAccountRepository;
+import com.fasterxml.jackson.core.JsonProcessingException;
+import com.fasterxml.jackson.databind.ObjectMapper;
+import java.util.List;
+import java.util.Map;
+import org.springframework.boot.CommandLineRunner;
+import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.stereotype.Component;
+
+@Component
+public class DataSeeder implements CommandLineRunner {
+
+    private static final String DATA_INTEGRATION_COURSE_TITLE = "Data Management and Integration";
+    private static final String DATA_INTEGRATION_VIDEO_URL = "https://youtu.be/zj0ZxjxHOAs?si=iVWJKeP1y6cUDFA-";
+    private static final String DATA_SLIDE_TITLE = "Slide Week 1";
+    private static final String DATA_SLIDE_TYPE = "SLIDE";
+    private static final String DATA_SLIDE_URL = "https://www.ibm.com/topics/data-integration";
+    private static final String DATA_READING_TITLE = "Reading: Data Integration";
+    private static final String DATA_READING_TYPE = "PDF";
+    private static final String DATA_READING_URL = "https://aws.amazon.com/what-is/etl/";
+
+    private final UserAccountRepository userAccountRepository;
+    private final CourseRepository courseRepository;
+    private final EnrollmentRepository enrollmentRepository;
+    private final LessonVideoRepository lessonVideoRepository;
+    private final CourseMaterialRepository courseMaterialRepository;
+    private final QuestionBankItemRepository questionBankItemRepository;
+    private final QuizRepository quizRepository;
+    private final QuestionRepository questionRepository;
+    private final PasswordEncoder passwordEncoder;
+    private final ObjectMapper objectMapper;
+
+    public DataSeeder(
+        UserAccountRepository userAccountRepository,
+        CourseRepository courseRepository,
+        EnrollmentRepository enrollmentRepository,
+        LessonVideoRepository lessonVideoRepository,
+        CourseMaterialRepository courseMaterialRepository,
+        QuestionBankItemRepository questionBankItemRepository,
+        QuizRepository quizRepository,
+        QuestionRepository questionRepository,
+        PasswordEncoder passwordEncoder,
+        ObjectMapper objectMapper
+    ) {
+        this.userAccountRepository = userAccountRepository;
+        this.courseRepository = courseRepository;
+        this.enrollmentRepository = enrollmentRepository;
+        this.lessonVideoRepository = lessonVideoRepository;
+        this.courseMaterialRepository = courseMaterialRepository;
+        this.questionBankItemRepository = questionBankItemRepository;
+        this.quizRepository = quizRepository;
+        this.questionRepository = questionRepository;
+        this.passwordEncoder = passwordEncoder;
+        this.objectMapper = objectMapper;
+    }
+
+    @Override
+    public void run(String... args) throws Exception {
+        UserAccount lecturer = userAccountRepository.findByEmail("lecturer@edusim.com")
+            .orElseGet(() -> createUser("Dr. Nadia Rahman", "lecturer@edusim.com", Role.LECTURER));
+        UserAccount student = userAccountRepository.findByEmail("student@edusim.com")
+            .orElseGet(() -> createUser("Aiman Hakim", "student@edusim.com", Role.STUDENT));
+
+        if (courseRepository.findByLecturerId(lecturer.getId()).isEmpty()) {
+            seedAcademicData(lecturer, student);
+        }
+
+        ensureDataIntegrationVideoLink();
+        ensureDataIntegrationMaterials();
+    }
+
+    private UserAccount createUser(String fullName, String email, Role role) {
+        UserAccount user = new UserAccount();
+        user.setFullName(fullName);
+        user.setEmail(email);
+        user.setRole(role);
+        user.setPasswordHash(passwordEncoder.encode("password123"));
+        return userAccountRepository.save(user);
+    }
+
+    private void seedAcademicData(UserAccount lecturer, UserAccount student) throws JsonProcessingException {
+        Course dataCourse = createCourse(
+            lecturer,
+            DATA_INTEGRATION_COURSE_TITLE,
+            "Concept, process, and tools for data integration architecture."
+        );
+        Course webCourse = createCourse(
+            lecturer,
+            "Web Application Development",
+            "Frontend and backend integration for real-world web systems."
+        );
+        Course dbCourse = createCourse(
+            lecturer,
+            "Database Management",
+            "Relational modeling, optimization, and transaction fundamentals."
+        );
+
+        enroll(student, dataCourse);
+        enroll(student, webCourse);
+        enroll(student, dbCourse);
+
+        LessonVideo video1 = createVideo(
+            dataCourse,
+            "Lesson 1: Integration Concepts",
+            "Understand ETL, ELT, and integration patterns.",
+            DATA_INTEGRATION_VIDEO_URL,
+            4,
+            1,
+            true
+        );
+        LessonVideo video2 = createVideo(
+            dataCourse,
+            "Lesson 2: Data Pipelines",
+            "Build reliable pipelines and orchestration flow.",
+            "https://www.youtube.com/watch?v=UZ7TVRjxa10",
+            22,
+            2,
+            true
+        );
+        createVideo(
+            dataCourse,
+            "Lesson 3: Practical Demo",
+            "Applying integration logic in a case study.",
+            "https://www.youtube.com/watch?v=ZrV6Lr6E3iY",
+            18,
+            3,
+            false
+        );
+
+        createMaterial(dataCourse, DATA_SLIDE_TITLE, DATA_SLIDE_TYPE, DATA_SLIDE_URL);
+        createMaterial(dataCourse, DATA_READING_TITLE, DATA_READING_TYPE, DATA_READING_URL);
+
+        QuestionBankItem q1 = createQuestion(
+            lecturer,
+            dataCourse,
+            QuestionType.MCQ,
+            "What is the main goal of ETL?",
+            List.of("To move and transform data", "To design UI", "To secure network", "To compile code"),
+            "To move and transform data",
+            1
+        );
+        QuestionBankItem q2 = createQuestion(
+            lecturer,
+            dataCourse,
+            QuestionType.TRUE_FALSE,
+            "Data warehouse is commonly used for analytics.",
+            List.of("True", "False"),
+            "True",
+            1
+        );
+        QuestionBankItem q3 = createQuestion(
+            lecturer,
+            dataCourse,
+            QuestionType.MULTI_SELECT,
+            "Select valid integration styles.",
+            List.of("Batch", "Streaming", "Drawing", "File Transfer"),
+            List.of("Batch", "Streaming"),
+            2
+        );
+        QuestionBankItem q4 = createQuestion(
+            lecturer,
+            dataCourse,
+            QuestionType.SHORT_ANSWER,
+            "What does API stand for?",
+            List.of(),
+            "application programming interface",
+            1
+        );
+        QuestionBankItem q5 = createQuestion(
+            lecturer,
+            dataCourse,
+            QuestionType.MATCHING,
+            "Match tool to function.",
+            Map.of(
+                "left", List.of("Kafka", "MySQL"),
+                "right", List.of("Streaming", "Relational Database")
+            ),
+            Map.of(
+                "Kafka", "Streaming",
+                "MySQL", "Relational Database"
+            ),
+            2
+        );
+
+        Quiz quiz = new Quiz();
+        quiz.setCourse(dataCourse);
+        quiz.setTitle("Quiz 1: Data Integration Concepts");
+        quiz.setDescription("This quiz covers key concepts from lesson videos and materials.");
+        quiz.setTimeLimitMinutes(10);
+        quiz.setMaxAttempts(2);
+        quiz.setPassingMark(50.0);
+        quiz.setPublished(true);
+        quiz.setUnlockAfterVideos(true);
+        quiz.setShuffleQuestions(false);
+        quiz.setShuffleAnswers(false);
+        quiz.setQuestionDisplayMode(QuizDisplayMode.ONE_BY_ONE);
+        quiz.setShowResultImmediately(true);
+        quizRepository.save(quiz);
+
+        saveQuizQuestion(quiz, q1, 1);
+        saveQuizQuestion(quiz, q2, 2);
+        saveQuizQuestion(quiz, q3, 3);
+        saveQuizQuestion(quiz, q4, 4);
+        saveQuizQuestion(quiz, q5, 5);
+    }
+
+    private void ensureDataIntegrationVideoLink() {
+        courseRepository.findAll().stream()
+            .filter(course -> DATA_INTEGRATION_COURSE_TITLE.equalsIgnoreCase(course.getTitle()))
+            .findFirst()
+            .ifPresent(course -> {
+                List<LessonVideo> videos = lessonVideoRepository.findByCourseIdOrderBySortOrder(course.getId());
+                if (videos.isEmpty()) {
+                    createVideo(
+                        course,
+                        "Lesson 1: Integration Concepts",
+                        "Understand ETL, ELT, and integration patterns.",
+                        DATA_INTEGRATION_VIDEO_URL,
+                        4,
+                        1,
+                        true
+                    );
+                    return;
+                }
+
+                LessonVideo firstVideo = videos.get(0);
+                if (!DATA_INTEGRATION_VIDEO_URL.equals(firstVideo.getVideoUrl()) || firstVideo.getDurationMinutes() != 4) {
+                    firstVideo.setVideoUrl(DATA_INTEGRATION_VIDEO_URL);
+                    firstVideo.setDurationMinutes(4);
+                    lessonVideoRepository.save(firstVideo);
+                }
+            });
+    }
+
+    private void ensureDataIntegrationMaterials() {
+        courseRepository.findAll().stream()
+            .filter(course -> DATA_INTEGRATION_COURSE_TITLE.equalsIgnoreCase(course.getTitle()))
+            .findFirst()
+            .ifPresent(course -> {
+                List<CourseMaterial> materials = courseMaterialRepository.findByCourseId(course.getId());
+                upsertMaterial(course, materials, DATA_SLIDE_TITLE, DATA_SLIDE_TYPE, DATA_SLIDE_URL);
+                upsertMaterial(course, materials, DATA_READING_TITLE, DATA_READING_TYPE, DATA_READING_URL);
+            });
+    }
+
+    private void upsertMaterial(
+        Course course,
+        List<CourseMaterial> materials,
+        String title,
+        String materialType,
+        String url
+    ) {
+        CourseMaterial existing = materials.stream()
+            .filter(material -> title.equalsIgnoreCase(material.getTitle()))
+            .findFirst()
+            .orElse(null);
+
+        if (existing == null) {
+            createMaterial(course, title, materialType, url);
+            return;
+        }
+
+        if (!materialType.equals(existing.getMaterialType()) || !url.equals(existing.getResourceUrl())) {
+            existing.setMaterialType(materialType);
+            existing.setResourceUrl(url);
+            courseMaterialRepository.save(existing);
+        }
+    }
+
+    private Course createCourse(UserAccount lecturer, String title, String description) {
+        Course course = new Course();
+        course.setLecturer(lecturer);
+        course.setTitle(title);
+        course.setDescription(description);
+        return courseRepository.save(course);
+    }
+
+    private void enroll(UserAccount student, Course course) {
+        if (!enrollmentRepository.existsByStudentIdAndCourseId(student.getId(), course.getId())) {
+            Enrollment enrollment = new Enrollment();
+            enrollment.setStudent(student);
+            enrollment.setCourse(course);
+            enrollmentRepository.save(enrollment);
+        }
+    }
+
+    private LessonVideo createVideo(
+        Course course,
+        String title,
+        String description,
+        String url,
+        int duration,
+        int order,
+        boolean mandatory
+    ) {
+        LessonVideo video = new LessonVideo();
+        video.setCourse(course);
+        video.setTitle(title);
+        video.setDescription(description);
+        video.setVideoUrl(url);
+        video.setDurationMinutes(duration);
+        video.setSortOrder(order);
+        video.setMandatory(mandatory);
+        return lessonVideoRepository.save(video);
+    }
+
+    private void createMaterial(Course course, String title, String type, String url) {
+        CourseMaterial material = new CourseMaterial();
+        material.setCourse(course);
+        material.setTitle(title);
+        material.setMaterialType(type);
+        material.setResourceUrl(url);
+        courseMaterialRepository.save(material);
+    }
+
+    private QuestionBankItem createQuestion(
+        UserAccount lecturer,
+        Course course,
+        QuestionType type,
+        String prompt,
+        Object options,
+        Object answer,
+        int points
+    ) throws JsonProcessingException {
+        QuestionBankItem item = new QuestionBankItem();
+        item.setCreator(lecturer);
+        item.setCourse(course);
+        item.setQuestionType(type);
+        item.setDifficultyLevel(DifficultyLevel.MEDIUM);
+        item.setTopicTag(course.getTitle());
+        item.setModuleTag(course.getTitle());
+        item.setPrompt(prompt);
+        item.setExplanation("Review core concept from lesson.");
+        item.setOptionsJson(objectMapper.writeValueAsString(options));
+        item.setCorrectAnswerJson(objectMapper.writeValueAsString(answer));
+        item.setPoints(points);
+        return questionBankItemRepository.save(item);
+    }
+
+    private void saveQuizQuestion(Quiz quiz, QuestionBankItem source, int sortOrder) {
+        Question question = new Question();
+        question.setQuiz(quiz);
+        question.setQuestionType(source.getQuestionType());
+        question.setPrompt(source.getPrompt());
+        question.setExplanation(source.getExplanation());
+        question.setOptionsJson(source.getOptionsJson());
+        question.setCorrectAnswerJson(source.getCorrectAnswerJson());
+        question.setPoints(source.getPoints());
+        question.setSortOrder(sortOrder);
+        questionRepository.save(question);
+    }
+}

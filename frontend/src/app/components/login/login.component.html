@@ -1,0 +1,84 @@
+<div class="login-shell">
+  <section class="login-layout">
+    <aside class="visual-panel">
+      <div class="visual-slider">
+        @for (slide of visualSlides; track slide.image; let i = $index) {
+          <img
+            class="slide-image"
+            [class.active]="i === currentSlideIndex"
+            [src]="slide.image"
+            [alt]="slide.alt">
+        }
+      </div>
+      <div class="visual-overlay">
+        <p>{{ visualSlides[currentSlideIndex].title }}</p>
+        <span>{{ visualSlides[currentSlideIndex].caption }}</span>
+        <div class="visual-dots">
+          @for (slide of visualSlides; track slide.image; let i = $index) {
+            <button
+              type="button"
+              [class.active]="i === currentSlideIndex"
+              aria-label="Show slide"
+              (click)="goToSlide(i)">
+            </button>
+          }
+        </div>
+      </div>
+    </aside>
+
+    <section class="auth-panel">
+      <div class="auth-inner">
+        <p class="kicker">EduSIM Access Portal</p>
+        <img class="brand-logo" src="assets/edusim-logo.svg" alt="EduSIM logo">
+        <h2>Sign in to your account</h2>
+        <p class="intro">
+          Educational Self-Instructional Material System (EduSIM) supports Open and Distance Learning through
+          interactive digital materials and self-assessment.
+        </p>
+
+        <form class="login-form" (ngSubmit)="submit()">
+          <div class="field-wrap">
+            <label for="email">Email</label>
+            <input id="email" name="email" type="email" autocomplete="username" [(ngModel)]="email" required>
+          </div>
+
+          <div class="field-wrap">
+            <label for="password">Password</label>
+            <input id="password" name="password" type="password" autocomplete="current-password" [(ngModel)]="password" required>
+          </div>
+
+          @if (errorMessage) {
+            <p class="error">{{ errorMessage }}</p>
+          }
+
+          <button class="btn login-btn" type="submit" [disabled]="isLoading">
+            {{ isLoading ? "Signing in..." : "Login" }}
+          </button>
+        </form>
+
+        <div class="extra-actions">
+          <a href="#" class="info-link" (click)="$event.preventDefault(); toggleAbout()">
+            {{ showAbout ? "Hide EduSIM Details" : "About EduSIM ODL System" }}
+          </a>
+        </div>
+
+        @if (showAbout) {
+          <div class="about-box">
+            <p>
+              Educational Self-Instructional Material System (EduSIM) is designed to support Open and Distance Learning
+              by providing an interactive digital platform for students to access learning materials and perform self-assessment.
+              The system improves the efficiency of self-directed learning through automatic marking, instant feedback,
+              and continuous progress tracking.
+            </p>
+          </div>
+        }
+
+        <div class="demo-box">
+          <p class="demo-title">Quick Demo Accounts</p>
+          <p><strong>Student:</strong> student&#64;edusim.com / password123</p>
+          <p><strong>Lecturer:</strong> lecturer&#64;edusim.com / password123</p>
+        </div>
+      </div>
+    </section>
+  </section>
+</div>

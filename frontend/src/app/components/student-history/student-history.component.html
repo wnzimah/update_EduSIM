@@ -1,0 +1,138 @@
+<div class="container history-shell">
+  @if (loading) {
+    <p>Loading attempt history...</p>
+  } @else if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+  } @else {
+    <section class="panel history-layout">
+      <section class="history-top">
+        <section class="profile-card">
+          <div class="avatar">{{ studentName().charAt(0) }}</div>
+          <div class="profile-meta">
+            <h2 [title]="studentName()">{{ studentName() }}</h2>
+            <p>{{ passRateLabel() }}</p>
+          </div>
+        </section>
+      </section>
+
+      <section class="history-main">
+        <div class="table-head">
+          <div>
+            <h1>My Quiz Attempts</h1>
+            <p>{{ attempts.length }} records</p>
+          </div>
+        </div>
+
+        @if (attempts.length === 0) {
+          <section class="empty-state">
+            <p class="muted">No quiz attempt yet.</p>
+          </section>
+        } @else {
+          <section class="attempt-table-wrap">
+            <table>
+              <thead>
+                <tr>
+                  <th>Quiz Title</th>
+                  <th>Attempt</th>
+                  <th>Submitted</th>
+                  <th>Score</th>
+                  <th>Result</th>
+                  <th>Details</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (attempt of attempts; track attempt.attemptId) {
+                  <tr>
+                    <td>
+                      <strong>{{ attempt.quizTitle }}</strong>
+                      <div class="muted">{{ attempt.courseTitle }}</div>
+                    </td>
+                    <td>#{{ attempt.attemptNumber }}</td>
+                    <td>{{ attempt.submittedAt | date: "medium" }}</td>
+                    <td>{{ attempt.resultReleased === false ? "-" : attempt.score }}</td>
+                    <td>
+                      @if (attempt.resultReleased === false) {
+                        <span class="badge warn">Pending</span>
+                      } @else {
+                        <span class="badge" [class.fail]="!attempt.passed">
+                          {{ attempt.passed ? "Pass" : "Fail" }}
+                        </span>
+                      }
+                    </td>
+                    <td>
+                      <button class="btn action-btn" type="button" (click)="openResult(attempt.attemptId)">
+                        Details
+                      </button>
+                    </td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          </section>
+        }
+
+        @if (selectedResult) {
+          <section class="result-detail">
+            <div class="detail-head">
+              <div>
+                <h2>{{ selectedResult.summary.quizTitle }}</h2>
+                <p class="muted">Feedback: {{ selectedResult.summary.feedback }}</p>
+                @if (selectedResult.summary.feedbackViewedAt) {
+                  <p class="muted">Last viewed: {{ selectedResult.summary.feedbackViewedAt | date: "medium" }}</p>
+                }
+                <div class="detail-stats">
+                  <span>Score: {{ selectedResult.summary.resultReleased === false ? "-" : (selectedResult.summary.score + "%") }}</span>
+                  <span>Time taken: {{ selectedResult.summary.durationSeconds || 0 }}s</span>
+                  <span>Submitted: {{ selectedResult.summary.submittedAt | date: "medium" }}</span>
+                </div>
+              </div>
+              @if (selectedResult.resultReleased !== false) {
+                <button class="btn btn-outline" type="button" (click)="downloadReport()">Download Score Report</button>
+              }
+            </div>
+
+            @if (selectedResult.resultReleased === false) {
+              <p class="muted">Result will be available after release time.</p>
+              @if (selectedResult.releaseAt) {
+                <p class="muted">Release time: {{ selectedResult.releaseAt | date: "medium" }}</p>
+              }
+            } @else {
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Question</th>
+                      <th>Type</th>
+                      <th>Your Answer</th>
+                      <th>Correct Answer</th>
+                      <th>Explanation</th>
+                      <th>Status</th>
+                      <th>Points</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (answer of selectedResult.answers; track answer.questionId) {
+                      <tr [class.success-row]="answer.correct" [class.warn-row]="!answer.correct">
+                        <td>{{ answer.prompt }}</td>
+                        <td>{{ answer.questionType }}</td>
+                        <td>{{ formatAnswer(answer.studentAnswer) }}</td>
+                        <td>{{ formatAnswer(answer.correctAnswer) }}</td>
+                        <td>{{ answer.explanation || "-" }}</td>
+                        <td>
+                          <span class="badge" [class.fail]="!answer.correct">
+                            {{ answer.correct ? "Yes" : "No" }}
+                          </span>
+                        </td>
+                        <td>{{ answer.awardedPoints }} / {{ answer.maxPoints }}</td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            }
+          </section>
+        }
+      </section>
+    </section>
+  }
+</div>

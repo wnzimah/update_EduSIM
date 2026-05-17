@@ -1,0 +1,981 @@
+<div class="container quiz-page">
+  <section class="style-hero panel">
+    <div class="style-hero-main">
+      <div class="style-hero-copy">
+        <h2>{{ quizForm.title.trim() || "Quiz Name" }}</h2>
+      </div>
+      <div class="style-hero-image"></div>
+    </div>
+  </section>
+
+  <section class="workspace-tabs-shell panel">
+    <nav class="workspace-tabs" aria-label="Quiz workspace tabs">
+      <a [routerLink]="['/lecturer/manage']" [queryParams]="tabQueryParams()">My Course</a>
+      <a [routerLink]="['/lecturer/quiz-overview']" [queryParams]="tabQueryParams()" [class.active]="isQuizMode() || isResultsMode()">Quiz</a>
+      <a [routerLink]="['/lecturer/quiz-settings']" [queryParams]="tabQueryParams()" [class.active]="isSettingsMode()">Settings</a>
+      <a [routerLink]="['/lecturer/quiz-builder']" [queryParams]="tabQueryParams()" [class.active]="isQuestionsMode()">Questions</a>
+      <a [routerLink]="['/lecturer/question-bank']" [queryParams]="tabQueryParams()" [class.active]="isBankMode()">Question Bank</a>
+    </nav>
+  </section>
+
+  <section class="course-filter-shell panel">
+    <div class="course-pick compact-pick">
+      <label for="courseId">Course</label>
+      <select id="courseId" [ngModel]="selectedCourseId ?? ''" (ngModelChange)="onCourseChange($event)" name="courseId">
+        <option value="">Select course</option>
+        @for (course of courses; track course.courseId) {
+          <option [value]="course.courseId">{{ course.title }}</option>
+        }
+      </select>
+    </div>
+    @if (selectedCourseId && currentCourseTitle()) {
+      <p class="selected-course-pill">
+        Selected course:
+        <strong>{{ currentCourseTitle() }}</strong>
+      </p>
+    }
+  </section>
+
+  @if (statusMessage) {
+    <p class="toast toast-ok">{{ statusMessage }}</p>
+  }
+  @if (errorMessage) {
+    <p class="toast toast-error">{{ errorMessage }}</p>
+  }
+  @if (showSuccessPopup) {
+    <div class="success-popup-backdrop" (click)="closeSuccessPopup()">
+      <section class="success-popup" (click)="$event.stopPropagation()">
+        <h3>Success</h3>
+        <p>{{ successPopupMessage }}</p>
+        <button type="button" class="btn btn-action" (click)="closeSuccessPopup()">OK</button>
+      </section>
+    </div>
+  }
+
+  @if (isBankMode()) {
+    <section class="published-block question-bank-filters-card">
+      <header>
+        <h2>Question Bank Filters</h2>
+        <span>{{ questionBank.length }} question(s)</span>
+      </header>
+      <div class="filter-grid">
+        <div class="field-block">
+          <label>Topic / Module</label>
+          <input [(ngModel)]="questionFilters.topicTag" name="topicFilter" placeholder="Data Integration">
+        </div>
+        <div class="field-block">
+          <label>Difficulty</label>
+          <select [(ngModel)]="questionFilters.difficultyLevel" name="difficultyFilter">
+            <option value="">All</option>
+            @for (level of difficultyLevels; track level.value) {
+              <option [value]="level.value">{{ level.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="field-block">
+          <label>Type</label>
+          <select [(ngModel)]="questionFilters.questionType" name="typeFilter">
+            <option value="">All</option>
+            @for (type of questionTypes; track type.value) {
+              <option [value]="type.value">{{ type.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="field-block">
+          <label>Search</label>
+          <input [(ngModel)]="questionFilters.search" name="searchFilter" placeholder="keyword">
+        </div>
+        <div class="field-block">
+          <label>Created From</label>
+          <input type="date" [(ngModel)]="questionFilters.createdFrom" name="createdFrom">
+        </div>
+        <div class="field-block">
+          <label>Created To</label>
+          <input type="date" [(ngModel)]="questionFilters.createdTo" name="createdTo">
+        </div>
+      </div>
+      <div class="filter-actions">
+        <button class="btn btn-action" type="button" (click)="applyQuestionFilters()">Apply Filter</button>
+        <button class="btn btn-outline" type="button" (click)="resetQuestionFilters()">Reset</button>
+      </div>
+    </section>
+  }
+
+  @if (isQuestionsMode()) {
+    <section class="studio-layout settings-layout">
+      <section class="main-editor">
+        <div class="editor-card">
+          <div class="field-block">
+            <label for="quizTitle">Name *</label>
+            <input id="quizTitle" name="quizTitle" [(ngModel)]="quizForm.title" placeholder="Unit Quiz">
+          </div>
+
+          <div class="field-block">
+            <label for="description">Instructions / Description</label>
+            <textarea
+              id="description"
+              name="description"
+              rows="2"
+              [(ngModel)]="quizForm.description"
+              placeholder="This quiz covers key topics from the lesson.">
+            </textarea>
+          </div>
+
+          <div class="split-row">
+            <div class="field-block compact">
+              <label for="gradeOutQuestions">Grade Out Of</label>
+              <div class="inline-group">
+                <input id="gradeOutQuestions" name="gradeOutQuestions" type="number" min="1" [(ngModel)]="quizForm.gradeOut">
+                <span>points</span>
+              </div>
+            </div>
+
+            <div class="field-block compact">
+              <label>Due Date / Time</label>
+              <div class="inline-group due">
+                <input type="date" [(ngModel)]="quizForm.closeDate" name="closeDateQuestions">
+                <input type="time" [(ngModel)]="quizForm.closeTime" name="closeTimeQuestions">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <section class="questions-editor">
+          <header class="questions-head moodle-questions-head">
+            <div>
+              <h2>Questions</h2>
+              <p class="moodle-subline">Questions: {{ selectedQuestionIds.length }} | {{ quizForm.published ? "This quiz is open" : "Draft mode" }}</p>
+            </div>
+            <div class="grade-box">
+              <label>Maximum grade</label>
+              <div class="grade-inline">
+                <input type="number" min="1" [(ngModel)]="quizForm.gradeOut" name="maximumGradeQuestion">
+                <button class="btn btn-outline" type="button" (click)="saveMaximumGrade()">Save</button>
+              </div>
+              <p>Total of marks: {{ totalSelectedPoints() | number : "1.2-2" }}</p>
+            </div>
+          </header>
+
+          <div class="question-actions moodle-actions">
+            <div class="moodle-right-actions">
+              <button class="btn btn-outline" type="button" (click)="repaginateSelectedQuestions()">Repaginate</button>
+              <button class="btn btn-outline" type="button" (click)="toggleBulkSelectionMode()">
+                {{ bulkSelectionMode ? "Disable multi select" : "Select multiple items" }}
+              </button>
+            </div>
+            <div class="moodle-right-actions">
+              <label class="check-row">
+                <input type="checkbox" [(ngModel)]="quizForm.shuffleQuestions" name="shuffleQuestionOrder">
+                Shuffle
+              </label>
+              <button class="btn btn-action" type="button" (click)="openQuestionLibrary()">Add Existing</button>
+              <div class="create-wrap" #createWrap (click)="$event.stopPropagation()">
+                <button class="btn btn-secondary" type="button" (click)="openTypeMenu($event)">
+                  Create New
+                  <span class="arrow" [class.open]="showTypeMenu" aria-hidden="true"></span>
+                </button>
+
+                @if (showTypeMenu) {
+                  <div class="type-menu">
+                    @for (type of questionTypes; track type.value) {
+                      <button type="button" (click)="openCreateModal(type.value)">{{ type.menuLabel }}</button>
+                    }
+                  </div>
+                }
+              </div>
+            </div>
+          </div>
+
+          @if (selectedQuestions().length === 0) {
+            <div class="empty-state">
+              <p class="title">Ready to begin adding quiz content?</p>
+              <p>Click Add Existing or Create New to get started.</p>
+            </div>
+          } @else {
+            <ul class="moodle-question-list">
+              @for (item of selectedQuestions(); track item.questionBankId; let i = $index) {
+                <li>
+                  <div class="drag-col">
+                    <button class="mini-icon" type="button" [disabled]="i === 0" (click)="moveSelectedQuestion(item.questionBankId, -1)">&#8593;</button>
+                    <button class="mini-icon" type="button" [disabled]="i === selectedQuestions().length - 1" (click)="moveSelectedQuestion(item.questionBankId, 1)">&#8595;</button>
+                  </div>
+                  <div class="idx-col">{{ i + 1 }}</div>
+                  <div class="question-col">
+                    <p class="selected-title">{{ item.prompt }}</p>
+                    <p class="selected-meta">{{ questionTypeLabel(item.questionType) }} | {{ item.topicTag || "-" }}</p>
+                  </div>
+                  <div class="bank-col">
+                    <span class="bank-pill">{{ item.moduleTag || "Question bank" }}</span>
+                  </div>
+                  <div class="version-col">
+                    <select>
+                      <option>Always latest</option>
+                    </select>
+                  </div>
+                  <div class="table-actions compact">
+                    <button class="mini-icon" type="button" (click)="openEditQuestion(item)">&#9998;</button>
+                    <button class="mini-icon" type="button" (click)="removeSelectedQuestion(item.questionBankId)">&#128465;</button>
+                  </div>
+                  <div class="points-col">
+                    {{ (item.points ?? 1) | number : "1.2-2" }}
+                  </div>
+                </li>
+              }
+            </ul>
+            <div class="add-bottom">
+              <button class="btn btn-outline" type="button" (click)="openQuestionLibrary()">Add</button>
+            </div>
+          }
+        </section>
+
+        <footer class="editor-footer">
+          <button class="btn btn-action" type="button" [disabled]="savingQuiz" (click)="createQuiz(true)">
+            {{ savingQuiz ? "Saving..." : "Save and Close" }}
+          </button>
+          <button class="btn btn-outline" type="button" [disabled]="savingQuiz" (click)="createQuiz(false)">
+            Save
+          </button>
+          <button class="btn btn-outline" type="button" [disabled]="savingQuiz" (click)="cancelDraft()">
+            Cancel
+          </button>
+          <label class="visibility-toggle">
+            <input type="checkbox" name="publishedQuestions" [(ngModel)]="quizForm.published">
+            Visibility
+          </label>
+        </footer>
+      </section>
+
+    </section>
+  }
+
+  @if (isSettingsMode()) {
+    <section class="studio-layout settings-layout">
+      <section class="main-editor settings-editor">
+        <section class="settings-accordion">
+          <article class="settings-accordion-item" id="quiz-general-section">
+            <button class="settings-accordion-toggle" type="button" (click)="toggleSettingsSection('general')">
+              <span class="accordion-arrow" [class.open]="isSettingsSectionOpen('general')" aria-hidden="true"></span>
+              <span>General</span>
+            </button>
+            @if (isSettingsSectionOpen('general')) {
+              <div class="settings-accordion-content">
+                <div class="field-block">
+                  <label for="quizTitleSettings">Quiz Name *</label>
+                  <input id="quizTitleSettings" name="quizTitleSettings" [(ngModel)]="quizForm.title" placeholder="Unit Quiz">
+                </div>
+
+                <div class="split-row">
+                  <div class="field-block compact">
+                    <label for="gradeOutSettings">Grade Out Of</label>
+                    <div class="inline-group">
+                      <input id="gradeOutSettings" name="gradeOutSettings" type="number" min="1" [(ngModel)]="quizForm.gradeOut">
+                      <span>points</span>
+                    </div>
+                  </div>
+                  <div class="field-block compact">
+                    <label>Open Date / Time</label>
+                    <div class="inline-group due">
+                      <input type="date" [(ngModel)]="quizForm.openDate" name="openDateSettings">
+                      <input type="time" [(ngModel)]="quizForm.openTime" name="openTimeSettings">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="field-block compact">
+                  <label>Close Date / Time</label>
+                  <div class="inline-group due">
+                    <input type="date" [(ngModel)]="quizForm.closeDate" name="closeDateSettings">
+                    <input type="time" [(ngModel)]="quizForm.closeTime" name="closeTimeSettings">
+                  </div>
+                </div>
+
+                <div class="field-block">
+                  <label for="quizDescriptionSettings">Description / Instructions</label>
+                  <textarea
+                    id="quizDescriptionSettings"
+                    name="quizDescriptionSettings"
+                    rows="4"
+                    [(ngModel)]="quizForm.description"
+                    placeholder="This quiz covers key topics from the lesson.">
+                  </textarea>
+                </div>
+              </div>
+            }
+          </article>
+
+          <article class="settings-accordion-item" id="quiz-timing-section">
+            <button class="settings-accordion-toggle" type="button" (click)="toggleSettingsSection('timing')">
+              <span class="accordion-arrow" [class.open]="isSettingsSectionOpen('timing')" aria-hidden="true"></span>
+              <span>Timing</span>
+            </button>
+            @if (isSettingsSectionOpen('timing')) {
+              <div class="settings-accordion-content">
+                <div class="split-row">
+                  <div class="field-block compact">
+                    <label>Time limit (minutes)</label>
+                    <input type="number" min="1" [(ngModel)]="quizForm.timeLimitMinutes" name="timeLimitSettings">
+                  </div>
+                  <div class="field-block compact">
+                    <label>Attempts allowed</label>
+                    <input type="number" min="1" [(ngModel)]="quizForm.maxAttempts" name="maxAttemptsSettings">
+                  </div>
+                </div>
+
+                <div class="field-block compact">
+                  <label>Question display mode</label>
+                  <select [(ngModel)]="quizForm.questionDisplayMode" name="questionDisplayModeSettings">
+                    <option value="ONE_BY_ONE">One by one</option>
+                    <option value="ALL_AT_ONCE">All at once</option>
+                  </select>
+                </div>
+
+                <label class="check-row">
+                  <input type="checkbox" [(ngModel)]="quizForm.shuffleQuestions" name="shuffleQuestionsSettings">
+                  Shuffle question order
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" [(ngModel)]="quizForm.shuffleAnswers" name="shuffleAnswersSettings">
+                  Shuffle answer options
+                </label>
+                <label class="check-row">
+                  <input type="checkbox" [(ngModel)]="quizForm.unlockAfterVideos" name="unlockAfterVideosSettings">
+                  Lock until mandatory videos complete
+                </label>
+              </div>
+            }
+          </article>
+
+          <article class="settings-accordion-item" id="quiz-grade-section">
+            <button class="settings-accordion-toggle" type="button" (click)="toggleSettingsSection('grade')">
+              <span class="accordion-arrow" [class.open]="isSettingsSectionOpen('grade')" aria-hidden="true"></span>
+              <span>Grade</span>
+            </button>
+            @if (isSettingsSectionOpen('grade')) {
+              <div class="settings-accordion-content">
+                <div class="field-block compact">
+                  <label>Pass mark (%)</label>
+                  <input type="number" min="0" max="100" [(ngModel)]="quizForm.passingMark" name="passingMarkSettings">
+                </div>
+
+                <div class="field-block compact">
+                  <label>Result release option</label>
+                  <div class="release-option-row">
+                    <label class="radio-row">
+                      <input
+                        type="radio"
+                        name="resultReleaseOptionSettings"
+                        [checked]="quizForm.showResultImmediately"
+                        (change)="setResultReleaseMode(true)">
+                      Immediate
+                    </label>
+                    <label class="radio-row">
+                      <input
+                        type="radio"
+                        name="resultReleaseOptionSettings"
+                        [checked]="!quizForm.showResultImmediately"
+                        (change)="setResultReleaseMode(false)">
+                      Until date
+                    </label>
+                  </div>
+                </div>
+
+                @if (!quizForm.showResultImmediately) {
+                  <div class="split-row">
+                    <div class="field-block compact">
+                      <label>Date to release mark</label>
+                      <input type="date" [(ngModel)]="quizForm.resultReleaseDate" name="resultReleaseDateSettings">
+                    </div>
+                    <div class="field-block compact">
+                      <label>Time to release mark</label>
+                      <input type="time" [(ngModel)]="quizForm.resultReleaseTime" name="resultReleaseTimeSettings">
+                    </div>
+                  </div>
+                }
+              </div>
+            }
+          </article>
+        </section>
+
+        <footer class="editor-footer settings-flow-actions">
+          <button class="btn btn-action" type="button" [disabled]="savingQuiz" (click)="createQuiz(true)">
+            {{ savingQuiz ? "Saving..." : "Save and return to course" }}
+          </button>
+          <button class="btn btn-outline" type="button" [disabled]="savingQuiz" (click)="createQuizAndDisplay()">
+            Save and open Questions
+          </button>
+          <button class="btn btn-outline" type="button" [disabled]="savingQuiz" (click)="cancelDraft()">Cancel</button>
+        </footer>
+
+      </section>
+    </section>
+  }
+
+  @if (isResultsMode() || isQuizMode()) {
+    <section class="published-block">
+      <header>
+        <h2>Quiz List & Publish</h2>
+        <span>{{ quizzes.length }} quiz(s)</span>
+      </header>
+
+      @if (quizListError) {
+        <p class="error">{{ quizListError }}</p>
+      }
+
+      @if (quizzes.length === 0) {
+        <p class="muted">No quiz in selected course.</p>
+      } @else {
+        <div class="quiz-table-wrap">
+          <table class="quiz-table">
+            <thead>
+              <tr>
+                <th>Quiz</th>
+                <th>Due date</th>
+                <th class="num-col">Time</th>
+                <th class="num-col">Attempts</th>
+                <th class="num-col">Pass</th>
+                <th>Result release</th>
+                <th class="num-col">Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+            @for (quiz of quizzes; track quiz.quizId) {
+              <tr class="quiz-row">
+                <td>
+                  <div class="quiz-cell">
+                    <p class="quiz-title">{{ quiz.title }}</p>
+                    <p class="quiz-sub">{{ quiz.description || "No description set." }}</p>
+                  </div>
+                </td>
+                <td>
+                  <div class="quiz-due">
+                    <span>{{ quiz.closeAt ? (quiz.closeAt | date : "mediumDate") : "Not set" }}</span>
+                    @if (quiz.closeAt) {
+                      <small>{{ quiz.closeAt | date : "shortTime" }}</small>
+                    }
+                  </div>
+                </td>
+                <td class="num-col">{{ quiz.timeLimitMinutes }} min</td>
+                <td class="num-col">{{ quiz.maxAttempts }}</td>
+                <td class="num-col">{{ quiz.passingMark }}%</td>
+                <td>
+                  @if (quiz.showResultImmediately) {
+                    <span class="release-badge immediate">Immediate</span>
+                  } @else {
+                    <span class="release-badge scheduled">Scheduled</span>
+                    <small class="release-time">{{ quiz.resultReleaseAt ? (quiz.resultReleaseAt | date : "medium") : "Not set" }}</small>
+                  }
+                </td>
+                <td class="num-col">
+                  <span class="status-badge" [class.draft]="!quiz.published" [class.published]="quiz.published">
+                    {{ quiz.published ? "Published" : "Draft" }}
+                  </span>
+                </td>
+                <td class="table-actions premium-actions">
+                  <button class="mini-link-btn" type="button" (click)="togglePublish(quiz.quizId, !quiz.published)">
+                    <span class="mini-action-icon">{{ quiz.published ? "◎" : "●" }}</span>
+                    <span>{{ quiz.published ? "Unpublish" : "Publish" }}</span>
+                  </button>
+                  <button class="mini-link-btn" type="button" title="Preview" aria-label="Preview" (click)="openQuizPreview(quiz.quizId)">
+                    <span class="mini-action-icon" aria-hidden="true">
+                      <svg class="mini-icon-svg" viewBox="0 0 24 24" focusable="false">
+                      <path d="M1 12s4-7 11-7 11 7 11 7-4 7-11 7S1 12 1 12Z"></path>
+                      <circle cx="12" cy="12" r="3"></circle>
+                      </svg>
+                    </span>
+                    <span>Preview</span>
+                  </button>
+                  <button class="mini-link-btn" type="button" (click)="duplicateQuiz(quiz.quizId)">
+                    <span class="mini-action-icon">⧉</span>
+                    <span>Duplicate</span>
+                  </button>
+                  <a
+                    class="mini-link-btn"
+                    routerLink="/lecturer/monitoring"
+                    [queryParams]="{ courseId: selectedCourseId ?? quiz.courseId, courseTitle: currentCourseTitle() || quiz.courseTitle, quizId: quiz.quizId }">
+                    <span class="mini-action-icon">↗</span>
+                    <span>Monitoring</span>
+                  </a>
+                  <button class="mini-link-btn danger" type="button" title="Delete quiz" aria-label="Delete quiz" (click)="deleteQuiz(quiz.quizId, quiz.title)">
+                    <span class="mini-action-icon" aria-hidden="true">
+                      <svg class="mini-icon-svg" viewBox="0 0 24 24" focusable="false">
+                      <path d="M3 6h18"></path>
+                      <path d="M8 6V4h8v2"></path>
+                      <path d="M6 6l1 14h10l1-14"></path>
+                      <path d="M10 10v7M14 10v7"></path>
+                      </svg>
+                    </span>
+                    <span>Delete</span>
+                  </button>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+        </div>
+      }
+    </section>
+  }
+
+  @if (isBankMode()) {
+    <section class="main-editor question-bank-main">
+      <div class="library-tools question-bank-tools">
+        <div class="tool-field">
+          <label>Select a category</label>
+          <select [(ngModel)]="questionBankView.category" name="questionBankCategory">
+            @for (category of categoryOptions(); track category.value) {
+              <option [value]="category.value">{{ category.label }}</option>
+            }
+          </select>
+        </div>
+        <div class="tool-field">
+          <label>Filter by tags</label>
+          <input [(ngModel)]="questionBankView.tagFilter" name="questionBankTag" placeholder="e.g. ETL">
+        </div>
+        <div class="tool-field">
+          <label>Show question text in list</label>
+          <select [(ngModel)]="questionBankView.showQuestionTextMode" name="questionTextMode">
+            @for (mode of questionTextModes; track mode.value) {
+              <option [value]="mode.value">{{ mode.label }}</option>
+            }
+          </select>
+        </div>
+      </div>
+
+      <div class="search-options-block">
+        <p>Search options</p>
+        <label class="check-row">
+          <input type="checkbox" [(ngModel)]="questionBankView.includeSubcategories" name="includeSubcategories">
+          Also show questions from subcategories
+        </label>
+        <label class="check-row">
+          <input type="checkbox" [(ngModel)]="questionBankView.includeOldQuestions" name="includeOldQuestions">
+          Also show old questions
+        </label>
+      </div>
+
+      <div class="library-tools bank-search-line">
+        <input type="text" name="librarySearch" placeholder="Search by question name or keyword..." [(ngModel)]="librarySearch">
+        <span class="count">{{ selectedCountLabel() }}</span>
+        <button type="button" class="btn btn-outline" (click)="openCreateQuestionQuick()">Create new question...</button>
+        <button type="button" class="btn btn-action" [disabled]="selectedQuestionIds.length === 0" (click)="useSelectedInQuizDraft()">
+          Use selected in quiz
+        </button>
+      </div>
+
+      <div class="bank-table-wrap">
+        <table class="bank-table">
+          <thead>
+            <tr>
+              <th>
+                <input
+                  type="checkbox"
+                  [checked]="isAllVisibleSelected()"
+                  (change)="toggleVisibleSelection($any($event.target).checked)">
+              </th>
+              <th>Question</th>
+              <th>Actions</th>
+              <th class="center-col">Status</th>
+              <th class="center-col">Version</th>
+              <th>Created by</th>
+              <th class="center-col">Comments</th>
+              <th class="center-col">Usage</th>
+              <th>Last used</th>
+              <th>Modified by</th>
+            </tr>
+          </thead>
+          <tbody>
+            @for (item of filteredQuestionBank(); track item.questionBankId) {
+              <tr [class.selected-row]="isSelected(item.questionBankId)">
+                <td>
+                  <input
+                    type="checkbox"
+                    [checked]="isSelected(item.questionBankId)"
+                    (change)="toggleQuestion(item.questionBankId, $any($event.target).checked)">
+                </td>
+                <td>
+                  <div class="question-cell">
+                    <p class="question-code">{{ item.questionCode || ('Q_' + item.questionBankId) }}</p>
+                    @if (showQuestionPrompt()) {
+                      <p class="question-text">{{ item.prompt }}</p>
+                    }
+                    @if (showQuestionMeta()) {
+                      <div class="question-meta-chips">
+                        <span>{{ questionTypeLabel(item.questionType) }}</span>
+                        <span>{{ item.topicTag || "-" }}</span>
+                        <span>{{ item.points || 1 }} point(s)</span>
+                      </div>
+                    }
+                  </div>
+                </td>
+                <td>
+                  <div class="table-actions compact premium-actions">
+                    <button class="mini-link-btn" type="button" (click)="openEditQuestion(item)">
+                      <span class="mini-action-icon">✎</span>
+                      <span>Edit</span>
+                    </button>
+                    <button class="mini-link-btn danger" type="button" (click)="deleteQuestion(item.questionBankId)">
+                      <span class="mini-action-icon">✕</span>
+                      <span>Delete</span>
+                    </button>
+                    <button class="mini-link-btn" type="button" (click)="toggleQuestion(item.questionBankId, !isSelected(item.questionBankId))">
+                      <span class="mini-action-icon">{{ isSelected(item.questionBankId) ? "−" : "+" }}</span>
+                      <span>{{ isSelected(item.questionBankId) ? "Remove" : "Add" }}</span>
+                    </button>
+                  </div>
+                </td>
+                <td class="center-col">
+                  <span
+                    class="bank-status-badge"
+                    [class.ready]="(item.status || 'Ready').toLowerCase() === 'ready'"
+                    [class.draft]="(item.status || '').toLowerCase() === 'draft'"
+                    [class.archived]="(item.status || '').toLowerCase() === 'archived'">
+                    {{ item.status || "Ready" }}
+                  </span>
+                </td>
+                <td class="center-col">v{{ item.version ?? 1 }}</td>
+                <td>
+                  <div class="meta-cell">
+                    <span>{{ item.createdBy || "Lecturer" }}</span>
+                    <small>{{ item.createdAt ? (item.createdAt | date : "medium") : "-" }}</small>
+                  </div>
+                </td>
+                <td class="center-col">{{ item.commentCount ?? 0 }}</td>
+                <td class="center-col">{{ item.usageCount ?? 0 }}</td>
+                <td>{{ item.lastUsedAt ? (item.lastUsedAt | date : "mediumDate") : "Never" }}</td>
+                <td>
+                  <div class="meta-cell">
+                    <span>{{ item.modifiedBy || (item.createdBy || "Lecturer") }}</span>
+                    <small>{{ item.updatedAt ? (item.updatedAt | date : "medium") : "-" }}</small>
+                  </div>
+                </td>
+              </tr>
+            }
+          </tbody>
+        </table>
+
+        @if (filteredQuestionBank().length === 0) {
+          <div class="empty-state">
+            <p class="title">No question found</p>
+            <p>Try changing filters or create a new question.</p>
+          </div>
+        }
+      </div>
+    </section>
+  }
+
+  @if (showCreateModal) {
+    <div class="modal-backdrop" (click)="closeCreateModal()">
+      <section class="modal-shell question-modal" (click)="$event.stopPropagation()">
+        <header class="modal-head">
+          <h2>{{ editingQuestionId ? "Edit" : "New" }} {{ questionTypeLabel(questionForm.questionType) }} Question</h2>
+          <button type="button" class="close-btn" (click)="closeCreateModal()">&#10005;</button>
+        </header>
+
+        <div class="modal-body">
+          <form class="modal-form modern-question-form" (ngSubmit)="saveQuestion()">
+            <section class="question-meta-grid">
+              <div class="field-block type-selector-block">
+                <label>Question Type</label>
+                <div class="question-type-strip">
+                  @for (type of questionTypeCardsUi; track type.value) {
+                    <button
+                      type="button"
+                      class="question-type-card"
+                      [class.active]="questionForm.questionType === type.value"
+                      [attr.aria-pressed]="questionForm.questionType === type.value ? 'true' : 'false'"
+                      (click)="setQuestionType(type.value)">
+                      <span class="question-type-icon">{{ type.icon }}</span>
+                      <span class="question-type-label">{{ type.shortLabel }}</span>
+                    </button>
+                  }
+                </div>
+              </div>
+
+              <div class="field-block">
+                <label>Topics Covered</label>
+                <input [(ngModel)]="questionForm.topicTag" name="topicTag" placeholder="e.g. Algebra - Geometry" required>
+              </div>
+
+              <div class="field-block">
+                <label>Grade</label>
+                <select [(ngModel)]="questionForm.difficultyLevel" name="difficultyLevel">
+                  @for (level of difficultyLevels; track level.value) {
+                    <option [value]="level.value">{{ level.label }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="field-block">
+                <label>Textbook / Module</label>
+                <input [(ngModel)]="questionForm.moduleTag" name="moduleTag" placeholder="Module reference">
+              </div>
+            </section>
+
+            <section class="question-editor-block">
+              <h4>Question</h4>
+              <div class="editor-row">
+                <select class="editor-font" name="questionEditorFont">
+                  <option>Aeonik</option>
+                  <option>Inter</option>
+                  <option>Manrope</option>
+                </select>
+                <div class="editor-tools">
+                  <button type="button" class="tool-btn" title="Bold" (click)="applyPromptTool('BOLD')">B</button>
+                  <button type="button" class="tool-btn" title="Italic" (click)="applyPromptTool('ITALIC')"><em>I</em></button>
+                  <button type="button" class="tool-btn" title="Heading" (click)="applyPromptTool('HEADING')">H</button>
+                  <button type="button" class="tool-btn" title="Quote" (click)="applyPromptTool('QUOTE')">&#8221;</button>
+                  <button type="button" class="tool-btn tool-icon" title="Insert Link" (click)="applyPromptTool('LINK')">&#128279;</button>
+                  <button type="button" class="tool-btn tool-icon" title="Insert Image" (click)="applyPromptTool('IMAGE')">&#128247;</button>
+                  <button type="button" class="tool-btn" title="Bulleted List" (click)="applyPromptTool('BULLET_LIST')">&#8801;</button>
+                  <button type="button" class="tool-btn" title="Numbered List" (click)="applyPromptTool('NUMBER_LIST')">&#9776;</button>
+                </div>
+                <button type="button" class="btn btn-action btn-mini" (click)="openAddElementPanel()">Add Element</button>
+              </div>
+              <textarea
+                id="questionPromptEditor"
+                rows="6"
+                [(ngModel)]="questionForm.prompt"
+                name="prompt"
+                placeholder="Type your question..."
+                required>
+              </textarea>
+            </section>
+
+            @if (questionForm.questionType === "MCQ" || questionForm.questionType === "MULTI_SELECT") {
+              <section class="choice-section">
+                <div class="choice-grid">
+                  @for (option of questionForm.options; track $index; let i = $index) {
+                    <article class="choice-card">
+                      <label class="choice-label">
+                        @if (questionForm.questionType === "MCQ") {
+                          <input
+                            type="radio"
+                            name="mcqCorrect"
+                            [checked]="questionForm.options[i].correct"
+                            (change)="setSingleCorrect(i)">
+                        } @else {
+                          <input
+                            type="checkbox"
+                            [checked]="questionForm.options[i].correct"
+                            (change)="setMultiCorrect(i, $any($event.target).checked)">
+                        }
+                        <span>Choice {{ i + 1 }}</span>
+                      </label>
+                      <div class="editor-row compact">
+                        <select class="editor-font" [name]="'choiceEditorFont' + i">
+                          <option>Aeonik</option>
+                          <option>Inter</option>
+                          <option>Manrope</option>
+                        </select>
+                        <div class="editor-tools">
+                          <button type="button" class="tool-btn" title="Bold" (click)="applyOptionTool(i, 'BOLD')">B</button>
+                          <button type="button" class="tool-btn" title="Italic" (click)="applyOptionTool(i, 'ITALIC')"><em>I</em></button>
+                          <button type="button" class="tool-btn" title="Heading" (click)="applyOptionTool(i, 'HEADING')">H</button>
+                          <button type="button" class="tool-btn" title="Quote" (click)="applyOptionTool(i, 'QUOTE')">&#8221;</button>
+                          <button type="button" class="tool-btn tool-icon" title="Insert Link" (click)="applyOptionTool(i, 'LINK')">&#128279;</button>
+                          <button type="button" class="tool-btn tool-icon" title="Insert Image" (click)="applyOptionTool(i, 'IMAGE')">&#128247;</button>
+                          <button type="button" class="tool-btn" title="Bulleted List" (click)="applyOptionTool(i, 'BULLET_LIST')">&#8801;</button>
+                          <button type="button" class="tool-btn" title="Numbered List" (click)="applyOptionTool(i, 'NUMBER_LIST')">&#9776;</button>
+                        </div>
+                      </div>
+                      <textarea
+                        [id]="'choiceEditor-' + i"
+                        [name]="'option' + i"
+                        [(ngModel)]="questionForm.options[i].text"
+                        placeholder="Type answer choice..."
+                        rows="3"
+                        required>
+                      </textarea>
+                      <div class="choice-actions">
+                        <button type="button" class="mini-link" (click)="removeOption(i)">Remove choice</button>
+                      </div>
+                    </article>
+                  }
+                </div>
+                <button type="button" class="btn btn-outline" (click)="addOption()">Add Choice</button>
+              </section>
+            }
+
+            <section class="question-extra-grid">
+              <div class="field-block">
+                <label>Explanation (optional)</label>
+                <textarea rows="3" [(ngModel)]="questionForm.explanation" name="explanation"></textarea>
+              </div>
+              <div class="matching-columns">
+                <div class="field-block">
+                  <label>Media Type</label>
+                  <select [(ngModel)]="questionForm.mediaType" name="mediaType">
+                    @for (type of mediaTypes; track type.value) {
+                      <option [value]="type.value">{{ type.label }}</option>
+                    }
+                  </select>
+                </div>
+                <div class="field-block">
+                  <label>Media URL</label>
+                  <input id="questionMediaUrl" [(ngModel)]="questionForm.mediaUrl" name="mediaUrl" placeholder="https://...">
+                </div>
+              </div>
+            </section>
+
+            @if (questionForm.questionType === "TRUE_FALSE") {
+              <div class="field-block">
+                <label>Correct Answer</label>
+                <div class="inline-pick">
+                  <label class="inline-check"><input type="radio" name="tfCorrect" value="True" [(ngModel)]="questionForm.trueFalseCorrect">True</label>
+                  <label class="inline-check"><input type="radio" name="tfCorrect" value="False" [(ngModel)]="questionForm.trueFalseCorrect">False</label>
+                </div>
+              </div>
+            }
+
+            @if (questionForm.questionType === "SHORT_ANSWER") {
+              <div class="field-block">
+                <label>Expected Answer</label>
+                <input [(ngModel)]="questionForm.shortAnswer" name="shortAnswer" required>
+              </div>
+              <div class="field-block">
+                <label>Keywords (comma separated)</label>
+                <input [(ngModel)]="questionForm.shortAnswerKeywords" name="shortAnswerKeywords" placeholder="etl, transform, load">
+              </div>
+            }
+
+            @if (questionForm.questionType === "MATCHING") {
+              <section class="matching-setup">
+                <h4>Question Setup</h4>
+                <div class="matching-columns">
+                  <div class="field-block">
+                    <label>Prompts</label>
+                    @for (prompt of questionForm.matchingPrompts; track $index; let i = $index) {
+                      <div class="matching-row">
+                        <input [name]="'prompt' + i" [placeholder]="'Prompt ' + (i + 1)" [(ngModel)]="questionForm.matchingPrompts[i]">
+                        <button type="button" class="remove-answer" (click)="removeMatchingPrompt(i)">&#10005;</button>
+                      </div>
+                    }
+                    <button type="button" class="mini-link" (click)="addMatchingPrompt()">+ Prompt</button>
+                  </div>
+                  <div class="field-block">
+                    <label>Possible Answers</label>
+                    @for (item of questionForm.matchingOptions; track $index; let i = $index) {
+                      <div class="matching-row">
+                        <input [name]="'possible' + i" [placeholder]="'Possible answer ' + (i + 1)" [(ngModel)]="questionForm.matchingOptions[i]">
+                        <button type="button" class="remove-answer" (click)="removeMatchingOption(i)">&#10005;</button>
+                      </div>
+                    }
+                    <button type="button" class="mini-link" (click)="addMatchingOption()">+ Option</button>
+                  </div>
+                </div>
+                <div class="matching-correct">
+                  <h4>Correct Answer Setup</h4>
+                  @for (prompt of questionForm.matchingPrompts; track $index; let i = $index) {
+                    @if (prompt.trim()) {
+                      <div class="match-map-row">
+                        <span>{{ prompt }}</span>
+                        <select [name]="'correct' + i" [(ngModel)]="questionForm.matchingCorrect[i]">
+                          <option value="">Select answer</option>
+                          @for (choice of matchingOptionChoices(); track choice) {
+                            <option [value]="choice">{{ choice }}</option>
+                          }
+                        </select>
+                      </div>
+                    }
+                  }
+                </div>
+                <div class="matching-extra">
+                  <label class="check-row">
+                    <input type="checkbox" [(ngModel)]="questionForm.allowDuplicateResponse" name="allowDuplicateResponse">
+                    Duplicate responses
+                  </label>
+                  <div class="inline-pick">
+                    <label class="inline-check">
+                      <input type="radio" name="matchingScoring" value="EXACT" [(ngModel)]="questionForm.scoringType">
+                      Exact Match
+                    </label>
+                    <label class="inline-check">
+                      <input type="radio" name="matchingScoring" value="PARTIAL" [(ngModel)]="questionForm.scoringType">
+                      Partial Match
+                    </label>
+                  </div>
+                </div>
+              </section>
+            }
+
+            <div class="points-row">
+              <div class="field-block compact">
+                <label>Points *</label>
+                <input type="number" min="1" [(ngModel)]="questionForm.points" name="points" required>
+              </div>
+              <div class="form-actions">
+                <button type="button" class="btn btn-outline" (click)="closeCreateModal()">Cancel</button>
+                <button class="btn btn-action" type="submit" [disabled]="savingQuestion">
+                  {{ savingQuestion ? "Saving..." : (editingQuestionId ? "Update Question" : "Save Question") }}
+                </button>
+              </div>
+            </div>
+          </form>
+
+          <aside class="preview-panel">
+            <h3>Preview</h3>
+            <p class="preview-question">{{ questionForm.prompt || "Question preview will appear here." }}</p>
+            @if (questionForm.mediaUrl.trim()) {
+              <p class="preview-note">Media: {{ questionForm.mediaType || "LINK" }} - {{ questionForm.mediaUrl }}</p>
+            }
+            @if (questionForm.questionType === "SHORT_ANSWER") {
+              <p class="preview-note">Expected answer: {{ questionForm.shortAnswer || "-" }}</p>
+            } @else if (questionForm.questionType === "MATCHING") {
+              <ul class="preview-list">
+                @for (prompt of questionForm.matchingPrompts; track $index; let i = $index) {
+                  @if (prompt.trim()) {
+                    <li>{{ prompt }} => {{ questionForm.matchingCorrect[i] || "..." }}</li>
+                  }
+                }
+              </ul>
+            } @else {
+              <ul class="preview-list">
+                @for (item of previewOptions(); track $index) {
+                  <li>{{ item }}</li>
+                }
+              </ul>
+            }
+          </aside>
+        </div>
+      </section>
+    </div>
+  }
+
+  @if (showPreviewModal) {
+    <div class="modal-backdrop" (click)="closeQuizPreview()">
+      <section class="modal-shell library-modal" (click)="$event.stopPropagation()">
+        <header class="modal-head">
+          <h2>Quiz Preview</h2>
+          <button type="button" class="close-btn" (click)="closeQuizPreview()">&#10005;</button>
+        </header>
+        <div class="modal-form">
+          @if (previewLoading) {
+            <p>Loading preview...</p>
+          } @else if (previewData) {
+            <p><strong>{{ previewData.quiz.title }}</strong></p>
+            <p>{{ previewData.quiz.description }}</p>
+            <p class="muted">Time limit: {{ previewData.quiz.timeLimitMinutes }} min | Attempts: {{ previewData.quiz.maxAttempts }}</p>
+            <p class="muted">
+              Result release:
+              {{ previewData.quiz.showResultImmediately ? "Immediate" : (previewData.quiz.resultReleaseAt ? (previewData.quiz.resultReleaseAt | date : "medium") : "Scheduled") }}
+            </p>
+            <ul class="selected-list">
+              @for (question of previewData.questions; track question.questionId) {
+                <li>
+                  <div>
+                    <p class="selected-title">Q{{ question.sortOrder }}. {{ question.prompt }}</p>
+                    <p class="selected-meta">{{ question.questionType }} | {{ question.points }} point(s)</p>
+                    @if (question.mediaUrl) {
+                      <p class="selected-meta">Media: {{ question.mediaType || "LINK" }} - {{ question.mediaUrl }}</p>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </section>
+    </div>
+  }
+</div>

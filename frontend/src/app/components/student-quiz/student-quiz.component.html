@@ -1,0 +1,281 @@
+<div class="container">
+  @if (loading) {
+    <p>Preparing quiz...</p>
+  } @else if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+    <a class="btn btn-outline" [routerLink]="backRoute()">Back</a>
+  } @else if (quizData) {
+    <a class="back-link" [routerLink]="backRoute()">&#8592; Back Course</a>
+    @if (statusMessage) {
+      <p class="ok">{{ statusMessage }}</p>
+    }
+
+    @if (result) {
+      <section class="panel result">
+        <h2>Quiz Submitted</h2>
+        <p class="ok">Your quiz has been answered successfully.</p>
+        @if (result.resultReleased) {
+          <p class="score">Score: <strong>{{ result.score }}%</strong></p>
+          <p>
+            Status:
+            <span class="badge" [class.fail]="!result.passed">
+              {{ result.passed ? "PASS" : "FAIL" }}
+            </span>
+          </p>
+          <p>Correct: {{ result.correctCount }}/{{ result.totalQuestions }}</p>
+          <p>{{ result.feedback }}</p>
+          @if (result.answers?.length) {
+            <div class="result-review">
+              <h3>Answer Review</h3>
+              <div class="table-scroll">
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Question</th>
+                      <th>Your Answer</th>
+                      <th>Correct Answer</th>
+                      <th>Explanation</th>
+                      <th>Status</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (answer of result.answers; track answer.questionId) {
+                      <tr [class.row-correct]="answer.correct" [class.row-wrong]="!answer.correct">
+                        <td>{{ answer.prompt }}</td>
+                        <td>{{ formatAnswer(answer.studentAnswer) }}</td>
+                        <td>{{ formatAnswer(answer.correctAnswer) }}</td>
+                        <td>{{ answer.explanation || "-" }}</td>
+                        <td>
+                          <span class="badge" [class.fail]="!answer.correct">
+                            {{ answer.correct ? "Correct" : "Incorrect" }}
+                          </span>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          }
+        } @else {
+          <p class="muted">Result is submitted and will be released by lecturer settings.</p>
+          @if (result.releaseAt) {
+            <p class="muted">Release time: {{ result.releaseAt | date: "medium" }}</p>
+          }
+        }
+        <div class="result-actions">
+          <a class="btn btn-outline" [routerLink]="backRoute()">Back Course</a>
+          <a class="btn" routerLink="/student/history">View Attempt History</a>
+        </div>
+      </section>
+    } @else {
+      <section class="panel quiz-layout">
+        <div class="quiz-main">
+          <div class="quiz-heading">
+            <h1>{{ quizData.title }}</h1>
+            <p class="meta">Attempt {{ quizData.attemptNumber }} | {{ quizData.timeLimitMinutes }} minutes</p>
+            <p class="meta">Due date: {{ quizData.closeAt ? (quizData.closeAt | date: "medium") : "Not set" }}</p>
+            @if (quizData.description) {
+              <p class="meta">{{ quizData.description }}</p>
+            }
+          </div>
+
+          @if (isAllAtOnce) {
+            <div class="all-questions">
+              @for (question of allQuestions(); track question.questionId; let questionIndex = $index) {
+                <section class="question-card">
+                  <h2 class="question-title">Q{{ questionIndex + 1 }}. {{ question.prompt }}</h2>
+                  @if (question.mediaUrl) {
+                    <p class="media-line">Media ({{ question.mediaType || "link" }}): <a [href]="question.mediaUrl" target="_blank">{{ question.mediaUrl }}</a></p>
+                  }
+
+                  @if (question.questionType === "MCQ" || question.questionType === "TRUE_FALSE") {
+                    <div class="answers">
+                      @for (option of optionsArray(question); track option; let optionIndex = $index) {
+                        <button
+                          type="button"
+                          class="option-btn"
+                          [class.selected]="answerText(question.questionId) === option"
+                          (click)="updateAnswer(question.questionId, option)">
+                          <span class="option-tag">{{ optionLabel(optionIndex) }}</span>
+                          <span>{{ option }}</span>
+                        </button>
+                      }
+                    </div>
+                  }
+
+                  @if (question.questionType === "MULTI_SELECT") {
+                    <div class="answers">
+                      @for (option of optionsArray(question); track option) {
+                        <label class="option-line">
+                          <input
+                            type="checkbox"
+                            [checked]="isMultiChecked(question.questionId, option)"
+                            (change)="toggleMulti(question.questionId, option, $any($event.target).checked)">
+                          <span>{{ option }}</span>
+                        </label>
+                      }
+                    </div>
+                  }
+
+                  @if (question.questionType === "SHORT_ANSWER") {
+                    <textarea
+                      rows="4"
+                      [ngModel]="answerText(question.questionId)"
+                      (ngModelChange)="updateAnswer(question.questionId, $event)"
+                      placeholder="Type your answer..."></textarea>
+                  }
+
+                  @if (question.questionType === "MATCHING") {
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Left</th>
+                          <th>Match With</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        @for (left of matchingLeft(question); track left) {
+                          <tr>
+                            <td>{{ left }}</td>
+                            <td>
+                              <select
+                                [ngModel]="matchingValue(question.questionId, left)"
+                                (ngModelChange)="updateMatching(question.questionId, left, $event)">
+                                <option value="">Select...</option>
+                                @for (right of matchingRight(question); track right) {
+                                  <option [value]="right">{{ right }}</option>
+                                }
+                              </select>
+                            </td>
+                          </tr>
+                        }
+                      </tbody>
+                    </table>
+                  }
+                </section>
+              }
+            </div>
+
+            <div class="actions">
+              <button class="btn" type="button" [disabled]="submitting" (click)="submitQuiz()">
+                {{ submitting ? "Submitting..." : "Submit Answer" }}
+              </button>
+            </div>
+          } @else {
+            @if (currentQuestion) {
+              <h2 class="question-title">Q{{ currentIndex + 1 }}. {{ currentQuestion.prompt }}</h2>
+              @if (currentQuestion.mediaUrl) {
+                <p class="media-line">Media ({{ currentQuestion.mediaType || "link" }}): <a [href]="currentQuestion.mediaUrl" target="_blank">{{ currentQuestion.mediaUrl }}</a></p>
+              }
+
+              @if (currentQuestion.questionType === "MCQ" || currentQuestion.questionType === "TRUE_FALSE") {
+                <div class="answers">
+                  @for (option of optionsArray(currentQuestion); track option; let optionIndex = $index) {
+                    <button
+                      type="button"
+                      class="option-btn"
+                      [class.selected]="answerText(currentQuestion.questionId) === option"
+                      (click)="updateAnswer(currentQuestion.questionId, option)">
+                      <span class="option-tag">{{ optionLabel(optionIndex) }}</span>
+                      <span>{{ option }}</span>
+                    </button>
+                  }
+                </div>
+              }
+
+              @if (currentQuestion.questionType === "MULTI_SELECT") {
+                <div class="answers">
+                  @for (option of optionsArray(currentQuestion); track option) {
+                    <label class="option-line">
+                      <input
+                        type="checkbox"
+                        [checked]="isMultiChecked(currentQuestion.questionId, option)"
+                        (change)="toggleMulti(currentQuestion.questionId, option, $any($event.target).checked)">
+                      <span>{{ option }}</span>
+                    </label>
+                  }
+                </div>
+              }
+
+              @if (currentQuestion.questionType === "SHORT_ANSWER") {
+                <textarea
+                  rows="5"
+                  [ngModel]="answerText(currentQuestion.questionId)"
+                  (ngModelChange)="updateAnswer(currentQuestion.questionId, $event)"
+                  placeholder="Type your answer..."></textarea>
+              }
+
+              @if (currentQuestion.questionType === "MATCHING") {
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Left</th>
+                      <th>Match With</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    @for (left of matchingLeft(currentQuestion); track left) {
+                      <tr>
+                        <td>{{ left }}</td>
+                        <td>
+                          <select
+                            [ngModel]="matchingValue(currentQuestion.questionId, left)"
+                            (ngModelChange)="updateMatching(currentQuestion.questionId, left, $event)">
+                            <option value="">Select...</option>
+                            @for (right of matchingRight(currentQuestion); track right) {
+                              <option [value]="right">{{ right }}</option>
+                            }
+                          </select>
+                        </td>
+                      </tr>
+                    }
+                  </tbody>
+                </table>
+              }
+
+              <div class="actions">
+                <button class="btn btn-outline" type="button" [disabled]="currentIndex === 0" (click)="previousQuestion()">
+                  Previous
+                </button>
+                <button class="btn btn-outline" type="button" [disabled]="isCurrentLastQuestion()" (click)="nextQuestion()">
+                  Next
+                </button>
+                <button class="btn" type="button" [disabled]="submitting" (click)="submitQuiz()">
+                  {{ submitting ? "Submitting..." : "Submit Answer" }}
+                </button>
+              </div>
+            } @else {
+              <p class="muted">This quiz has no questions yet. Please contact your lecturer.</p>
+              <a class="btn btn-outline" [routerLink]="backRoute()">Back Course</a>
+            }
+          }
+        </div>
+
+        <aside class="quiz-side">
+            <div class="timer-card">
+              <div class="timer-circle" [class.critical]="remainingSeconds <= 60">{{ timeLabel() }}</div>
+              <p>Timer remaining</p>
+              <p class="answered">{{ answeredCount() }} / {{ quizData.questions?.length ?? 0 }} answered</p>
+            </div>
+
+          @if (!isAllAtOnce) {
+            <div class="question-list">
+              @for (question of quizData.questions; track question.questionId; let i = $index) {
+                <button
+                  type="button"
+                  class="question-item"
+                  [class.current]="currentIndex === i"
+                  [class.answered]="isQuestionAnswered(i)"
+                  (click)="goToQuestion(i)">
+                  <span>Question {{ i + 1 }}</span>
+                  <span class="state">{{ isQuestionAnswered(i) ? "Answered" : "Pending" }}</span>
+                </button>
+              }
+            </div>
+          }
+        </aside>
+      </section>
+    }
+  }
+</div>

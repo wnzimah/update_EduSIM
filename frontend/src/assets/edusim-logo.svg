@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 84" role="img" aria-labelledby="title desc">
+  <title id="title">EduSIM Logo</title>
+  <desc id="desc">EduSIM blue and gold education portal logo</desc>
+  <defs>
+    <linearGradient id="g1" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#1D4ED8" />
+      <stop offset="100%" stop-color="#2563EB" />
+    </linearGradient>
+    <linearGradient id="g2" x1="0%" y1="0%" x2="100%" y2="0%">
+      <stop offset="0%" stop-color="#F59E0B" />
+      <stop offset="100%" stop-color="#FBBF24" />
+    </linearGradient>
+  </defs>
+
+  <g transform="translate(0 10)">
+    <path d="M24 0h44l18 18v28L68 64H24L6 46V18z" fill="url(#g1)" />
+    <path d="M18 20 46 8l28 12-28 12z" fill="#fff" opacity=".96" />
+    <path d="M28 30h36v6H28z" fill="#fff" opacity=".92" />
+    <path d="M28 40h26v6H28z" fill="#fff" opacity=".92" />
+    <rect x="68" y="30" width="10" height="10" rx="2" fill="url(#g2)" />
+  </g>
+
+  <g transform="translate(98 22)">
+    <text x="0" y="24" font-family="'Space Grotesk', 'Manrope', Arial, sans-serif" font-size="34" font-weight="700" fill="#1D4ED8">
+      EduSIM
+    </text>
+    <text x="2" y="43" font-family="'Manrope', Arial, sans-serif" font-size="12" font-weight="600" fill="#9EC5FF">
+      Digital Learning Portal
+    </text>
+  </g>
+</svg>

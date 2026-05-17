@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="ms">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Planner & Duit Tracker</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <div class="bg-shape shape-1"></div>
+  <div class="bg-shape shape-2"></div>
+
+  <header class="hero">
+    <p class="eyebrow">Personal Dashboard</p>
+    <h1>Planner, Cashflow & Profit Bisnes</h1>
+    <p class="subtext">Rekod apa perlu dibuat, duit keluar masuk, dan untung bisnes anda setiap hari.</p>
+    <div class="hero-meta">
+      <span id="todayDate"></span>
+      <span id="tomorrowTaskCount">Tugasan esok: 0</span>
+    </div>
+  </header>
+
+  <main class="dashboard">
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Schedule</h2>
+      </div>
+
+      <form id="scheduleForm" class="form-grid">
+        <label>
+          Tugasan
+          <input id="scheduleTitle" type="text" placeholder="Contoh: Siapkan report stok" required>
+        </label>
+        <label>
+          Tarikh
+          <input id="scheduleDueDate" type="date" required>
+        </label>
+        <label>
+          Keutamaan
+          <select id="schedulePriority">
+            <option value="HIGH">Tinggi</option>
+            <option value="MEDIUM" selected>Sederhana</option>
+            <option value="LOW">Rendah</option>
+          </select>
+        </label>
+        <button type="submit">Tambah Tugasan</button>
+      </form>
+
+      <p id="scheduleEmpty" class="empty">Belum ada tugasan direkod.</p>
+      <ul id="scheduleList" class="list"></ul>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Duit Masuk / Keluar</h2>
+      </div>
+
+      <div class="summary-grid">
+        <article class="metric">
+          <span>Jumlah Masuk</span>
+          <strong id="cashInTotal">RM 0.00</strong>
+        </article>
+        <article class="metric">
+          <span>Jumlah Keluar</span>
+          <strong id="cashOutTotal">RM 0.00</strong>
+        </article>
+        <article class="metric">
+          <span>Baki Semasa</span>
+          <strong id="cashBalance">RM 0.00</strong>
+        </article>
+      </div>
+
+      <form id="cashflowForm" class="form-grid">
+        <label>
+          Tarikh
+          <input id="cashflowDate" type="date" required>
+        </label>
+        <label>
+          Jenis
+          <select id="cashflowType">
+            <option value="IN">Masuk</option>
+            <option value="OUT">Keluar</option>
+          </select>
+        </label>
+        <label>
+          Amaun (RM)
+          <input id="cashflowAmount" type="number" min="0.01" step="0.01" required>
+        </label>
+        <label class="full">
+          Catatan
+          <input id="cashflowNote" type="text" placeholder="Contoh: Bayaran customer / Bil utiliti">
+        </label>
+        <button type="submit">Tambah Rekod Duit</button>
+      </form>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tarikh</th>
+              <th>Jenis</th>
+              <th>Amaun</th>
+              <th>Catatan</th>
+              <th>Tindakan</th>
+            </tr>
+          </thead>
+          <tbody id="cashflowBody"></tbody>
+        </table>
+      </div>
+      <p id="cashflowEmpty" class="empty">Belum ada transaksi duit.</p>
+    </section>
+
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Business: Kos & Untung</h2>
+      </div>
+
+      <div class="summary-grid">
+        <article class="metric">
+          <span>Total Kos Pembelian</span>
+          <strong id="businessCost">RM 0.00</strong>
+        </article>
+        <article class="metric">
+          <span>Total Jualan</span>
+          <strong id="businessRevenue">RM 0.00</strong>
+        </article>
+        <article class="metric">
+          <span>Untung Bersih</span>
+          <strong id="businessProfit">RM 0.00</strong>
+        </article>
+      </div>
+
+      <form id="businessForm" class="form-grid">
+        <label>
+          Tarikh
+          <input id="businessDate" type="date" required>
+        </label>
+        <label>
+          Jenis
+          <select id="businessType">
+            <option value="PURCHASE">Kos Pembelian</option>
+            <option value="SALE">Jualan</option>
+          </select>
+        </label>
+        <label>
+          Item
+          <input id="businessItem" type="text" placeholder="Contoh: Bahan mentah / Sale produk A" required>
+        </label>
+        <label>
+          Amaun (RM)
+          <input id="businessAmount" type="number" min="0.01" step="0.01" required>
+        </label>
+        <button type="submit">Tambah Rekod Bisnes</button>
+      </form>
+
+      <div class="table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th>Tarikh</th>
+              <th>Jenis</th>
+              <th>Item</th>
+              <th>Amaun</th>
+              <th>Tindakan</th>
+            </tr>
+          </thead>
+          <tbody id="businessBody"></tbody>
+        </table>
+      </div>
+      <p id="businessEmpty" class="empty">Belum ada rekod bisnes.</p>
+    </section>
+  </main>
+
+  <script src="app.js" defer></script>
+</body>
+</html>

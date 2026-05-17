@@ -1,0 +1,30 @@
+package com.edusim.dto;
+
+import jakarta.validation.constraints.Email;
+import jakarta.validation.constraints.NotBlank;
+
+public class AuthDtos {
+
+    public record LoginRequest(
+        @Email @NotBlank String email,
+        @NotBlank String password
+    ) {
+    }
+
+    public record AuthResponse(
+        String token,
+        Long userId,
+        String fullName,
+        String email,
+        String role
+    ) {
+    }
+
+    public record ProfileResponse(
+        Long id,
+        String fullName,
+        String email,
+        String role
+    ) {
+    }
+}

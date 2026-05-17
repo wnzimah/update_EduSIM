@@ -1,0 +1,760 @@
+import { CommonModule } from "@angular/common";
+import { Component, OnDestroy, OnInit, inject } from "@angular/core";
+import { Router, RouterLink } from "@angular/router";
+import { FormsModule } from "@angular/forms";
+import { StudentService } from "../../services/student.service";
+
+type PlannerCategory = "QUIZ" | "VIDEO" | "TASK" | "STUDY";
+
+type PlannerEvent = {
+  id: number;
+  title: string;
+  date: string;
+  category: PlannerCategory;
+  courseId: number | null;
+  quizId?: number;
+  videoId?: number;
+  auto?: boolean;
+};
+
+@Component({
+  selector: "app-student-dashboard",
+  standalone: true,
+  imports: [CommonModule, RouterLink, FormsModule],
+  templateUrl: "./student-dashboard.component.html",
+  styleUrl: "./student-dashboard.component.css"
+})
+export class StudentDashboardComponent implements OnInit, OnDestroy {
+  private readonly studentService = inject(StudentService);
+  private readonly router = inject(Router);
+  private readonly eventStorageKey = "edusim.student.dashboard.events";
+
+  dashboard: any = null;
+  loading = true;
+  errorMessage = "";
+  searchText = "";
+  courseTab: "all" | "inProgress" | "completed" = "all";
+  courseSort: "name" | "progressDesc" | "progressAsc" = "name";
+  timelineSearch = "";
+  calendarCourseFilter = "all";
+  showEventModal = false;
+  selectedDay: number | null = null;
+
+  readonly weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
+  readonly bannerSlides = [
+    {
+      imageUrl: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?auto=format&fit=crop&w=2200&q=80",
+      title: "Open and Distance Learning Experience",
+      subtitle: "Learn anytime with guided lessons, video activities, and self-paced study flow."
+    },
+    {
+      imageUrl: "https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=2200&q=80",
+      title: "Video Lessons and Digital Materials",
+      subtitle: "Access course videos, slides, and references from one place without switching platforms."
+    },
+    {
+      imageUrl: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=2200&q=80",
+      title: "Self-Assessment with Instant Feedback",
+      subtitle: "Complete quizzes, unlock results quickly, and track your progress throughout the semester."
+    }
+  ];
+
+  activeBannerIndex = 0;
+  monthLabel = "";
+  monthGrid: Array<Array<number | null>> = [];
+  plannerEvents: PlannerEvent[] = [];
+  private userEvents: PlannerEvent[] = [];
+  private viewingDate = new Date();
+  private bannerTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly bannerIntervalMs = 4500;
+
+  eventForm: {
+    title: string;
+    date: string;
+    courseId: string;
+    category: PlannerCategory;
+  } = {
+    title: "",
+    date: "",
+    courseId: "all",
+    category: "TASK"
+  };
+
+  ngOnInit(): void {
+    this.buildCalendar();
+    this.loadStoredEvents();
+    this.startBannerAutoplay();
+    this.loadDashboard();
+  }
+
+  ngOnDestroy(): void {
+    this.stopBannerAutoplay();
+  }
+
+  loadDashboard(): void {
+    this.loading = true;
+    this.studentService.dashboard().subscribe({
+      next: (data) => {
+        this.dashboard = data;
+        this.generateAutoPlannerEvents();
+        this.loading = false;
+      },
+      error: (error) => {
+        this.errorMessage = error?.error?.message ?? "Failed to load dashboard";
+        this.loading = false;
+      }
+    });
+  }
+
+  completeVideo(videoId: number): void {
+    this.studentService.completeVideo(videoId).subscribe({
+      next: () => this.loadDashboard()
+    });
+  }
+
+  startQuiz(quizId: number, locked: boolean, courseId?: number): void {
+    if (locked) {
+      return;
+    }
+    this.router.navigate(["/student/quiz", quizId], {
+      queryParams: courseId ? { courseId } : {}
+    });
+  }
+
+  previousMonth(): void {
+    this.viewingDate = new Date(this.viewingDate.getFullYear(), this.viewingDate.getMonth() - 1, 1);
+    this.buildCalendar();
+    this.generateAutoPlannerEvents();
+  }
+
+  nextMonth(): void {
+    this.viewingDate = new Date(this.viewingDate.getFullYear(), this.viewingDate.getMonth() + 1, 1);
+    this.buildCalendar();
+    this.generateAutoPlannerEvents();
+  }
+
+  goToToday(): void {
+    const today = new Date();
+    this.viewingDate = new Date(today.getFullYear(), today.getMonth(), 1);
+    this.buildCalendar();
+    this.selectedDay = today.getDate();
+    this.generateAutoPlannerEvents();
+  }
+
+  isToday(day: number | null): boolean {
+    if (!day) {
+      return false;
+    }
+    const today = new Date();
+    return (
+      day === today.getDate() &&
+      this.viewingDate.getMonth() === today.getMonth() &&
+      this.viewingDate.getFullYear() === today.getFullYear()
+    );
+  }
+
+  filteredCourses(): any[] {
+    if (!this.dashboard?.courses) {
+      return [];
+    }
+    const keyword = this.searchText.trim().toLowerCase();
+    const filtered = [...this.dashboard.courses]
+      .filter((course: any) => !keyword || String(course.title ?? "").toLowerCase().includes(keyword))
+      .filter((course: any) => {
+        if (this.courseTab === "completed") {
+          return Number(course.progress ?? 0) >= 100;
+        }
+        if (this.courseTab === "inProgress") {
+          const progress = Number(course.progress ?? 0);
+          return progress > 0 && progress < 100;
+        }
+        return true;
+      });
+
+    if (this.courseSort === "progressDesc") {
+      return filtered.sort((a: any, b: any) => Number(b.progress ?? 0) - Number(a.progress ?? 0));
+    }
+    if (this.courseSort === "progressAsc") {
+      return filtered.sort((a: any, b: any) => Number(a.progress ?? 0) - Number(b.progress ?? 0));
+    }
+    return filtered.sort((a: any, b: any) => String(a.title ?? "").localeCompare(String(b.title ?? "")));
+  }
+
+  setCourseTab(tab: "all" | "inProgress" | "completed"): void {
+    this.courseTab = tab;
+  }
+
+  courseImage(course: any, index: number): string {
+    const title = String(course?.title ?? "").toLowerCase();
+    if (title.includes("data")) {
+      return "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1400&q=80";
+    }
+    if (title.includes("web")) {
+      return "https://images.unsplash.com/photo-1504384308090-c894fdcc538d?auto=format&fit=crop&w=1400&q=80";
+    }
+    if (title.includes("database")) {
+      return "https://images.unsplash.com/photo-1484417894907-623942c8ee29?auto=format&fit=crop&w=1400&q=80";
+    }
+    const fallback = [
+      "https://images.unsplash.com/photo-1531498860502-7c67cf02f657?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1484417894907-623942c8ee29?auto=format&fit=crop&w=1200&q=80",
+      "https://images.unsplash.com/photo-1526379095098-d400fd0bf935?auto=format&fit=crop&w=1200&q=80"
+    ];
+    return fallback[index % fallback.length];
+  }
+
+  courseDescription(course: any): string {
+    const text = String(course?.description ?? "").trim();
+    if (text) {
+      return text;
+    }
+    return "Structured learning resources and guided activities for this course.";
+  }
+
+  quizCountForCourse(course: any): number {
+    const courseId = Number(course?.courseId ?? 0);
+    const title = String(course?.title ?? "").trim().toLowerCase();
+    const ids = new Set<string>();
+
+    for (const quiz of this.dashboard?.availableQuizzes ?? []) {
+      if (Number(quiz?.courseId ?? 0) === courseId || String(quiz?.courseTitle ?? "").trim().toLowerCase() === title) {
+        const key = quiz?.quizId ? `q-${quiz.quizId}` : `t-${String(quiz?.title ?? "").trim().toLowerCase()}`;
+        ids.add(key);
+      }
+    }
+
+    for (const attempt of this.dashboard?.latestResults ?? []) {
+      const sameCourse =
+        Number(attempt?.courseId ?? 0) === courseId ||
+        String(attempt?.courseTitle ?? "").trim().toLowerCase() === title;
+      if (sameCourse) {
+        const key = attempt?.quizId
+          ? `q-${attempt.quizId}`
+          : `t-${String(attempt?.quizTitle ?? "").trim().toLowerCase()}`;
+        ids.add(key);
+      }
+    }
+
+    return ids.size;
+  }
+
+  submissionCountForCourse(course: any): number {
+    const courseId = Number(course?.courseId ?? 0);
+    const title = String(course?.title ?? "").trim().toLowerCase();
+    return (this.dashboard?.latestResults ?? []).filter((attempt: any) =>
+      Number(attempt?.courseId ?? 0) === courseId ||
+      String(attempt?.courseTitle ?? "").trim().toLowerCase() === title
+    ).length;
+  }
+
+  goToPerformance(course: any): void {
+    this.router.navigate(["/student/history"], {
+      queryParams: {
+        courseId: course?.courseId ?? null,
+        courseTitle: course?.title ?? null
+      }
+    });
+  }
+
+  timelineEntries(): Array<any> {
+    if (!this.dashboard) {
+      return [];
+    }
+
+    const entries: Array<any> = [];
+
+    for (const quiz of this.dashboard.availableQuizzes ?? []) {
+      const dueLabel = quiz.closeAt ? ` Due: ${this.formatDateTime(quiz.closeAt)}` : "";
+      const lockReason = String(quiz.lockReason ?? "").trim() || "Quiz is currently unavailable.";
+      const actionLabel = quiz.locked
+        ? (quiz.alreadySubmitted ? "Completed" : "Locked")
+        : "Open quiz";
+      entries.push({
+        type: "quiz",
+        title: quiz.title,
+        detail: quiz.locked
+          ? `${lockReason}${dueLabel}`
+          : `Quiz ready for submission.${dueLabel}`,
+        actionLabel,
+        disabled: quiz.locked,
+        quizId: quiz.quizId,
+        courseId: quiz.courseId
+      });
+    }
+
+    for (const video of this.dashboard.pendingVideos ?? []) {
+      entries.push({
+        type: "video",
+        title: video.title,
+        detail: `${video.courseTitle} - ${video.durationMinutes} min`,
+        actionLabel: "Mark complete",
+        disabled: false,
+        videoId: video.videoId
+      });
+    }
+
+    for (const result of this.dashboard.latestResults ?? []) {
+      const released = result.resultReleased !== false;
+      entries.push({
+        type: "result",
+        title: released ? `${result.quizTitle} (${result.score}%)` : `${result.quizTitle} (Pending)`,
+        detail: released
+          ? (result.passed ? "Latest result: PASS" : "Latest result: FAIL")
+          : "Result pending lecturer release.",
+        actionLabel: "View history",
+        disabled: false,
+        attemptId: result.attemptId
+      });
+    }
+
+    for (const notice of this.dashboard.resultNotifications ?? []) {
+      entries.push({
+        type: "notification",
+        title: `Result available: ${notice.quizTitle}`,
+        detail: notice.message ?? "Your scheduled result is now available.",
+        actionLabel: "View result",
+        disabled: false,
+        attemptId: notice.attemptId
+      });
+    }
+
+    return entries.slice(0, 14);
+  }
+
+  filteredTimelineEntries(): Array<any> {
+    const keyword = this.timelineSearch.trim().toLowerCase();
+    if (!keyword) {
+      return this.timelineEntries().slice(0, 8);
+    }
+
+    return this.timelineEntries()
+      .filter((entry) =>
+        String(entry.title ?? "").toLowerCase().includes(keyword) ||
+        String(entry.detail ?? "").toLowerCase().includes(keyword)
+      )
+      .slice(0, 8);
+  }
+
+  handleTimelineAction(entry: any): void {
+    if (entry.disabled) {
+      return;
+    }
+    if (entry.type === "quiz" && entry.quizId) {
+      this.startQuiz(entry.quizId, false, entry.courseId);
+      return;
+    }
+    if (entry.type === "video" && entry.videoId) {
+      this.completeVideo(entry.videoId);
+      return;
+    }
+    if (entry.type === "result") {
+      this.router.navigate(["/student/history"], {
+        queryParams: entry.attemptId ? { attemptId: entry.attemptId } : {}
+      });
+      return;
+    }
+    if (entry.type === "notification" && entry.attemptId) {
+      this.router.navigate(["/student/history"], {
+        queryParams: { attemptId: entry.attemptId }
+      });
+    }
+  }
+
+  latestAttemptRows(): any[] {
+    return (this.dashboard?.latestResults ?? []).slice(0, 6);
+  }
+
+  completedCoursesCount(): number {
+    return (this.dashboard?.courses ?? []).filter((course: any) => Number(course.progress ?? 0) >= 100).length;
+  }
+
+  activitiesCompletedCount(): number {
+    const mandatoryDone = (this.dashboard?.courses ?? []).reduce(
+      (sum: number, course: any) => sum + Number(course.mandatoryCompleted ?? 0),
+      0
+    );
+    const attempts = (this.dashboard?.latestResults ?? []).length;
+    return mandatoryDone + attempts;
+  }
+
+  activitiesDueCount(): number {
+    const openQuiz = (this.dashboard?.availableQuizzes ?? []).filter((quiz: any) => !quiz.locked).length;
+    const pendingVideo = (this.dashboard?.pendingVideos ?? []).length;
+    return openQuiz + pendingVideo;
+  }
+
+  completionHeadline(): string {
+    const courses = this.dashboard?.courses ?? [];
+    if (courses.length === 0) {
+      return "Start your first course to see your progress.";
+    }
+    const total = courses.reduce((sum: number, course: any) => sum + Number(course.progress ?? 0), 0);
+    const average = Math.round(total / courses.length);
+    return `${average}% of your learning targets are completed. Keep going.`;
+  }
+
+  upcomingPlannerEvents(limit = 6): PlannerEvent[] {
+    const today = new Date();
+    const events = this.plannerEvents
+      .filter((event) => this.matchesCourseFilter(event))
+      .filter((event) => new Date(event.date) >= new Date(today.getFullYear(), today.getMonth(), today.getDate()))
+      .sort((a, b) => a.date.localeCompare(b.date));
+    return events.slice(0, limit);
+  }
+
+  nextBanner(): void {
+    this.activeBannerIndex = (this.activeBannerIndex + 1) % this.bannerSlides.length;
+  }
+
+  goToBanner(index: number): void {
+    this.activeBannerIndex = index;
+    this.restartBannerAutoplay();
+  }
+
+  pauseBanner(): void {
+    this.stopBannerAutoplay();
+  }
+
+  resumeBanner(): void {
+    this.startBannerAutoplay();
+  }
+
+  openEventModal(day: number | null = null): void {
+    this.showEventModal = true;
+    this.eventForm = {
+      title: "",
+      date: day ? this.dateForCell(day) : this.defaultEventDate(),
+      courseId: this.calendarCourseFilter,
+      category: "TASK"
+    };
+  }
+
+  selectDay(day: number | null): void {
+    if (!day) {
+      return;
+    }
+    this.selectedDay = day;
+  }
+
+  selectedDayLabel(): string {
+    if (!this.selectedDay) {
+      return "Selected day";
+    }
+    const selectedDate = new Date(this.dateForCell(this.selectedDay));
+    return selectedDate.toLocaleDateString("en-US", {
+      weekday: "short",
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+  }
+
+  selectedDayEvents(): PlannerEvent[] {
+    return this.eventsForDay(this.selectedDay);
+  }
+
+  canOpenPlannerEvent(event: PlannerEvent): boolean {
+    return Boolean(
+      (event.category === "QUIZ" && event.quizId) ||
+      (event.category === "VIDEO" && event.videoId) ||
+      event.courseId
+    );
+  }
+
+  openPlannerEvent(event: PlannerEvent): void {
+    if (event.category === "QUIZ" && event.quizId) {
+      const quiz = (this.dashboard?.availableQuizzes ?? []).find(
+        (item: any) => Number(item?.quizId ?? 0) === Number(event.quizId)
+      );
+
+      if (quiz) {
+        this.startQuiz(quiz.quizId, Boolean(quiz.locked), quiz.courseId);
+        return;
+      }
+    }
+
+    if (event.category === "VIDEO" && event.videoId) {
+      this.completeVideo(event.videoId);
+      return;
+    }
+
+    if (event.courseId) {
+      this.router.navigate(["/student/courses", event.courseId]);
+    }
+  }
+
+  closeEventModal(): void {
+    this.showEventModal = false;
+  }
+
+  addPlannerEvent(): void {
+    const title = this.eventForm.title.trim();
+    const date = this.eventForm.date;
+    if (!title || !date) {
+      return;
+    }
+
+    const event: PlannerEvent = {
+      id: Date.now(),
+      title,
+      date,
+      category: this.eventForm.category,
+      courseId: this.eventForm.courseId === "all" ? null : Number(this.eventForm.courseId),
+      auto: false
+    };
+
+    this.userEvents = [...this.userEvents, event];
+    this.saveStoredEvents();
+    this.generateAutoPlannerEvents();
+    this.closeEventModal();
+  }
+
+  removePlannerEvent(eventId: number, domEvent: Event): void {
+    domEvent.stopPropagation();
+    this.userEvents = this.userEvents.filter((event) => event.id !== eventId);
+    this.saveStoredEvents();
+    this.generateAutoPlannerEvents();
+  }
+
+  eventsForDay(day: number | null): PlannerEvent[] {
+    if (!day) {
+      return [];
+    }
+
+    const dateKey = this.dateForCell(day);
+    return this.plannerEvents
+      .filter((event) => event.date === dateKey)
+      .filter((event) => this.matchesCourseFilter(event))
+      .sort((a, b) => a.title.localeCompare(b.title));
+  }
+
+  visibleEventsForDay(day: number | null): PlannerEvent[] {
+    return this.eventsForDay(day).slice(0, 3);
+  }
+
+  extraEventsCount(day: number | null): number {
+    const count = this.eventsForDay(day).length;
+    return Math.max(0, count - 3);
+  }
+
+  eventClass(event: PlannerEvent): string {
+    if (event.category === "QUIZ") {
+      return "event-quiz";
+    }
+    if (event.category === "VIDEO") {
+      return "event-video";
+    }
+    if (event.category === "STUDY") {
+      return "event-study";
+    }
+    return "event-task";
+  }
+
+  private buildCalendar(): void {
+    this.monthLabel = new Intl.DateTimeFormat("en-US", {
+      month: "long",
+      year: "numeric"
+    }).format(this.viewingDate);
+
+    const year = this.viewingDate.getFullYear();
+    const month = this.viewingDate.getMonth();
+    const firstDate = new Date(year, month, 1);
+    const totalDays = new Date(year, month + 1, 0).getDate();
+
+    let firstWeekDay = firstDate.getDay();
+    firstWeekDay = firstWeekDay === 0 ? 7 : firstWeekDay;
+
+    const rows: Array<Array<number | null>> = [];
+    let week: Array<number | null> = new Array(firstWeekDay - 1).fill(null);
+
+    for (let day = 1; day <= totalDays; day++) {
+      week.push(day);
+      if (week.length === 7) {
+        rows.push(week);
+        week = [];
+      }
+    }
+
+    if (week.length > 0) {
+      while (week.length < 7) {
+        week.push(null);
+      }
+      rows.push(week);
+    }
+
+    this.monthGrid = rows;
+    this.ensureSelectedDay();
+  }
+
+  private generateAutoPlannerEvents(): void {
+    if (!this.dashboard) {
+      this.plannerEvents = [...this.userEvents];
+      return;
+    }
+
+    const daysInMonth = new Date(this.viewingDate.getFullYear(), this.viewingDate.getMonth() + 1, 0).getDate();
+    const autoEvents: PlannerEvent[] = [];
+    let autoId = -1;
+
+    for (const quiz of this.dashboard.availableQuizzes ?? []) {
+      const day = this.seededDay(`quiz-${quiz.quizId}-${quiz.title}`, daysInMonth);
+      autoEvents.push({
+        id: autoId--,
+        title: quiz.title,
+        date: this.dateForCell(day),
+        category: "QUIZ",
+        courseId: quiz.courseId ?? null,
+        quizId: quiz.quizId ?? undefined,
+        auto: true
+      });
+    }
+
+    for (const video of this.dashboard.pendingVideos ?? []) {
+      const day = this.seededDay(`video-${video.videoId}-${video.title}`, daysInMonth);
+      autoEvents.push({
+        id: autoId--,
+        title: `Watch: ${video.title}`,
+        date: this.dateForCell(day),
+        category: "VIDEO",
+        courseId: video.courseId ?? null,
+        videoId: video.videoId ?? undefined,
+        auto: true
+      });
+    }
+
+    for (const course of this.dashboard.courses ?? []) {
+      const day = this.seededDay(`study-${course.courseId}-${course.title}`, daysInMonth);
+      autoEvents.push({
+        id: autoId--,
+        title: `Revision slot - ${course.title}`,
+        date: this.dateForCell(day),
+        category: "STUDY",
+        courseId: course.courseId ?? null,
+        auto: true
+      });
+    }
+
+    this.plannerEvents = [...autoEvents, ...this.userEvents];
+  }
+
+  private matchesCourseFilter(event: PlannerEvent): boolean {
+    if (this.calendarCourseFilter === "all") {
+      return true;
+    }
+    return event.courseId === Number(this.calendarCourseFilter);
+  }
+
+  private seededDay(seed: string, maxDay: number): number {
+    let hash = 0;
+    for (let index = 0; index < seed.length; index++) {
+      hash = (hash << 5) - hash + seed.charCodeAt(index);
+      hash |= 0;
+    }
+    return Math.abs(hash % maxDay) + 1;
+  }
+
+  private dateForCell(day: number): string {
+    const year = this.viewingDate.getFullYear();
+    const month = String(this.viewingDate.getMonth() + 1).padStart(2, "0");
+    const dayValue = String(day).padStart(2, "0");
+    return `${year}-${month}-${dayValue}`;
+  }
+
+  private defaultEventDate(): string {
+    if (this.selectedDay) {
+      return this.dateForCell(this.selectedDay);
+    }
+
+    const today = new Date();
+    if (
+      today.getFullYear() === this.viewingDate.getFullYear() &&
+      today.getMonth() === this.viewingDate.getMonth()
+    ) {
+      return this.dateForCell(today.getDate());
+    }
+    return this.dateForCell(1);
+  }
+
+  private ensureSelectedDay(): void {
+    const maxDay = new Date(this.viewingDate.getFullYear(), this.viewingDate.getMonth() + 1, 0).getDate();
+    if (this.selectedDay && this.selectedDay >= 1 && this.selectedDay <= maxDay) {
+      return;
+    }
+
+    const today = new Date();
+    if (
+      today.getFullYear() === this.viewingDate.getFullYear() &&
+      today.getMonth() === this.viewingDate.getMonth()
+    ) {
+      this.selectedDay = today.getDate();
+      return;
+    }
+
+    this.selectedDay = 1;
+  }
+
+  private loadStoredEvents(): void {
+    try {
+      const raw = localStorage.getItem(this.eventStorageKey);
+      if (!raw) {
+        this.userEvents = [];
+        return;
+      }
+
+      const parsed = JSON.parse(raw) as PlannerEvent[];
+      this.userEvents = parsed
+        .filter((event) => !!event?.title && !!event?.date)
+        .map((event) => ({
+          id: Number(event.id),
+          title: String(event.title),
+          date: String(event.date),
+          category: event.category ?? "TASK",
+          courseId: event.courseId == null ? null : Number(event.courseId),
+          quizId: event.quizId == null ? undefined : Number(event.quizId),
+          videoId: event.videoId == null ? undefined : Number(event.videoId),
+          auto: false
+        }));
+    } catch {
+      this.userEvents = [];
+    }
+  }
+
+  private saveStoredEvents(): void {
+    localStorage.setItem(this.eventStorageKey, JSON.stringify(this.userEvents));
+  }
+
+  private startBannerAutoplay(): void {
+    this.stopBannerAutoplay();
+    if (this.bannerSlides.length < 2) {
+      return;
+    }
+    this.bannerTimer = setInterval(() => this.nextBanner(), this.bannerIntervalMs);
+  }
+
+  private stopBannerAutoplay(): void {
+    if (!this.bannerTimer) {
+      return;
+    }
+    clearInterval(this.bannerTimer);
+    this.bannerTimer = null;
+  }
+
+  private restartBannerAutoplay(): void {
+    this.stopBannerAutoplay();
+    this.startBannerAutoplay();
+  }
+
+  private formatDateTime(value: string): string {
+    const date = new Date(value);
+    if (Number.isNaN(date.getTime())) {
+      return value;
+    }
+    return date.toLocaleString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit"
+    });
+  }
+}

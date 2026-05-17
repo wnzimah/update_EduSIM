@@ -1,0 +1,142 @@
+<div class="container">
+  @if (loading) {
+    <p>Loading course...</p>
+  } @else if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+  } @else if (courseData) {
+    <section class="panel hero">
+      <h1>{{ courseData.course.title }}</h1>
+      <p>{{ courseData.course.description }}</p>
+      <p class="muted">
+        Mandatory video completed: {{ courseData.progress.mandatoryCompleted }}/{{ courseData.progress.mandatoryTotal }}
+        ({{ courseData.progress.percent }}%)
+      </p>
+    </section>
+
+    <section class="panel block activity-block">
+      <h2>Activity/Resources</h2>
+
+      @if (selectedVideo) {
+        <div class="featured-video">
+          @if (selectedVideoEmbedUrl) {
+            <iframe
+              [src]="selectedVideoEmbedUrl"
+              title="Course Video Player"
+              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+              allowfullscreen>
+            </iframe>
+          } @else {
+            <button class="video-fallback" type="button" (click)="openVideo(selectedVideo.videoUrl)">
+              <img [src]="thumbnailFor(selectedVideo.videoUrl)" [alt]="selectedVideo.title">
+              <span>Play {{ selectedVideo.title }}</span>
+            </button>
+          }
+
+          <div class="featured-meta">
+            <h3>{{ selectedVideo.title }}</h3>
+            <p>{{ selectedVideo.description }}</p>
+            <div class="video-action-row">
+              <span>{{ selectedVideo.durationMinutes }} min</span>
+              @if (selectedVideo.completed) {
+                <span class="badge">Completed</span>
+              } @else {
+                <span class="badge warn">Pending</span>
+              }
+              <button class="btn btn-outline" type="button" (click)="openVideo(selectedVideo.videoUrl)">
+                Open Video
+              </button>
+              <button
+                class="btn"
+                type="button"
+                [disabled]="selectedVideo.completed"
+                (click)="completeVideo(selectedVideo.videoId)">
+                {{ selectedVideo.completed ? "Completed" : "Mark Complete" }}
+              </button>
+            </div>
+          </div>
+        </div>
+      }
+
+      <div class="video-list">
+        @for (video of courseData.videos; track video.videoId) {
+          <button
+            class="video-item"
+            type="button"
+            [class.active]="video.videoId === selectedVideoId"
+            (click)="chooseVideo(video)">
+            <span class="order">#{{ video.sortOrder }}</span>
+            <span class="title">{{ video.title }}</span>
+            <span class="time">{{ video.durationMinutes }} min</span>
+            @if (video.completed) {
+              <span class="badge">Done</span>
+            } @else {
+              <span class="badge warn">Pending</span>
+            }
+          </button>
+        }
+      </div>
+    </section>
+
+    <section class="panel block compact-section">
+      <button class="section-toggle" type="button" (click)="toggleResourceSection()">
+        <span>Resources / Material</span>
+        <span class="toggle-icon" [class.open]="resourceSectionOpen" aria-hidden="true"></span>
+      </button>
+      @if (resourceSectionOpen) {
+        @if (courseData.materials.length === 0) {
+          <p class="muted">Tiada resource lagi.</p>
+        } @else {
+          <ul class="resource-list">
+            @for (material of courseData.materials; track material.materialId) {
+              <li>
+                <strong>{{ material.title }}</strong>
+                <span class="badge">{{ material.materialType }}</span>
+                <a [href]="material.resourceUrl" target="_blank" rel="noopener">Open</a>
+              </li>
+            }
+          </ul>
+        }
+      }
+    </section>
+
+    <section class="panel block compact-section">
+      <button class="section-toggle" type="button" (click)="toggleQuizSection()">
+        <span>Quiz</span>
+        <span class="toggle-icon" [class.open]="quizSectionOpen" aria-hidden="true"></span>
+      </button>
+      @if (quizSectionOpen) {
+        @if (courseData.quizzes.length === 0) {
+      <p class="muted">No quiz has been published yet.</p>
+        } @else {
+          <div class="quiz-list">
+            @for (quiz of courseData.quizzes; track quiz.quizId) {
+              <div class="quiz-item">
+                <div>
+                  <h3>{{ quiz.title }}</h3>
+                  <p class="muted">Due date: {{ quiz.closeAt ? (quiz.closeAt | date: "medium") : "Not set" }}</p>
+                  <p class="muted">Attempts: {{ quiz.attemptsUsed ?? 0 }}/{{ quiz.maxAttempts ?? 1 }}</p>
+                  <p class="muted">{{ quiz.timeLimitMinutes }} min | Pass mark {{ quiz.passingMark }}%</p>
+                  @if (quiz.lockReason) {
+                    <p class="muted">{{ quiz.lockReason }}</p>
+                  }
+                </div>
+                <div class="quiz-actions">
+                  @if (quiz.alreadySubmitted) {
+                    <span class="badge">Completed</span>
+                  } @else if (quiz.locked) {
+                    <span class="badge warn">Locked</span>
+                  } @else {
+                    <span class="badge">Ready</span>
+                  }
+                  <button class="btn" [disabled]="quiz.locked || (quiz.attemptsRemaining ?? 0) <= 0" (click)="startQuiz(quiz)">
+                    {{ quiz.alreadySubmitted ? "Completed" : "Attempt Quiz" }}
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        }
+      }
+    </section>
+  }
+</div>

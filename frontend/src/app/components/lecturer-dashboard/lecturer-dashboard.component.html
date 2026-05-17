@@ -1,0 +1,213 @@
+<div class="container lecturer-shell">
+  @if (loading) {
+    <p>Loading dashboard...</p>
+  } @else if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+  } @else if (dashboard) {
+    <section class="panel lecturer-layout">
+      <section class="main-panel">
+        <section class="lecturer-hero">
+          <div class="hero-overlay">
+            <p class="hero-kicker">EduSIM Lecturer Portal</p>
+            <h2>Guide Learning and Assessment from One Place</h2>
+            <p>Manage course content, publish quizzes, and monitor student outcomes with a clear workflow.</p>
+          </div>
+        </section>
+
+        <section class="welcome-band">
+          <div>
+            <p class="welcome-tag">Welcome back</p>
+            <h1>{{ dashboard.lecturer.name }}</h1>
+          </div>
+        </section>
+
+        <section class="grid cards-3">
+          <article class="panel card">
+            <h2>{{ dashboard.stats.courses }}</h2>
+            <p>Courses Managed</p>
+          </article>
+          <article class="panel card">
+            <h2>{{ dashboard.stats.videos }}</h2>
+            <p>Total Videos</p>
+          </article>
+          <article class="panel card">
+            <h2>{{ dashboard.stats.quizzes }}</h2>
+            <p>Total Quizzes</p>
+          </article>
+          <article class="panel card">
+            <h2>{{ dashboard.stats.students }}</h2>
+            <p>Enrolled Students</p>
+          </article>
+        </section>
+
+        <section class="panel block course-overview-block">
+          <div class="overview-head">
+            <h2>Course Overview</h2>
+            <span>{{ filteredCourses().length }} course</span>
+          </div>
+
+          <div class="overview-search">
+            <input
+              type="text"
+              name="lecturerCourseSearch"
+              placeholder="Search course"
+              [(ngModel)]="courseSearch">
+          </div>
+
+          @if (filteredCourses().length === 0) {
+            <p class="muted">No managed courses found.</p>
+          } @else {
+            <div class="overview-grid">
+              @for (course of filteredCourses(); track course.courseId; let i = $index) {
+                <article class="overview-card">
+                  <img [src]="courseImage(course, i)" [alt]="course.title">
+                  <div class="overview-body">
+                    <p class="overview-meta">Managed Course</p>
+                    <h3>{{ course.title }}</h3>
+                    <p class="overview-desc">{{ course.description || "Course description is not set yet." }}</p>
+                    <div class="overview-stats">
+                      <span>{{ course.videoCount }} videos</span>
+                      <span>{{ course.quizCount }} quizzes</span>
+                      <span>{{ recentSubmissionCount(course.title) }} submissions</span>
+                    </div>
+                    <div class="overview-actions">
+                      <a
+                        class="action-link"
+                        [routerLink]="['/lecturer/manage']"
+                        [queryParams]="{ courseId: course.courseId, flash: 'Course workspace opened.' }">
+                        <span class="action-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h5l2 2h8A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path>
+                          </svg>
+                        </span>
+                        <span>Open Course</span>
+                        <span class="action-arrow" aria-hidden="true">↗</span>
+                      </a>
+                      <a
+                        class="action-link"
+                        [routerLink]="['/lecturer/quiz-settings']"
+                        [queryParams]="{ courseId: course.courseId, mode: 'create' }">
+                        <span class="action-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path d="M4 20h4l10-10a2 2 0 0 0-4-4L4 16z"></path>
+                            <path d="M13 7l4 4"></path>
+                          </svg>
+                        </span>
+                        <span>Add/Edit Quiz</span>
+                        <span class="action-arrow" aria-hidden="true">↗</span>
+                      </a>
+                      <a
+                        class="action-link"
+                        [routerLink]="['/lecturer/monitoring']"
+                        [queryParams]="{ courseId: course.courseId, courseTitle: course.title }">
+                        <span class="action-icon" aria-hidden="true">
+                          <svg viewBox="0 0 24 24">
+                            <path d="M4 19V5"></path>
+                            <path d="M4 19h16"></path>
+                            <path d="M8 16v-4"></path>
+                            <path d="M12 16v-7"></path>
+                            <path d="M16 16v-2"></path>
+                            <path d="M20 16v-9"></path>
+                          </svg>
+                        </span>
+                        <span>Performance Dashboard</span>
+                        <span class="action-arrow" aria-hidden="true">↗</span>
+                      </a>
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </section>
+
+        <section class="panel block">
+          <div class="heading">
+            <h2>Recent Submission</h2>
+          </div>
+          @if (dashboard.recentActivity.length === 0) {
+            <p class="muted">No submission yet.</p>
+          } @else {
+            <table>
+              <thead>
+                <tr>
+                  <th>Student</th>
+                  <th>Quiz</th>
+                  <th>Course</th>
+                  <th>Score</th>
+                  <th>Status</th>
+                  <th>Date</th>
+                </tr>
+              </thead>
+              <tbody>
+                @for (item of dashboard.recentActivity; track item.attemptId) {
+                  <tr>
+                    <td>{{ item.studentName }}</td>
+                    <td>{{ item.quizTitle }}</td>
+                    <td>{{ item.courseTitle }}</td>
+                    <td>{{ item.score }}%</td>
+                    <td>
+                      <span class="badge" [class.fail]="!item.passed">
+                        {{ item.passed ? "PASS" : "FAIL" }}
+                      </span>
+                    </td>
+                    <td>{{ item.submittedAt | date: "medium" }}</td>
+                  </tr>
+                }
+              </tbody>
+            </table>
+          }
+        </section>
+      </section>
+
+      <aside class="side-panel">
+        <section class="calendar-card">
+          <div class="month-head">
+            <h3>{{ monthLabel }}</h3>
+            <div class="month-nav">
+              <button type="button" (click)="previousMonth()">&#8249;</button>
+              <button type="button" (click)="nextMonth()">&#8250;</button>
+            </div>
+          </div>
+
+          <div class="calendar-grid">
+            @for (dayLabel of weekDays; track dayLabel) {
+              <span class="weekday">{{ dayLabel }}</span>
+            }
+            @for (week of monthGrid; track $index) {
+              @for (day of week; track $index) {
+                <div class="day-cell" [class.today]="isToday(day)" [class.has-entry]="entriesForDay(day).length > 0">
+                  {{ day ?? "" }}
+                </div>
+              }
+            }
+          </div>
+        </section>
+
+        <section class="timeline-card">
+          <h3>Timeline</h3>
+          @if (timelineEntries().length === 0) {
+            <p class="muted">No activity yet.</p>
+          } @else {
+            <ul class="timeline-list">
+              @for (item of timelineEntries(); track item.id) {
+                <li>
+                  <p class="timeline-title">{{ item.title }}</p>
+                  <p class="timeline-sub">{{ item.subtitle }}</p>
+                  <p class="timeline-meta">
+                    {{ item.occurredAt | date: "shortTime" }}
+                    @if (item.type === "MARKING") {
+                      - {{ item.score ?? 0 }}%
+                    } @else {
+                      - {{ timelineTypeLabel(item.type) }}
+                    }
+                  </p>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      </aside>
+    </section>
+  }
+</div>

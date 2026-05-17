@@ -1,0 +1,246 @@
+<div class="container dashboard-container">
+  @if (loading) {
+    <p>Loading dashboard...</p>
+  } @else if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+  } @else if (dashboard) {
+    <section class="student-shell panel">
+      <section class="student-hero">
+        <div class="hero-overlay">
+          <p class="hero-kicker">EduSIM Student Portal</p>
+          <h2>Track Learning and Self-Assessment from One Place</h2>
+          <p>Access course materials, complete quizzes, and stay on top of your progress with a clear workflow.</p>
+        </div>
+      </section>
+
+      <section class="welcome-band">
+        <div>
+          <p class="welcome-tag">Welcome back</p>
+          <h1>{{ dashboard.student.name }}</h1>
+          <p class="welcome-note">{{ completionHeadline() }}</p>
+        </div>
+      </section>
+
+      <section class="stats-grid">
+        <article class="stat-card">
+          <p class="stat-value">{{ dashboard.courses?.length ?? 0 }}</p>
+          <p class="stat-label">Courses Enrolled</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-value">{{ completedCoursesCount() }}</p>
+          <p class="stat-label">Courses Completed</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-value">{{ activitiesCompletedCount() }}</p>
+          <p class="stat-label">Activities Completed</p>
+        </article>
+        <article class="stat-card">
+          <p class="stat-value">{{ activitiesDueCount() }}</p>
+          <p class="stat-label">Activities Due</p>
+        </article>
+      </section>
+
+      <section class="course-overview">
+        <div class="overview-head">
+          <h2>Course overview</h2>
+          <a class="muted-link" routerLink="/student/history">See attempt history</a>
+        </div>
+
+        <div class="overview-tabs">
+          <button type="button" [class.active]="courseTab === 'all'" (click)="setCourseTab('all')">All</button>
+          <button type="button" [class.active]="courseTab === 'inProgress'" (click)="setCourseTab('inProgress')">In progress</button>
+          <button type="button" [class.active]="courseTab === 'completed'" (click)="setCourseTab('completed')">Completed</button>
+        </div>
+
+        <div class="overview-tools">
+          <select name="courseSort" [(ngModel)]="courseSort">
+            <option value="name">Sort by course name</option>
+            <option value="progressDesc">Highest progress</option>
+            <option value="progressAsc">Lowest progress</option>
+          </select>
+          <input
+            type="text"
+            name="courseSearchTop"
+            placeholder="Search course"
+            [(ngModel)]="searchText">
+          <span class="view-mode">List view</span>
+        </div>
+
+        <div class="course-grid">
+          @for (course of filteredCourses(); track course.courseId; let i = $index) {
+            <article class="course-card">
+              <img [src]="courseImage(course, i)" [alt]="course.title">
+              <div class="course-body">
+                <h3>{{ course.title }}</h3>
+                <p class="progress-text">{{ course.progress }}% complete</p>
+                <div class="progress-track">
+                  <span class="progress-fill" [style.width.%]="course.progress"></span>
+                </div>
+                <div class="course-actions">
+                  <a class="btn btn-outline course-btn" [routerLink]="['/student/courses', course.courseId]">Open Course</a>
+                </div>
+              </div>
+            </article>
+          }
+        </div>
+      </section>
+
+      <section class="bottom-grid">
+        <section class="timeline-card panel">
+          <div class="timeline-headline">
+            <h3>Timeline</h3>
+            <span>{{ filteredTimelineEntries().length }} items</span>
+          </div>
+          <input
+            class="timeline-search"
+            type="text"
+            name="timelineSearch"
+            placeholder="Search activity"
+            [(ngModel)]="timelineSearch">
+          @if (filteredTimelineEntries().length === 0) {
+            <p class="muted">No activity.</p>
+          } @else {
+            <ul class="timeline-list">
+              @for (entry of filteredTimelineEntries(); track $index) {
+                <li>
+                  <p class="item-title">{{ entry.title }}</p>
+                  <p class="item-detail">{{ entry.detail }}</p>
+                  <button
+                    type="button"
+                    class="item-action"
+                    [disabled]="entry.disabled"
+                    (click)="handleTimelineAction(entry)">
+                    {{ entry.actionLabel }}
+                  </button>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+
+        <section class="calendar-card panel">
+          <h3>Calendar</h3>
+          <select name="calendarCourseFilter" [(ngModel)]="calendarCourseFilter">
+            <option value="all">All courses</option>
+            @for (course of dashboard.courses; track course.courseId) {
+              <option [value]="course.courseId">{{ course.title }}</option>
+            }
+          </select>
+
+          <div class="month-head">
+            <p>{{ monthLabel }}</p>
+            <div class="month-nav">
+              <button type="button" (click)="previousMonth()">&#8249;</button>
+              <button type="button" (click)="nextMonth()">&#8250;</button>
+            </div>
+          </div>
+
+          <div class="calendar-grid">
+            @for (dayLabel of weekDays; track dayLabel) {
+              <span class="weekday">{{ dayLabel }}</span>
+            }
+            @for (week of monthGrid; track $index) {
+              @for (day of week; track $index) {
+                <button
+                  type="button"
+                  class="day-cell"
+                  [class.today]="isToday(day)"
+                  [class.has-event]="eventsForDay(day).length > 0"
+                  [class.selected]="day === selectedDay"
+                  [disabled]="!day"
+                  (click)="selectDay(day)">
+                  {{ day ?? "" }}
+                </button>
+              }
+            }
+          </div>
+
+          <div class="calendar-tools">
+            <button type="button" class="btn btn-outline calendar-add-btn" (click)="openEventModal(selectedDay)">
+              Add Event
+            </button>
+            <button type="button" class="calendar-today-btn" (click)="goToToday()">Today</button>
+          </div>
+
+          <div class="calendar-events">
+            <div class="calendar-events-head">
+              <p>{{ selectedDayLabel() }}</p>
+              <span>{{ selectedDayEvents().length }} event(s)</span>
+            </div>
+
+            @if (selectedDayEvents().length === 0) {
+              <p class="muted">No event on this date.</p>
+            } @else {
+              <ul class="calendar-event-list">
+                @for (event of selectedDayEvents(); track event.id) {
+                  <li [class]="eventClass(event)">
+                    <div>
+                      <p class="event-title">{{ event.title }}</p>
+                      <p class="event-meta">{{ event.category }}{{ event.auto ? " - Auto" : " - Custom" }}</p>
+                    </div>
+
+                    <div class="event-actions">
+                      @if (canOpenPlannerEvent(event)) {
+                        <button type="button" class="event-open-btn" (click)="openPlannerEvent(event)">Open</button>
+                      }
+                      @if (!event.auto) {
+                        <button type="button" class="event-delete-btn" (click)="removePlannerEvent(event.id, $event)">Delete</button>
+                      }
+                    </div>
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+        </section>
+      </section>
+    </section>
+
+    @if (showEventModal) {
+      <div class="modal-backdrop" (click)="closeEventModal()">
+        <section class="event-modal panel" (click)="$event.stopPropagation()">
+          <h3>Create Study Event</h3>
+
+          <form (ngSubmit)="addPlannerEvent()">
+            <div class="form-field">
+              <label for="eventTitle">Event title</label>
+              <input id="eventTitle" name="eventTitle" [(ngModel)]="eventForm.title" required>
+            </div>
+
+            <div class="form-field">
+              <label for="eventDate">Date</label>
+              <input id="eventDate" name="eventDate" type="date" [(ngModel)]="eventForm.date" required>
+            </div>
+
+            <div class="form-grid">
+              <div class="form-field">
+                <label for="eventCourse">Course</label>
+                <select id="eventCourse" name="eventCourse" [(ngModel)]="eventForm.courseId">
+                  <option value="all">General</option>
+                  @for (course of dashboard.courses; track course.courseId) {
+                    <option [value]="course.courseId">{{ course.title }}</option>
+                  }
+                </select>
+              </div>
+
+              <div class="form-field">
+                <label for="eventCategory">Category</label>
+                <select id="eventCategory" name="eventCategory" [(ngModel)]="eventForm.category">
+                  <option value="TASK">Task</option>
+                  <option value="STUDY">Study</option>
+                  <option value="QUIZ">Quiz</option>
+                  <option value="VIDEO">Video</option>
+                </select>
+              </div>
+            </div>
+
+            <div class="modal-actions">
+              <button class="btn btn-outline" type="button" (click)="closeEventModal()">Cancel</button>
+              <button class="btn" type="submit">Add Event</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    }
+  }
+</div>
