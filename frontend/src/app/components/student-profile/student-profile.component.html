@@ -1,0 +1,107 @@
+<div class="container profile-page">
+  @if (loading) {
+    <p>Loading profile...</p>
+  } @else if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+  } @else {
+    <section class="profile-layout">
+      <section class="profile-main">
+        <section class="panel hero-card">
+          <div class="avatar">{{ studentName().charAt(0) }}</div>
+          <div class="hero-copy">
+            <h1>{{ studentName() }}</h1>
+            <p>{{ completionLabel() }}</p>
+            <div class="hero-actions">
+              <a class="chip-button" routerLink="/student/my-courses">My Courses</a>
+              <a class="chip-button chip-button-alt" routerLink="/student/dashboard/grades">Grades</a>
+            </div>
+          </div>
+          <div class="hero-progress">
+            <p>Progress</p>
+            <strong>{{ overallProgressPercent() }}%</strong>
+            <span>{{ enrolledCoursesCount() }} courses</span>
+          </div>
+        </section>
+
+        <section class="accordion-list">
+          @for (section of profileSections; track section.title) {
+            <details class="panel accordion-item" [open]="section.open ?? false">
+              <summary>
+                <span>{{ section.title }}</span>
+                <span class="chevron" aria-hidden="true">&#9662;</span>
+              </summary>
+              <div class="accordion-content">
+                <p>{{ section.detail }}</p>
+                <div class="mini-tags">
+                  <span>Open quizzes: {{ openQuizCount() }}</span>
+                  <span>Pending results: {{ pendingResultCount() }}</span>
+                </div>
+              </div>
+            </details>
+          }
+        </section>
+
+        <section class="last-courses">
+          <div class="section-head">
+            <h2>Recently accessed courses</h2>
+            <a routerLink="/student/my-courses">View all</a>
+          </div>
+          @if (lastAccessedCourses().length === 0) {
+            <p class="muted">No enrolled course yet.</p>
+          } @else {
+            <div class="course-grid">
+              @for (course of lastAccessedCourses(); track course.courseId; let i = $index) {
+                <article class="panel course-card">
+                  <div class="thumb-wrap">
+                    <img [src]="courseImage(course, i)" [alt]="course.title">
+                    <a class="preview-btn" [routerLink]="['/student/courses', course.courseId]">Open</a>
+                  </div>
+                  <div class="card-body">
+                    <h3>{{ course.title }}</h3>
+                    <p>{{ course.progress ?? 0 }}% complete</p>
+                    <div class="progress-track">
+                      <span class="progress-fill" [style.width.%]="course.progress ?? 0"></span>
+                    </div>
+                  </div>
+                </article>
+              }
+            </div>
+          }
+        </section>
+      </section>
+
+      <aside class="profile-side">
+        <section class="panel side-card">
+          <h3>Profile</h3>
+          <dl>
+            @for (row of profileFacts(); track row.label) {
+              <div>
+                <dt>{{ row.label }}</dt>
+                <dd>{{ row.value }}</dd>
+              </div>
+            }
+          </dl>
+        </section>
+
+        <section class="panel side-card">
+          <h3>Recent activity</h3>
+          @if (recentActivities().length === 0) {
+            <p class="muted">No recent activity.</p>
+          } @else {
+            <ul class="activity-list">
+              @for (item of recentActivities(); track item.attemptId) {
+                <li>
+                  <p class="activity-title">{{ item.quizTitle }}</p>
+                  <p class="activity-meta">{{ item.submittedAt | date: "medium" }}</p>
+                  <span class="status-pill" [class.pass]="activityStatusClass(item) === 'pass'" [class.fail]="activityStatusClass(item) === 'fail'" [class.pending]="activityStatusClass(item) === 'pending'">
+                    {{ activityStatusLabel(item) }}
+                  </span>
+                </li>
+              }
+            </ul>
+          }
+        </section>
+      </aside>
+    </section>
+  }
+</div>

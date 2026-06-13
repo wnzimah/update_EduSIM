@@ -55,6 +55,9 @@
           {{ currentCourse ? ("Manage lessons, resources, and quiz flow for " + currentCourse.title + ".") : "Manage lessons and resources with a clear content workflow." }}
         </p>
       </div>
+      <a class="btn dashboard-back-btn" routerLink="/lecturer/dashboard">
+        Back to Dashboard
+      </a>
     </header>
 
     <section class="workflow-panel">
@@ -82,6 +85,14 @@
           (click)="setManageTab('CONTENT')">
           3. Course Content &amp; Updating Lesson Video
         </button>
+        <button
+          class="flow-tab"
+          type="button"
+          [class.active]="manageTab === 'STUDENTS'"
+          [disabled]="!currentCourse"
+          (click)="setManageTab('STUDENTS')">
+          4. Students
+        </button>
       </div>
     </section>
 
@@ -96,12 +107,6 @@
                 <option [value]="course.courseId">{{ course.title }}</option>
               }
             </select>
-            @if (selectedCourseId && currentCourse) {
-              <p class="selected-course-pill">
-                Selected course:
-                <strong>{{ currentCourse.title }}</strong>
-              </p>
-            }
           </div>
         </div>
       }
@@ -116,6 +121,20 @@
             <label for="newCourseDescription">Description</label>
             <input id="newCourseDescription" name="newCourseDescription" placeholder="Brief course description" [(ngModel)]="courseForm.description" required>
           </div>
+          <div class="field">
+            <label for="newCourseImage">Course Image</label>
+            <div class="course-image-upload">
+              <input id="newCourseImage" name="newCourseImage" type="file" accept="image/png, image/jpeg, image/webp" (change)="onCourseImageSelected($event, 'CREATE')">
+              <span>Choose image from computer</span>
+            </div>
+            <small class="field-help">Optional. Lecturer uploads the image shown on the course card.</small>
+          </div>
+          @if (courseForm.imageUrl.trim()) {
+            <div class="course-image-preview">
+              <img [src]="courseForm.imageUrl" alt="Course image preview">
+              <button class="remove-image-btn" type="button" (click)="removeCourseImage('CREATE')">Remove image</button>
+            </div>
+          }
           <div class="form-actions">
             <button class="btn" type="submit">Create Course</button>
           </div>
@@ -133,6 +152,20 @@
               <label for="courseDescription">Course Description</label>
               <input id="courseDescription" name="courseDescription" [(ngModel)]="courseEditForm.description" required>
             </div>
+            <div class="field">
+              <label for="courseImageFile">Course Image</label>
+              <div class="course-image-upload">
+                <input id="courseImageFile" name="courseImageFile" type="file" accept="image/png, image/jpeg, image/webp" (change)="onCourseImageSelected($event, 'EDIT')">
+                <span>Choose image from computer</span>
+              </div>
+              <small class="field-help">Optional. Lecturer uploads the image shown on the course card.</small>
+            </div>
+            @if (courseEditForm.imageUrl.trim()) {
+              <div class="course-image-preview">
+                <img [src]="courseEditForm.imageUrl" alt="Course image preview">
+                <button class="remove-image-btn" type="button" (click)="removeCourseImage('EDIT')">Remove image</button>
+              </div>
+            }
             <div class="form-actions">
               <button class="btn" type="submit">Update Course</button>
               <button class="btn btn-danger" type="button" (click)="deleteSelectedCourse()">Delete Course</button>
@@ -152,6 +185,50 @@
           </div>
         } @else {
           <p class="warning">Select a course first before managing course content.</p>
+        }
+      }
+
+      @if (manageTab === "STUDENTS") {
+        @if (currentCourse) {
+          <section class="student-management-panel">
+            <header>
+              <div>
+                <h3>{{ currentCourse.title }} - Student Enrolment</h3>
+                <p class="muted">View enrolled students and add a student to this course using their EduSIM email.</p>
+              </div>
+              <strong>{{ courseStudents.length }} student(s)</strong>
+            </header>
+
+            <form class="student-add-form" (ngSubmit)="addCourseStudent()">
+              <div class="field">
+                <label for="studentEmail">Student Email</label>
+                <input id="studentEmail" name="studentEmail" type="email" placeholder="student@edusim.com" [(ngModel)]="studentForm.email" required>
+              </div>
+              <button class="btn" type="submit">Add Student</button>
+            </form>
+
+            @if (courseStudents.length === 0) {
+              <p class="muted">No student enrolled in this course yet.</p>
+            } @else {
+              <div class="student-list-table">
+                <div class="student-list-head">
+                  <span>Student</span>
+                  <span>Email</span>
+                  <span>Enrolled</span>
+                </div>
+                @for (student of courseStudents; track student.enrollmentId) {
+                  <div class="student-list-row">
+                    <span class="student-avatar">{{ studentInitials(student) }}</span>
+                    <strong>{{ student.fullName }}</strong>
+                    <span>{{ student.email }}</span>
+                    <span>{{ student.enrolledAt | date: "mediumDate" }}</span>
+                  </div>
+                }
+              </div>
+            }
+          </section>
+        } @else {
+          <p class="warning">Select a course first before managing students.</p>
         }
       }
     </section>
@@ -241,6 +318,42 @@
             <button class="btn" type="submit">Add Material</button>
           </form>
         }
+      }
+
+      @if (videoItems.length > 0) {
+        <section class="lesson-path-settings" aria-label="Lesson path settings">
+          <div class="lesson-path-head">
+            <div>
+              <p>Learning Path Setting</p>
+              <h3>Module 1: {{ currentCourse?.title ?? "Course" }}</h3>
+              <span>{{ mandatoryLessonCount() }} of {{ videoItems.length }} lessons required</span>
+            </div>
+            <strong>{{ lessonPathPercent() }}%</strong>
+          </div>
+
+          <div class="lesson-path-progress">
+            <span [style.width.%]="lessonPathPercent()"></span>
+          </div>
+
+          <div class="lecturer-lesson-tree">
+            @for (video of videoItems; track video.id) {
+              <div class="lecturer-lesson-row" [class.active]="isSelectedItem(video)" [class.optional]="!video.mandatory">
+                <button class="lesson-main-button" type="button" (click)="selectContentItem(video)">
+                  <span class="lesson-status-dot"></span>
+                  <span>{{ video.sortOrder }}. {{ video.title }}</span>
+                  <small>{{ video.mandatory ? "Required" : "Optional" }}</small>
+                </button>
+                <div class="lesson-setting-actions">
+                  <button type="button" [disabled]="!canMoveVideo(video, -1)" (click)="moveVideo(video, -1)">Up</button>
+                  <button type="button" [disabled]="!canMoveVideo(video, 1)" (click)="moveVideo(video, 1)">Down</button>
+                  <button type="button" (click)="toggleVideoRequirement(video)">
+                    {{ video.mandatory ? "Make Optional" : "Make Required" }}
+                  </button>
+                </div>
+              </div>
+            }
+          </div>
+        </section>
       }
 
       <div class="content-list-wrap">

@@ -1,0 +1,206 @@
+<div class="quiz-preview-page">
+  @if (loading) {
+    <section class="preview-state" aria-live="polite">
+      <p>Loading preview</p>
+      <h1>Preparing quiz details...</h1>
+      <span>Questions, answers, release rules, and marking setup are being synced.</span>
+    </section>
+  } @else if (errorMessage) {
+    <section class="preview-state error-state">
+      <p>Preview unavailable</p>
+      <h1>{{ errorMessage }}</h1>
+      <a class="preview-btn secondary" routerLink="/lecturer/quiz-overview">Back to Quiz Overview</a>
+    </section>
+  } @else if (quiz) {
+    <header class="preview-hero">
+      <nav class="preview-topbar" aria-label="Quiz preview actions">
+        <a class="back-link" routerLink="/lecturer/quiz-overview" [queryParams]="backQueryParams()">Back to Quiz Overview</a>
+        <div class="topbar-actions">
+          <a class="preview-btn secondary" routerLink="/lecturer/quiz-results" [queryParams]="backQueryParams()">Results</a>
+          <a class="preview-btn" routerLink="/lecturer/quiz-builder" [queryParams]="backQueryParams()">Edit Quiz</a>
+        </div>
+      </nav>
+
+      <div class="hero-grid">
+        <div class="hero-copy">
+          <p class="eyebrow">{{ quiz.courseTitle || "Course quiz" }}</p>
+          <h1>{{ quiz.title }}</h1>
+          <p class="description">{{ quiz.description || "No description has been added for this quiz." }}</p>
+          <div class="hero-badges">
+            <span [class.draft]="!quiz.published">{{ quizStatusLabel() }}</span>
+            <span>{{ displayModeLabel() }}</span>
+            <span>{{ resultReleaseLabel() }}</span>
+          </div>
+        </div>
+
+        <aside class="score-card" aria-label="Quiz summary">
+          <p>Total marks</p>
+          <strong>{{ totalPoints() }}</strong>
+          <span>{{ questions.length }} question{{ questions.length === 1 ? "" : "s" }}</span>
+        </aside>
+      </div>
+    </header>
+
+    <main class="preview-layout">
+      <aside class="preview-sidebar">
+        <section class="side-panel">
+          <h2>Quiz Setup</h2>
+          <dl class="detail-list">
+            <div>
+              <dt>Time limit</dt>
+              <dd>{{ quiz.timeLimitMinutes || 0 }} min</dd>
+            </div>
+            <div>
+              <dt>Attempts</dt>
+              <dd>{{ quiz.maxAttempts || 0 }}</dd>
+            </div>
+            <div>
+              <dt>Passing mark</dt>
+              <dd>{{ quiz.passingMark || 0 }}%</dd>
+            </div>
+            <div>
+              <dt>Open date</dt>
+              <dd>{{ quiz.openAt ? (quiz.openAt | date : "medium") : "Not set" }}</dd>
+            </div>
+            <div>
+              <dt>Close date</dt>
+              <dd>{{ quiz.closeAt ? (quiz.closeAt | date : "medium") : "Not set" }}</dd>
+            </div>
+            <div>
+              <dt>Result release</dt>
+              <dd>{{ quiz.showResultImmediately ? "Immediate" : (quiz.resultReleaseAt ? (quiz.resultReleaseAt | date : "medium") : "Not set") }}</dd>
+            </div>
+          </dl>
+        </section>
+
+        <section class="side-panel">
+          <h2>Question Mix</h2>
+          @if (typeBreakdown().length === 0) {
+            <p class="muted">No questions added yet.</p>
+          } @else {
+            <div class="type-stack">
+              @for (item of typeBreakdown(); track item.type) {
+                <div>
+                  <span>{{ item.label }}</span>
+                  <strong>{{ item.count }}</strong>
+                </div>
+              }
+            </div>
+          }
+        </section>
+
+        <section class="side-panel">
+          <h2>Student Feedback</h2>
+          <div class="feedback-stack">
+            @for (item of feedbackItems(); track item.label) {
+              <div [class.enabled]="item.enabled">
+                <span>{{ item.enabled ? "On" : "Off" }}</span>
+                <p>{{ item.label }}</p>
+              </div>
+            }
+          </div>
+        </section>
+      </aside>
+
+      <section class="question-column">
+        <div class="section-head">
+          <div>
+            <p class="eyebrow">Question details</p>
+            <h2>Full Quiz Preview</h2>
+          </div>
+          <span>{{ totalPoints() }} point{{ totalPoints() === 1 ? "" : "s" }} available</span>
+        </div>
+
+        @if (questions.length === 0) {
+          <section class="empty-questions">
+            <h3>No questions yet</h3>
+            <p>Add questions in the quiz builder before publishing this quiz.</p>
+          </section>
+        } @else {
+          @for (question of questions; track question.questionId) {
+            <article class="question-card">
+              <header class="question-head">
+                <div>
+                  <p>Q{{ question.sortOrder }}</p>
+                  <h3>{{ question.prompt }}</h3>
+                </div>
+                <div class="question-meta">
+                  <span>{{ questionTypeLabel(question.questionType) }}</span>
+                  <span>{{ question.points || 0 }} point{{ question.points === 1 ? "" : "s" }}</span>
+                </div>
+              </header>
+
+              @if (question.mediaUrl) {
+                <div class="media-panel">
+                  <span>{{ question.mediaType || "Media" }}</span>
+                  <a [href]="question.mediaUrl" target="_blank" rel="noreferrer">{{ question.mediaUrl }}</a>
+                </div>
+              }
+
+              @if (question.questionType === "MCQ" || question.questionType === "MULTI_SELECT") {
+                <div class="option-list">
+                  @for (option of answerOptions(question); track option; let index = $index) {
+                    <div class="option-row" [class.correct]="isCorrectOption(question, option)">
+                      <span class="option-key">{{ index + 1 }}</span>
+                      <p>{{ option }}</p>
+                      @if (isCorrectOption(question, option)) {
+                        <strong>Correct</strong>
+                      }
+                    </div>
+                  }
+                </div>
+              } @else if (question.questionType === "TRUE_FALSE" || question.questionType === "SHORT_ANSWER") {
+                <div class="answer-panel">
+                  <span>Correct answer</span>
+                  @if (correctAnswerValues(question).length) {
+                    @for (answer of correctAnswerValues(question); track answer) {
+                      <strong>{{ answer }}</strong>
+                    }
+                  } @else {
+                    <strong>Not set</strong>
+                  }
+                  @if (keywords(question).length) {
+                    <p>Keywords: {{ keywords(question).join(", ") }}</p>
+                  }
+                </div>
+              } @else if (question.questionType === "MATCHING") {
+                <div class="matching-preview">
+                  <div class="matching-toolbar">
+                    <span>{{ matchingScoringLabel(question) }}</span>
+                    <span>{{ duplicateResponseLabel(question) }}</span>
+                  </div>
+                  <div class="matching-grid">
+                    <section>
+                      <h4>Prompts and correct matches</h4>
+                      @for (prompt of matchingPrompts(question); track prompt) {
+                        <div class="match-row">
+                          <p>{{ prompt }}</p>
+                          <strong>{{ matchingAnswerFor(question, prompt) }}</strong>
+                        </div>
+                      }
+                    </section>
+                    <section>
+                      <h4>Possible responses</h4>
+                      <div class="response-list">
+                        @for (response of matchingResponses(question); track response) {
+                          <span>{{ response }}</span>
+                        }
+                      </div>
+                    </section>
+                  </div>
+                </div>
+              }
+
+              @if (question.explanation) {
+                <footer class="explanation-panel">
+                  <span>Explanation</span>
+                  <p>{{ question.explanation }}</p>
+                </footer>
+              }
+            </article>
+          }
+        }
+      </section>
+    </main>
+  }
+</div>

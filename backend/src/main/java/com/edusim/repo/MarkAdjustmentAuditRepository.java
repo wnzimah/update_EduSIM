@@ -6,6 +6,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 
 public interface MarkAdjustmentAuditRepository extends JpaRepository<MarkAdjustmentAudit, Long> {
     List<MarkAdjustmentAudit> findByAttemptAnswerAttemptIdOrderByChangedAtDesc(Long attemptId);
+    void deleteByAttemptAnswerAttemptIdIn(List<Long> attemptIds);
     void deleteByAttemptAnswerAttemptQuizId(Long quizId);
     void deleteByAttemptAnswerAttemptQuizCourseId(Long courseId);
 }

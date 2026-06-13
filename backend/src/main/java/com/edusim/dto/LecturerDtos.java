@@ -3,6 +3,7 @@ package com.edusim.dto;
 import com.edusim.model.DifficultyLevel;
 import com.edusim.model.QuestionType;
 import com.edusim.model.QuizDisplayMode;
+import com.edusim.model.ReviewTiming;
 import jakarta.validation.constraints.Max;
 import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
@@ -15,7 +16,8 @@ public class LecturerDtos {
 
     public record CourseRequest(
         @NotBlank String title,
-        @NotBlank String description
+        @NotBlank String description,
+        String imageUrl
     ) {
     }
 
@@ -33,6 +35,11 @@ public class LecturerDtos {
         @NotBlank String title,
         @NotBlank String materialType,
         @NotBlank String resourceUrl
+    ) {
+    }
+
+    public record CourseStudentRequest(
+        @NotBlank String email
     ) {
     }
 
@@ -76,6 +83,17 @@ public class LecturerDtos {
         @NotNull Boolean shuffleAnswers,
         @NotNull QuizDisplayMode questionDisplayMode,
         @NotNull Boolean showResultImmediately,
+        Boolean showScoreAfterSubmission,
+        Boolean showCorrectAnswer,
+        Boolean showExplanation,
+        Boolean showRelatedConcept,
+        Boolean showLearningRecommendation,
+        Boolean showStudentAnswerReview,
+        ReviewTiming reviewTiming,
+        Boolean showSelectedAnswer,
+        Boolean showConfidence,
+        Boolean showScoreBreakdown,
+        Boolean manualReleaseStatus,
         LocalDateTime openAt,
         LocalDateTime closeAt,
         LocalDateTime resultReleaseAt,
@@ -91,5 +109,8 @@ public class LecturerDtos {
     }
 
     public record PublishRequest(@NotNull Boolean published) {
+    }
+
+    public record ManualReleaseRequest(Boolean released) {
     }
 }

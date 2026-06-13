@@ -1,25 +1,44 @@
 :root {
+  --edusim-primary: #2563eb;
+  --edusim-primary-dark: #174aa9;
+  --edusim-primary-soft: #eef6ff;
+  --edusim-accent: #f59e0b;
+  --edusim-accent-soft: #fff7e6;
+  --edusim-success: #16803c;
+  --edusim-success-soft: #eaf7ef;
+  --edusim-danger: #b42318;
+  --edusim-danger-soft: #fff2f2;
+  --edusim-warning: #b45309;
+  --edusim-warning-soft: #fff7ed;
+  --edusim-ink: #0f172a;
+  --edusim-muted: #64748b;
+  --edusim-border: #dbe4f0;
+  --edusim-panel: #ffffff;
+  --edusim-page: #fbfbff;
+  --edusim-hero: linear-gradient(110deg, #ffffff 0%, #f8fbff 52%, #fff7e6 100%);
+  --edusim-primary-gradient: linear-gradient(135deg, #2563eb 0%, #174aa9 100%);
+  --edusim-accent-gradient: linear-gradient(135deg, #f97316 0%, #f59e0b 100%);
   --bg: #08122d;
   --bg-soft: #0f1f46;
-  --bg-glow: #1f4fb8;
-  --panel: #f7faff;
+  --bg-glow: #2563eb;
+  --panel: #f8fbff;
   --panel-strong: #ffffff;
   --surface: #eaf0ff;
   --text: #152a4d;
   --muted: #5c739a;
-  --primary: #2f63ff;
-  --primary-dark: #1e45c9;
-  --accent: #55a8ff;
+  --primary: var(--edusim-primary);
+  --primary-dark: var(--edusim-primary-dark);
+  --accent: var(--edusim-accent);
   --navy: #091431;
-  --danger: #d4314f;
-  --border: #c6d5f3;
-  --field-bg: #edf3ff;
+  --danger: var(--edusim-danger);
+  --border: var(--edusim-border);
+  --field-bg: #f8fbff;
   --field-bg-hover: #f6f9ff;
-  --field-border: #afc4ee;
+  --field-border: #c8d7ec;
   --shadow-soft: 0 10px 24px rgba(10, 32, 80, 0.18);
   --shadow-medium: 0 20px 44px rgba(10, 32, 80, 0.24);
-  --grad-main: linear-gradient(114deg, #152d74 0%, #2755d9 52%, #3f88ff 100%);
-  --grad-alt: linear-gradient(114deg, #1b3fa2 0%, #2f63ff 50%, #55a8ff 100%);
+  --grad-main: var(--edusim-primary-gradient);
+  --grad-alt: linear-gradient(135deg, #174aa9 0%, #2563eb 100%);
   --layout-container-max: 1360px;
   --card-standard-max: 1120px;
   --field-control-height: 46px;
@@ -50,8 +69,22 @@
   100% { transform: translateX(220%); }
 }
 
+html,
+body {
+  min-height: 100%;
+  max-width: 100%;
+  overflow-x: hidden;
+}
+
+app-root {
+  min-height: 100dvh;
+  display: flex;
+  flex-direction: column;
+}
+
 body {
   margin: 0;
+  min-height: 100dvh;
   font-family: "Manrope", sans-serif;
   background:
     radial-gradient(circle at 12% 18%, rgba(80, 152, 255, 0.22) 0, rgba(80, 152, 255, 0) 38%),
@@ -296,4 +329,170 @@ tbody tr:hover {
 .page {
   padding: 24px 0 40px;
   animation: fade-up 0.35s ease both;
+}
+
+/* EduSIM consistency layer: shared button, popup, and message colors. */
+:where(
+  .btn,
+  .drawer-logout,
+  .complete-btn,
+  .course-action,
+  .start-btn,
+  .save-btn,
+  .submit-btn,
+  .add-btn,
+  .module-head button,
+  .unit-row,
+  .dock-toggle b,
+  .flow-tab.active,
+  .view-toggle button.active,
+  .level-pill,
+  .status-badge.published,
+  .bank-status-badge,
+  .settings-step-map button.active .settings-step-status
+) {
+  border-color: var(--edusim-primary) !important;
+  background: var(--edusim-primary-gradient) !important;
+  color: #ffffff !important;
+  box-shadow: 0 12px 24px rgba(37, 99, 235, 0.18) !important;
+}
+
+:where(.btn:hover, .drawer-logout:hover, .module-head button:hover, .flow-tab.active:hover) {
+  border-color: var(--edusim-primary-dark) !important;
+  background: linear-gradient(135deg, var(--edusim-primary-dark), var(--edusim-primary)) !important;
+}
+
+:where(
+  .btn-outline,
+  .flow-tab,
+  .view-toggle button,
+  .notification-head button,
+  .widget-drawer-close,
+  .confirm-close,
+  .login-modal-close,
+  .remove-image-btn
+) {
+  border-color: #bdd5ff !important;
+  background: var(--edusim-primary-soft) !important;
+  color: var(--edusim-primary-dark) !important;
+}
+
+:where(.btn-danger, .remove-image-btn, .settings-step-map button.error .settings-step-status) {
+  border-color: var(--edusim-danger) !important;
+  background: linear-gradient(135deg, var(--edusim-danger), #dc2626) !important;
+  color: #ffffff !important;
+}
+
+:where(
+  .book-tab,
+  .outline-tabs button.active
+) {
+  border-color: var(--edusim-accent) !important;
+}
+
+:where(.lesson-row.done .lesson-dot, .path-dock-head span) {
+  background: var(--edusim-accent-gradient) !important;
+}
+
+:where(.module-progress span, .course-progress-fill, .progress-fill, .progress-bar span) {
+  background: linear-gradient(90deg, var(--edusim-primary), var(--edusim-primary-dark), var(--edusim-accent)) !important;
+}
+
+:where(
+  .modal-shell,
+  .confirm-modal,
+  .planner-modal,
+  .submit-modal,
+  .forgot-modal,
+  .auth-card[role="dialog"],
+  .resource-drawer,
+  .widget-drawer,
+  .notification-drawer,
+  .user-drawer,
+  .utility-menu
+) {
+  border: 1px solid var(--edusim-border) !important;
+  border-radius: 8px !important;
+  background: var(--edusim-panel) !important;
+  color: var(--edusim-ink) !important;
+  box-shadow: 0 24px 54px rgba(15, 23, 42, 0.22) !important;
+}
+
+:where(
+  .modal-head,
+  .planner-modal-head,
+  .notification-head,
+  .drawer-hero,
+  .widget-drawer header,
+  .utility-menu header
+) {
+  background: var(--edusim-hero) !important;
+  border-bottom-color: var(--edusim-border) !important;
+}
+
+:where(
+  .modal-backdrop,
+  .confirm-backdrop,
+  .planner-modal-backdrop,
+  .submit-modal-backdrop,
+  .login-modal-backdrop,
+  .forgot-modal-backdrop,
+  .widget-drawer-backdrop
+) {
+  background: rgba(9, 20, 49, 0.58) !important;
+  backdrop-filter: blur(5px);
+}
+
+:where(
+  .ok,
+  .toast-ok,
+  .comment-success,
+  .import-success,
+  .reflection-message,
+  .status:not(.error),
+  .dashboard-state:not(.error)
+) {
+  border: 1px solid rgba(22, 128, 60, 0.24) !important;
+  border-left: 4px solid var(--edusim-success) !important;
+  border-radius: 8px !important;
+  background: var(--edusim-success-soft) !important;
+  color: var(--edusim-success) !important;
+  padding: 10px 12px !important;
+  font-weight: 800 !important;
+}
+
+:where(
+  .error,
+  .toast-error,
+  .comment-error,
+  .import-error,
+  .inline-draft-error,
+  .notification-state.error,
+  .status.error
+) {
+  border: 1px solid rgba(180, 35, 24, 0.24) !important;
+  border-left: 4px solid var(--edusim-danger) !important;
+  border-radius: 8px !important;
+  background: var(--edusim-danger-soft) !important;
+  color: var(--edusim-danger) !important;
+  padding: 10px 12px !important;
+  font-weight: 800 !important;
+}
+
+:where(.badge.warn, .status-pill.pending, .status-badge.draft) {
+  border-color: rgba(180, 83, 9, 0.24) !important;
+  background: var(--edusim-warning-soft) !important;
+  color: var(--edusim-warning) !important;
+}
+
+:where(.status-pill.approved, .status-pill.pass, .status-pill:not(.fail):not(.pending):not(.rejected)) {
+  border-color: rgba(22, 128, 60, 0.24) !important;
+  background: var(--edusim-success-soft) !important;
+  color: var(--edusim-success) !important;
+}
+
+:where(.status-pill.rejected, .status-pill.fail, .badge.fail) {
+  border-color: rgba(180, 35, 24, 0.24) !important;
+  background: var(--edusim-danger-soft) !important;
+  color: var(--edusim-danger) !important;
 }

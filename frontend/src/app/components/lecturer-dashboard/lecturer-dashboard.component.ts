@@ -44,6 +44,7 @@ export class LecturerDashboardComponent implements OnInit {
   monthLabel = "";
   monthGrid: Array<Array<number | null>> = [];
   showEventForm = false;
+  selectedDateKey = "";
   eventForm = {
     title: "",
     date: "",
@@ -54,6 +55,7 @@ export class LecturerDashboardComponent implements OnInit {
   private viewingDate = new Date();
 
   ngOnInit(): void {
+    this.selectedDateKey = this.defaultEventDate();
     this.buildCalendar();
     forkJoin({
       dashboard: this.lecturerService.dashboard(),
@@ -85,6 +87,16 @@ export class LecturerDashboardComponent implements OnInit {
     this.buildCalendar();
   }
 
+  selectCalendarDay(day: number | null): void {
+    if (!day) {
+      return;
+    }
+    this.selectedDateKey = this.dateForCell(day);
+    this.eventForm.date = this.selectedDateKey;
+    this.statusMessage = "";
+    this.errorMessage = "";
+  }
+
   isToday(day: number | null): boolean {
     if (!day) {
       return false;
@@ -97,7 +109,14 @@ export class LecturerDashboardComponent implements OnInit {
     );
   }
 
-  entriesForDay(day: number | null): any[] {
+  isSelectedDay(day: number | null): boolean {
+    if (!day) {
+      return false;
+    }
+    return this.dateForCell(day) === this.selectedDateKey;
+  }
+
+  entriesForDay(day: number | null): TimelineEntry[] {
     if (!day) {
       return [];
     }
@@ -119,6 +138,28 @@ export class LecturerDashboardComponent implements OnInit {
     return [...upcoming, ...recentPast].slice(0, 10);
   }
 
+  selectedDateLabel(): string {
+    if (!this.selectedDateKey) {
+      return "Select a date";
+    }
+    const date = new Date(`${this.selectedDateKey}T00:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return this.selectedDateKey;
+    }
+    return date.toLocaleDateString("en-US", {
+      weekday: "long",
+      month: "long",
+      day: "numeric",
+      year: "numeric"
+    });
+  }
+
+  selectedDateEntries(): TimelineEntry[] {
+    return this.buildTimelineEntries()
+      .filter((entry) => this.toDateKey(entry.occurredAt) === this.selectedDateKey)
+      .sort((a, b) => this.safeTimestamp(a.occurredAt) - this.safeTimestamp(b.occurredAt));
+  }
+
   timelineTypeLabel(type: TimelineEntryType): string {
     if (type === "QUIZ_DUE") {
       return "Due";
@@ -132,9 +173,17 @@ export class LecturerDashboardComponent implements OnInit {
   toggleEventForm(): void {
     this.showEventForm = !this.showEventForm;
     this.errorMessage = "";
-    if (this.showEventForm && !this.eventForm.date) {
-      this.eventForm.date = this.defaultEventDate();
+    this.statusMessage = "";
+    if (this.showEventForm) {
+      this.eventForm.date = this.selectedDateKey || this.defaultEventDate();
     }
+  }
+
+  openEventFormForSelectedDate(): void {
+    this.showEventForm = true;
+    this.errorMessage = "";
+    this.statusMessage = "";
+    this.eventForm.date = this.selectedDateKey || this.defaultEventDate();
   }
 
   addCalendarEvent(): void {
@@ -161,6 +210,12 @@ export class LecturerDashboardComponent implements OnInit {
     };
     this.manualEvents = [entry, ...this.manualEvents];
     this.persistManualEvents();
+    this.selectedDateKey = date;
+    const eventDate = new Date(`${date}T00:00:00`);
+    if (!Number.isNaN(eventDate.getTime())) {
+      this.viewingDate = new Date(eventDate.getFullYear(), eventDate.getMonth(), 1);
+      this.buildCalendar();
+    }
     this.statusMessage = "New event added to calendar.";
     this.showEventForm = false;
     this.eventForm = {
@@ -171,6 +226,14 @@ export class LecturerDashboardComponent implements OnInit {
     };
   }
 
+  deleteCalendarEvent(eventId: string): void {
+    this.errorMessage = "";
+    this.statusMessage = "";
+    this.manualEvents = this.manualEvents.filter((event) => event.id !== eventId);
+    this.persistManualEvents();
+    this.statusMessage = "Event removed from calendar.";
+  }
+
   filteredCourses(): any[] {
     const keyword = this.courseSearch.trim().toLowerCase();
     return [...this.courses]
@@ -179,6 +242,10 @@ export class LecturerDashboardComponent implements OnInit {
   }
 
   courseImage(course: any, index: number): string {
+    const imageUrl = String(course?.imageUrl ?? "").trim();
+    if (imageUrl) {
+      return imageUrl;
+    }
     const title = String(course?.title ?? "").toLowerCase();
     if (title.includes("data")) {
       return "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1400&q=80";

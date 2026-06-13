@@ -35,6 +35,8 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   searchText = "";
   courseTab: "all" | "inProgress" | "completed" = "all";
   courseSort: "name" | "progressDesc" | "progressAsc" = "name";
+  coursePage = 1;
+  readonly coursesPerPage = 2;
   timelineSearch = "";
   calendarCourseFilter = "all";
   showEventModal = false;
@@ -96,6 +98,7 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     this.studentService.dashboard().subscribe({
       next: (data) => {
         this.dashboard = data;
+        this.coursePage = 1;
         this.generateAutoPlannerEvents();
         this.loading = false;
       },
@@ -118,6 +121,227 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     }
     this.router.navigate(["/student/quiz", quizId], {
       queryParams: courseId ? { courseId } : {}
+    });
+  }
+
+  primaryCourse(): any | null {
+    const courses = [...(this.dashboard?.courses ?? [])];
+    if (courses.length === 0) {
+      return null;
+    }
+    const inProgress = courses
+      .filter((course: any) => Number(course?.progress ?? 0) < 100)
+      .sort((a: any, b: any) => Number(b?.progress ?? 0) - Number(a?.progress ?? 0));
+    return inProgress[0] ?? courses[0];
+  }
+
+  dashboardCourses(): any[] {
+    return [...(this.dashboard?.courses ?? [])]
+      .sort((a: any, b: any) => Number(b?.progress ?? 0) - Number(a?.progress ?? 0))
+      .slice(0, 3);
+  }
+
+  overallProgress(): number {
+    const courses = this.dashboard?.courses ?? [];
+    if (courses.length === 0) {
+      return 0;
+    }
+    const total = courses.reduce((sum: number, course: any) => sum + Number(course?.progress ?? 0), 0);
+    return Math.round(total / courses.length);
+  }
+
+  progressRingBackground(): string {
+    const degrees = Math.max(0, Math.min(100, this.overallProgress())) * 3.6;
+    return `conic-gradient(#4f46e5 0deg ${degrees}deg, #e7e9f2 ${degrees}deg 360deg)`;
+  }
+
+  courseProgressLabel(course: any): string {
+    return `${Math.round(Number(course?.progress ?? 0))}%`;
+  }
+
+  currentCourseStatus(course: any): string {
+    const progress = Number(course?.progress ?? 0);
+    if (progress >= 100) {
+      return "Completed";
+    }
+    if (progress > 0) {
+      return "In progress";
+    }
+    return "Ready to start";
+  }
+
+  nextLessonLabel(course: any): string {
+    const courseId = Number(course?.courseId ?? 0);
+    const video = (this.dashboard?.pendingVideos ?? []).find((item: any) => Number(item?.courseId ?? 0) === courseId);
+    if (video) {
+      return `${video.title} (${video.durationMinutes} min)`;
+    }
+    const quiz = (this.dashboard?.availableQuizzes ?? []).find((item: any) => Number(item?.courseId ?? 0) === courseId && !item?.locked);
+    if (quiz) {
+      return `Quiz ready: ${quiz.title}`;
+    }
+    return "All required lessons are up to date.";
+  }
+
+  focusMessage(): string {
+    const recommendation = this.recommendationsPreview()[0];
+    if (recommendation) {
+      return recommendation.title;
+    }
+    if (this.activitiesDueCount() > 0) {
+      return `${this.activitiesDueCount()} learning activity needs attention.`;
+    }
+    return "Review your latest feedback before the next quiz.";
+  }
+
+  latestFeedback(): any | null {
+    const rows = this.dashboard?.latestResults ?? [];
+    return rows[0] ?? null;
+  }
+
+  feedbackScoreLabel(feedback: any): string {
+    if (feedback?.resultReleased === false) {
+      return "-";
+    }
+    if (feedback?.score === null || feedback?.score === undefined) {
+      return "Hidden";
+    }
+    return `${Math.round(Number(feedback.score ?? 0))}%`;
+  }
+
+  feedbackStatusLabel(feedback: any): string {
+    if (feedback?.resultReleased === false) {
+      return "Pending release";
+    }
+    if (feedback?.passed === true) {
+      return "Pass";
+    }
+    if (feedback?.passed === false) {
+      return "Need revision";
+    }
+    return "Released";
+  }
+
+  feedbackFeedbackText(feedback: any): string {
+    const text = String(feedback?.feedback ?? "").trim();
+    if (text) {
+      return text;
+    }
+    return "Open detailed feedback to review question-by-question explanation and learning recommendations.";
+  }
+
+  openFeedback(feedback: any): void {
+    this.router.navigate(["/student/history"], {
+      queryParams: feedback?.attemptId ? { attemptId: feedback.attemptId } : {}
+    });
+  }
+
+  recommendationsPreview(): Array<{
+    badge: string;
+    title: string;
+    reason: string;
+    action: string;
+    link?: string;
+    courseId?: number;
+  }> {
+    const rows: Array<{
+      badge: string;
+      title: string;
+      reason: string;
+      action: string;
+      link?: string;
+      courseId?: number;
+    }> = [];
+    const seen = new Set<string>();
+
+    for (const result of this.dashboard?.latestResults ?? []) {
+      const recommendations = Array.isArray(result?.recommendations) ? result.recommendations : [];
+      for (const item of recommendations) {
+        const material = this.firstRecommendationMaterial(item);
+        const title = String(item?.title ?? item?.weakTopic ?? item?.topicTag ?? "Recommended revision").trim();
+        const key = title.toLowerCase();
+        if (!title || seen.has(key)) {
+          continue;
+        }
+        seen.add(key);
+        rows.push({
+          badge: "Topic",
+          title,
+          reason: String(item?.reason ?? "Review this topic to strengthen your next quiz attempt.").trim(),
+          action: material ? `Open ${this.learningMaterialLabel(material)}` : String(item?.actionLabel ?? "View feedback").trim(),
+          link: material?.resourceUrl,
+          courseId: Number(result?.courseId ?? 0) || undefined
+        });
+        if (rows.length >= 3) {
+          return rows;
+        }
+      }
+    }
+
+    for (const video of this.dashboard?.pendingVideos ?? []) {
+      rows.push({
+        badge: "Lesson",
+        title: `Watch ${video.title}`,
+        reason: `${video.courseTitle} has a pending ${video.durationMinutes}-minute lesson.`,
+        action: "Continue course",
+        courseId: Number(video.courseId ?? 0)
+      });
+      if (rows.length >= 3) {
+        return rows;
+      }
+    }
+
+    for (const quiz of this.dashboard?.availableQuizzes ?? []) {
+      if (quiz?.locked) {
+        continue;
+      }
+      rows.push({
+        badge: "Quiz",
+        title: quiz.title,
+        reason: `${quiz.courseTitle} quiz is open for practice and assessment.`,
+        action: "Start quiz",
+        courseId: Number(quiz.courseId ?? 0)
+      });
+      if (rows.length >= 3) {
+        return rows;
+      }
+    }
+
+    const course = this.primaryCourse();
+    if (course) {
+      rows.push({
+        badge: "Course",
+        title: `Continue ${course.title}`,
+        reason: `${this.courseProgressLabel(course)} completed. Keep the learning path moving.`,
+        action: "Open course",
+        courseId: Number(course.courseId ?? 0)
+      });
+    } else {
+      rows.push({
+        badge: "Feedback",
+        title: "Review learning history",
+        reason: "Once quizzes are completed, detailed feedback and learning recommendations will appear here.",
+        action: "Open history"
+      });
+    }
+
+    return rows.slice(0, 3);
+  }
+
+  streakDays(): Array<{ label: string; done: boolean }> {
+    const submittedDates = new Set(
+      (this.dashboard?.latestResults ?? [])
+        .map((row: any) => this.toDateKey(row?.submittedAt))
+        .filter((value: string | null): value is string => !!value)
+    );
+    const today = new Date();
+    return Array.from({ length: 7 }, (_, index) => {
+      const date = new Date(today);
+      date.setDate(today.getDate() - (6 - index));
+      return {
+        label: date.toLocaleDateString("en-US", { weekday: "short" }).slice(0, 3),
+        done: submittedDates.has(this.toDateKey(date) ?? "")
+      };
     });
   }
 
@@ -154,6 +378,49 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   }
 
   filteredCourses(): any[] {
+    const courses = this.filteredCoursesAll();
+    if (courses.length === 0) {
+      this.coursePage = 1;
+      return [];
+    }
+
+    const totalPages = Math.max(1, Math.ceil(courses.length / this.coursesPerPage));
+    if (this.coursePage > totalPages) {
+      this.coursePage = totalPages;
+    }
+
+    const start = (this.coursePage - 1) * this.coursesPerPage;
+    return courses.slice(start, start + this.coursesPerPage);
+  }
+
+  totalCoursePages(): number {
+    const total = Math.ceil(this.filteredCoursesAll().length / this.coursesPerPage);
+    return Math.max(1, total);
+  }
+
+  coursePageNumbers(): number[] {
+    return Array.from({ length: this.totalCoursePages() }, (_, index) => index + 1);
+  }
+
+  setCoursePage(page: number): void {
+    if (page < 1 || page > this.totalCoursePages()) {
+      return;
+    }
+    this.coursePage = page;
+  }
+
+  nextCoursePage(): void {
+    if (this.coursePage >= this.totalCoursePages()) {
+      return;
+    }
+    this.coursePage += 1;
+  }
+
+  resetCoursePage(): void {
+    this.coursePage = 1;
+  }
+
+  private filteredCoursesAll(): any[] {
     if (!this.dashboard?.courses) {
       return [];
     }
@@ -182,9 +449,14 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
 
   setCourseTab(tab: "all" | "inProgress" | "completed"): void {
     this.courseTab = tab;
+    this.coursePage = 1;
   }
 
   courseImage(course: any, index: number): string {
+    const imageUrl = String(course?.imageUrl ?? "").trim();
+    if (imageUrl) {
+      return imageUrl;
+    }
     const title = String(course?.title ?? "").toLowerCase();
     if (title.includes("data")) {
       return "https://images.unsplash.com/photo-1519389950473-47ba0277781c?auto=format&fit=crop&w=1400&q=80";
@@ -264,17 +536,14 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     const entries: Array<any> = [];
 
     for (const quiz of this.dashboard.availableQuizzes ?? []) {
-      const dueLabel = quiz.closeAt ? ` Due: ${this.formatDateTime(quiz.closeAt)}` : "";
-      const lockReason = String(quiz.lockReason ?? "").trim() || "Quiz is currently unavailable.";
+      const scheduleDetail = this.formatScheduleDetail(quiz.openAt, quiz.closeAt);
       const actionLabel = quiz.locked
         ? (quiz.alreadySubmitted ? "Completed" : "Locked")
         : "Open quiz";
       entries.push({
         type: "quiz",
         title: quiz.title,
-        detail: quiz.locked
-          ? `${lockReason}${dueLabel}`
-          : `Quiz ready for submission.${dueLabel}`,
+        detail: scheduleDetail,
         actionLabel,
         disabled: quiz.locked,
         quizId: quiz.quizId,
@@ -295,12 +564,14 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
 
     for (const result of this.dashboard.latestResults ?? []) {
       const released = result.resultReleased !== false;
+      const resultTitle = released
+        ? (result.passed ? `${result.quizTitle} (${result.score}%)` : `${result.quizTitle}`)
+        : `${result.quizTitle} (Pending)`;
+      const scheduleDetail = this.resultScheduleDetail(result);
       entries.push({
         type: "result",
-        title: released ? `${result.quizTitle} (${result.score}%)` : `${result.quizTitle} (Pending)`,
-        detail: released
-          ? (result.passed ? "Latest result: PASS" : "Latest result: FAIL")
-          : "Result pending lecturer release.",
+        title: resultTitle,
+        detail: scheduleDetail,
         actionLabel: "View history",
         disabled: false,
         attemptId: result.attemptId
@@ -362,6 +633,30 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
 
   latestAttemptRows(): any[] {
     return (this.dashboard?.latestResults ?? []).slice(0, 6);
+  }
+
+  gradeCardHeadline(): string {
+    const released = this.releasedResults();
+    if (released.length === 0) {
+      return "No Grade Yet";
+    }
+
+    const total = released.reduce((sum, row) => sum + Number(row?.score ?? 0), 0);
+    const average = Math.round(total / released.length);
+    return `Avg ${average}%`;
+  }
+
+  gradeCardSummary(): string {
+    const released = this.releasedResults();
+    if (released.length === 0) {
+      return "Awaiting released quiz results";
+    }
+
+    const passed = released.filter((row) => Boolean(row?.passed)).length;
+    const latest = released[0];
+    const latestTitle = String(latest?.quizTitle ?? "Latest quiz").trim() || "Latest quiz";
+    const latestScore = Number(latest?.score ?? 0);
+    return `${released.length} released results, ${passed} pass. Latest: ${latestTitle} (${latestScore}%).`;
   }
 
   completedCoursesCount(): number {
@@ -548,6 +843,41 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
       return "event-study";
     }
     return "event-task";
+  }
+
+  private firstRecommendationMaterial(item: any): any | null {
+    const materials = Array.isArray(item?.learningMaterials)
+      ? item.learningMaterials
+      : (Array.isArray(item?.materials) ? item.materials : []);
+    return materials.find((material: any) => String(material?.resourceUrl ?? "").trim()) ?? null;
+  }
+
+  private learningMaterialLabel(material: any): string {
+    const type = String(material?.type ?? material?.materialType ?? "material").toLowerCase();
+    if (type.includes("video")) {
+      return "video";
+    }
+    if (type.includes("slide")) {
+      return "slides";
+    }
+    if (type.includes("pdf") || type.includes("note")) {
+      return "notes";
+    }
+    return "material";
+  }
+
+  private toDateKey(value: unknown): string | null {
+    if (!value) {
+      return null;
+    }
+    const date = value instanceof Date ? value : new Date(String(value));
+    if (Number.isNaN(date.getTime())) {
+      return null;
+    }
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, "0");
+    const day = String(date.getDate()).padStart(2, "0");
+    return `${year}-${month}-${day}`;
   }
 
   private buildCalendar(): void {
@@ -742,6 +1072,59 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
   private restartBannerAutoplay(): void {
     this.stopBannerAutoplay();
     this.startBannerAutoplay();
+  }
+
+  private releasedResults(): any[] {
+    const rows = this.dashboard?.latestResults ?? [];
+    return rows.filter((row: any) =>
+      row?.resultReleased !== false &&
+      Number.isFinite(Number(row?.score))
+    );
+  }
+
+  private parseDateValue(value: unknown): Date | null {
+    if (!value) {
+      return null;
+    }
+    const parsed = new Date(String(value));
+    if (Number.isNaN(parsed.getTime())) {
+      return null;
+    }
+    return parsed;
+  }
+
+  private formatDateOnly(date: Date): string {
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
+  }
+
+  private formatTimeOnly(date: Date): string {
+    return date.toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: false
+    });
+  }
+
+  private formatScheduleDetail(openAt: unknown, closeAt: unknown): string {
+    const openDate = this.parseDateValue(openAt);
+    const dueDate = this.parseDateValue(closeAt);
+    const openLabel = openDate ? this.formatDateOnly(openDate) : "-";
+    const dueDateLabel = dueDate ? this.formatDateOnly(dueDate) : "-";
+    const timeLabel = dueDate ? this.formatTimeOnly(dueDate) : "-";
+    return `Open: ${openLabel} | Due date: ${dueDateLabel} | Time: ${timeLabel}`;
+  }
+
+  private resultScheduleDetail(result: any): string {
+    const quizMeta = (this.dashboard?.availableQuizzes ?? []).find((quiz: any) =>
+      Number(quiz?.quizId ?? 0) === Number(result?.quizId ?? 0)
+    );
+    const openAt = result?.openAt ?? quizMeta?.openAt;
+    const closeAt = result?.closeAt ?? quizMeta?.closeAt;
+    return this.formatScheduleDetail(openAt, closeAt);
   }
 
   private formatDateTime(value: string): string {

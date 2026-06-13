@@ -1,6 +1,7 @@
 package com.edusim.controller;
 
 import com.edusim.dto.LecturerDtos.CourseRequest;
+import com.edusim.dto.LecturerDtos.CourseStudentRequest;
 import com.edusim.dto.LecturerDtos.MarkAdjustmentRequest;
 import com.edusim.dto.LecturerDtos.MaterialRequest;
 import com.edusim.dto.LecturerDtos.PublishRequest;
@@ -16,6 +17,10 @@ import jakarta.validation.Valid;
 import java.time.LocalDate;
 import java.util.List;
 import java.util.Map;
+import org.springframework.http.ContentDisposition;
+import org.springframework.http.HttpHeaders;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.format.annotation.DateTimeFormat;
@@ -29,6 +34,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 @RestController
 @RequestMapping("/api/lecturer")
@@ -75,6 +81,22 @@ public class LecturerController {
     public Map<String, Object> deleteCourse(@PathVariable Long courseId, Authentication authentication) {
         UserAccount lecturer = authService.getCurrentUser(authentication);
         return lecturerService.deleteCourse(courseId, lecturer);
+    }
+
+    @GetMapping("/courses/{courseId}/students")
+    public List<Map<String, Object>> courseStudents(@PathVariable Long courseId, Authentication authentication) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.getCourseStudents(courseId, lecturer);
+    }
+
+    @PostMapping("/courses/{courseId}/students")
+    public Map<String, Object> addCourseStudent(
+        @PathVariable Long courseId,
+        @Valid @RequestBody CourseStudentRequest request,
+        Authentication authentication
+    ) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.addCourseStudent(courseId, request, lecturer);
     }
 
     @PostMapping("/courses/{courseId}/videos")
@@ -180,6 +202,23 @@ public class LecturerController {
         return lecturerService.addQuestionBank(request, lecturer);
     }
 
+    @PostMapping(
+        value = {"/question-bank/import", "/question-bank/document-import", "/question-bank/document-import/upload"},
+        consumes = MediaType.MULTIPART_FORM_DATA_VALUE
+    )
+    public Map<String, Object> importQuestionBank(
+        @RequestParam Long courseId,
+        @RequestParam MultipartFile file,
+        @RequestParam(required = false) String topicTag,
+        @RequestParam(required = false) DifficultyLevel difficultyLevel,
+        @RequestParam(required = false) QuestionType questionType,
+        @RequestParam(defaultValue = "5") Integer questionCount,
+        Authentication authentication
+    ) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.importQuestionBank(courseId, file, topicTag, difficultyLevel, questionType, questionCount, lecturer);
+    }
+
     @PutMapping("/question-bank/{questionBankId}")
     public Map<String, Object> updateQuestionBank(
         @PathVariable Long questionBankId,
@@ -211,6 +250,38 @@ public class LecturerController {
         return lecturerService.getQuizzes(lecturer, courseId);
     }
 
+    @GetMapping("/quizzes/import-template")
+    public ResponseEntity<byte[]> quizImportTemplate() {
+        return csvDownload(
+            "edusim-quiz-import-template.csv",
+            lecturerService.quizImportTemplate()
+        );
+    }
+
+    @GetMapping("/quizzes/export")
+    public ResponseEntity<byte[]> exportQuizzes(
+        @RequestParam(required = false) Long courseId,
+        @RequestParam(required = false) Long quizId,
+        Authentication authentication
+    ) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return csvDownload(
+            "edusim-quiz-backup.csv",
+            lecturerService.exportQuizzes(lecturer, courseId, quizId)
+        );
+    }
+
+    @PostMapping("/quizzes/import")
+    public Map<String, Object> importQuizBackup(
+        @RequestParam Long courseId,
+        @RequestParam MultipartFile file,
+        @RequestParam(defaultValue = "false") boolean deleteExistingQuestions,
+        Authentication authentication
+    ) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.importQuizBackup(courseId, file, deleteExistingQuestions, lecturer);
+    }
+
     @PatchMapping("/quizzes/{quizId}/publish")
     public Map<String, Object> publishQuiz(
         @PathVariable Long quizId,
@@ -219,6 +290,12 @@ public class LecturerController {
     ) {
         UserAccount lecturer = authService.getCurrentUser(authentication);
         return lecturerService.publishQuiz(quizId, request, lecturer);
+    }
+
+    @PatchMapping("/quizzes/{quizId}/release-result")
+    public Map<String, Object> releaseQuizResult(@PathVariable Long quizId, Authentication authentication) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.releaseQuizResult(quizId, lecturer);
     }
 
     @PostMapping("/quizzes/{quizId}/duplicate")
@@ -239,6 +316,30 @@ public class LecturerController {
         return lecturerService.previewQuiz(quizId, lecturer);
     }
 
+    @GetMapping("/reset-requests")
+    public List<Map<String, Object>> resetRequests(Authentication authentication) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.getResetRequests(lecturer);
+    }
+
+    @PatchMapping("/reset-requests/{requestId}/approve")
+    public Map<String, Object> approveResetRequest(@PathVariable Long requestId, Authentication authentication) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.approveResetRequest(lecturer, requestId);
+    }
+
+    @PatchMapping("/reset-requests/{requestId}/reject")
+    public Map<String, Object> rejectResetRequest(@PathVariable Long requestId, Authentication authentication) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.rejectResetRequest(lecturer, requestId);
+    }
+
+    @DeleteMapping("/reset-requests/{requestId}")
+    public Map<String, Object> deleteResetRequest(@PathVariable Long requestId, Authentication authentication) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.deleteResetRequest(lecturer, requestId);
+    }
+
     @GetMapping("/results")
     public List<Map<String, Object>> results(
         @RequestParam(required = false) Long quizId,
@@ -247,6 +348,16 @@ public class LecturerController {
     ) {
         UserAccount lecturer = authService.getCurrentUser(authentication);
         return lecturerService.getResults(lecturer, quizId, courseId);
+    }
+
+    @GetMapping("/assessment-insights")
+    public Map<String, Object> assessmentInsights(
+        @RequestParam(required = false) Long quizId,
+        @RequestParam(required = false) Long courseId,
+        Authentication authentication
+    ) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.getAssessmentInsights(lecturer, quizId, courseId);
     }
 
     @GetMapping("/results/{attemptId}")
@@ -263,5 +374,12 @@ public class LecturerController {
     ) {
         UserAccount lecturer = authService.getCurrentUser(authentication);
         return lecturerService.adjustAnswerScore(lecturer, answerId, request);
+    }
+
+    private ResponseEntity<byte[]> csvDownload(String fileName, byte[] bytes) {
+        return ResponseEntity.ok()
+            .header(HttpHeaders.CONTENT_DISPOSITION, ContentDisposition.attachment().filename(fileName).build().toString())
+            .contentType(MediaType.parseMediaType("text/csv"))
+            .body(bytes);
     }
 }

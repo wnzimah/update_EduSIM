@@ -1,246 +1,197 @@
-<div class="container dashboard-container">
+<div class="dashboard-shell">
   @if (loading) {
-    <p>Loading dashboard...</p>
+    <section class="dashboard-state">Loading dashboard...</section>
   } @else if (errorMessage) {
-    <p class="error">{{ errorMessage }}</p>
+    <section class="dashboard-state error">{{ errorMessage }}</section>
   } @else if (dashboard) {
-    <section class="student-shell panel">
-      <section class="student-hero">
-        <div class="hero-overlay">
-          <p class="hero-kicker">EduSIM Student Portal</p>
-          <h2>Track Learning and Self-Assessment from One Place</h2>
-          <p>Access course materials, complete quizzes, and stay on top of your progress with a clear workflow.</p>
-        </div>
-      </section>
+    <section class="learning-board">
+      <section class="board-main">
+        <header class="board-header">
+          <div>
+            <p class="eyebrow">Welcome back</p>
+            <h1>{{ dashboard.student.name }}</h1>
+            <span>{{ completionHeadline() }}</span>
+          </div>
+          <a class="header-profile" routerLink="/student/profile" aria-label="Open profile">
+            <span>{{ dashboard.student.name.charAt(0) }}</span>
+            <div>
+              <strong>{{ dashboard.student.name }}</strong>
+              <small>Learner</small>
+            </div>
+          </a>
+        </header>
 
-      <section class="welcome-band">
-        <div>
-          <p class="welcome-tag">Welcome back</p>
-          <h1>{{ dashboard.student.name }}</h1>
-          <p class="welcome-note">{{ completionHeadline() }}</p>
-        </div>
-      </section>
-
-      <section class="stats-grid">
-        <article class="stat-card">
-          <p class="stat-value">{{ dashboard.courses?.length ?? 0 }}</p>
-          <p class="stat-label">Courses Enrolled</p>
-        </article>
-        <article class="stat-card">
-          <p class="stat-value">{{ completedCoursesCount() }}</p>
-          <p class="stat-label">Courses Completed</p>
-        </article>
-        <article class="stat-card">
-          <p class="stat-value">{{ activitiesCompletedCount() }}</p>
-          <p class="stat-label">Activities Completed</p>
-        </article>
-        <article class="stat-card">
-          <p class="stat-value">{{ activitiesDueCount() }}</p>
-          <p class="stat-label">Activities Due</p>
-        </article>
-      </section>
-
-      <section class="course-overview">
-        <div class="overview-head">
-          <h2>Course overview</h2>
-          <a class="muted-link" routerLink="/student/history">See attempt history</a>
-        </div>
-
-        <div class="overview-tabs">
-          <button type="button" [class.active]="courseTab === 'all'" (click)="setCourseTab('all')">All</button>
-          <button type="button" [class.active]="courseTab === 'inProgress'" (click)="setCourseTab('inProgress')">In progress</button>
-          <button type="button" [class.active]="courseTab === 'completed'" (click)="setCourseTab('completed')">Completed</button>
-        </div>
-
-        <div class="overview-tools">
-          <select name="courseSort" [(ngModel)]="courseSort">
-            <option value="name">Sort by course name</option>
-            <option value="progressDesc">Highest progress</option>
-            <option value="progressAsc">Lowest progress</option>
-          </select>
-          <input
-            type="text"
-            name="courseSearchTop"
-            placeholder="Search course"
-            [(ngModel)]="searchText">
-          <span class="view-mode">List view</span>
-        </div>
-
-        <div class="course-grid">
-          @for (course of filteredCourses(); track course.courseId; let i = $index) {
-            <article class="course-card">
-              <img [src]="courseImage(course, i)" [alt]="course.title">
-              <div class="course-body">
-                <h3>{{ course.title }}</h3>
-                <p class="progress-text">{{ course.progress }}% complete</p>
-                <div class="progress-track">
-                  <span class="progress-fill" [style.width.%]="course.progress"></span>
+        <section class="overview-grid">
+          <article class="featured-course">
+            @if (primaryCourse(); as course) {
+              <div class="course-visual">
+                <img [src]="courseImage(course, 0)" [alt]="course.title" />
+                <span>{{ courseProgressLabel(course) }}</span>
+              </div>
+              <div class="featured-copy">
+                <span class="status-pill">{{ currentCourseStatus(course) }}</span>
+                <h2>{{ course.title }}</h2>
+                <p>{{ courseDescription(course) }}</p>
+                <div class="course-progress">
+                  <small>{{ courseProgressLabel(course) }} complete</small>
+                  <span>
+                    <i [style.width.%]="course.progress"></i>
+                  </span>
                 </div>
-                <div class="course-actions">
-                  <a class="btn btn-outline course-btn" [routerLink]="['/student/courses', course.courseId]">Open Course</a>
+                <div class="featured-actions">
+                  <a class="primary-action" [routerLink]="['/student/courses', course.courseId]">Continue course</a>
+                  <button class="ghost-action" type="button" (click)="goToPerformance(course)">View feedback</button>
                 </div>
               </div>
-            </article>
-          }
-        </div>
-      </section>
+              <aside class="next-card">
+                <strong>Next lesson</strong>
+                <p>{{ nextLessonLabel(course) }}</p>
+                <span>{{ quizCountForCourse(course) }} quiz set(s)</span>
+                <span>{{ submissionCountForCourse(course) }} submission(s)</span>
+              </aside>
+            } @else {
+              <div class="empty-feature">
+                <h2>No enrolled course yet</h2>
+                <p>Courses assigned by your lecturer will appear here.</p>
+              </div>
+            }
+          </article>
 
-      <section class="bottom-grid">
-        <section class="timeline-card panel">
-          <div class="timeline-headline">
-            <h3>Timeline</h3>
-            <span>{{ filteredTimelineEntries().length }} items</span>
-          </div>
-          <input
-            class="timeline-search"
-            type="text"
-            name="timelineSearch"
-            placeholder="Search activity"
-            [(ngModel)]="timelineSearch">
-          @if (filteredTimelineEntries().length === 0) {
-            <p class="muted">No activity.</p>
-          } @else {
-            <ul class="timeline-list">
-              @for (entry of filteredTimelineEntries(); track $index) {
-                <li>
-                  <p class="item-title">{{ entry.title }}</p>
-                  <p class="item-detail">{{ entry.detail }}</p>
-                  <button
-                    type="button"
-                    class="item-action"
-                    [disabled]="entry.disabled"
-                    (click)="handleTimelineAction(entry)">
-                    {{ entry.actionLabel }}
-                  </button>
-                </li>
-              }
-            </ul>
-          }
+          <aside class="progress-card">
+            <div class="section-head compact">
+              <h2>Your progress</h2>
+              <a routerLink="/student/my-courses">View all</a>
+            </div>
+            <div class="progress-ring" [style.background]="progressRingBackground()">
+              <div>
+                <strong>{{ overallProgress() }}%</strong>
+                <span>Overall</span>
+              </div>
+            </div>
+            <div class="progress-stats">
+              <span><b>{{ completedCoursesCount() }}</b> course complete</span>
+              <span><b>{{ activitiesCompletedCount() }}</b> activities done</span>
+              <span><b>{{ activitiesDueCount() }}</b> due now</span>
+            </div>
+          </aside>
         </section>
 
-        <section class="calendar-card panel">
-          <h3>Calendar</h3>
-          <select name="calendarCourseFilter" [(ngModel)]="calendarCourseFilter">
-            <option value="all">All courses</option>
-            @for (course of dashboard.courses; track course.courseId) {
-              <option [value]="course.courseId">{{ course.title }}</option>
-            }
-          </select>
-
-          <div class="month-head">
-            <p>{{ monthLabel }}</p>
-            <div class="month-nav">
-              <button type="button" (click)="previousMonth()">&#8249;</button>
-              <button type="button" (click)="nextMonth()">&#8250;</button>
+        <section class="insight-grid">
+          <article class="feedback-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Instant feedback</p>
+                <h2>Latest quiz result</h2>
+              </div>
+              <a routerLink="/student/history">Details</a>
             </div>
-          </div>
 
-          <div class="calendar-grid">
-            @for (dayLabel of weekDays; track dayLabel) {
-              <span class="weekday">{{ dayLabel }}</span>
+            @if (latestFeedback(); as feedback) {
+              <div class="feedback-score" [class.pending]="feedback.resultReleased === false">
+                <span>{{ feedbackScoreLabel(feedback) }}</span>
+                <strong>{{ feedbackStatusLabel(feedback) }}</strong>
+              </div>
+              <h3>{{ feedback.quizTitle }}</h3>
+              <p>{{ feedbackFeedbackText(feedback) }}</p>
+              <div class="feedback-meta">
+                <span>{{ feedback.courseTitle }}</span>
+                <span>{{ feedback.submittedAt | date: "mediumDate" }}</span>
+              </div>
+              <button class="primary-action small" type="button" (click)="openFeedback(feedback)">
+                View detailed feedback
+              </button>
+            } @else {
+              <div class="mini-empty">
+                <strong>No quiz feedback yet</strong>
+                <p>Complete a quiz to unlock instant score and detailed feedback.</p>
+              </div>
             }
-            @for (week of monthGrid; track $index) {
-              @for (day of week; track $index) {
-                <button
-                  type="button"
-                  class="day-cell"
-                  [class.today]="isToday(day)"
-                  [class.has-event]="eventsForDay(day).length > 0"
-                  [class.selected]="day === selectedDay"
-                  [disabled]="!day"
-                  (click)="selectDay(day)">
-                  {{ day ?? "" }}
+          </article>
+
+          <article class="recommend-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Learning recommendation</p>
+                <h2>Suggested next steps</h2>
+              </div>
+              <a routerLink="/student/history">Review</a>
+            </div>
+
+            <div class="recommend-list">
+              @for (item of recommendationsPreview(); track $index) {
+                <article class="recommend-item">
+                  <span>{{ item.badge }}</span>
+                  <div>
+                    <strong>{{ item.title }}</strong>
+                    <p>{{ item.reason }}</p>
+                    @if (item.link) {
+                      <a [href]="item.link" target="_blank" rel="noopener">{{ item.action }}</a>
+                    } @else if (item.courseId) {
+                      <a [routerLink]="['/student/courses', item.courseId]">{{ item.action }}</a>
+                    } @else {
+                      <a routerLink="/student/history">{{ item.action }}</a>
+                    }
+                  </div>
+                </article>
+              }
+            </div>
+          </article>
+        </section>
+
+        <section class="lower-grid">
+          <article class="course-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Ongoing courses</p>
+                <h2>Continue learning</h2>
+              </div>
+              <a routerLink="/student/my-courses">View all</a>
+            </div>
+
+            <div class="course-card-grid">
+              @for (course of dashboardCourses(); track course.courseId; let index = $index) {
+                <article class="mini-course">
+                  <img [src]="courseImage(course, index)" [alt]="course.title" />
+                  <div>
+                    <strong>{{ course.title }}</strong>
+                    <small>{{ course.mandatoryCompleted || 0 }} / {{ course.mandatoryTotal || 0 }} lessons completed</small>
+                    <span class="mini-track"><i [style.width.%]="course.progress"></i></span>
+                    <a [routerLink]="['/student/courses', course.courseId]">Open course</a>
+                  </div>
+                </article>
+              }
+            </div>
+          </article>
+
+          <aside class="activity-panel">
+            <div class="section-head">
+              <div>
+                <p class="eyebrow">Learning path</p>
+                <h2>Today focus</h2>
+              </div>
+            </div>
+
+            <div class="streak-row">
+              @for (day of streakDays(); track day.label) {
+                <span [class.done]="day.done">{{ day.label }}</span>
+              }
+            </div>
+
+            <div class="timeline-list">
+              @for (entry of filteredTimelineEntries().slice(0, 4); track $index) {
+                <button type="button" class="timeline-item" [disabled]="entry.disabled" (click)="handleTimelineAction(entry)">
+                  <span [class]="entry.type"></span>
+                  <div>
+                    <strong>{{ entry.title }}</strong>
+                    <small>{{ entry.detail }}</small>
+                  </div>
+                  <em>{{ entry.actionLabel }}</em>
                 </button>
               }
-            }
-          </div>
-
-          <div class="calendar-tools">
-            <button type="button" class="btn btn-outline calendar-add-btn" (click)="openEventModal(selectedDay)">
-              Add Event
-            </button>
-            <button type="button" class="calendar-today-btn" (click)="goToToday()">Today</button>
-          </div>
-
-          <div class="calendar-events">
-            <div class="calendar-events-head">
-              <p>{{ selectedDayLabel() }}</p>
-              <span>{{ selectedDayEvents().length }} event(s)</span>
             </div>
-
-            @if (selectedDayEvents().length === 0) {
-              <p class="muted">No event on this date.</p>
-            } @else {
-              <ul class="calendar-event-list">
-                @for (event of selectedDayEvents(); track event.id) {
-                  <li [class]="eventClass(event)">
-                    <div>
-                      <p class="event-title">{{ event.title }}</p>
-                      <p class="event-meta">{{ event.category }}{{ event.auto ? " - Auto" : " - Custom" }}</p>
-                    </div>
-
-                    <div class="event-actions">
-                      @if (canOpenPlannerEvent(event)) {
-                        <button type="button" class="event-open-btn" (click)="openPlannerEvent(event)">Open</button>
-                      }
-                      @if (!event.auto) {
-                        <button type="button" class="event-delete-btn" (click)="removePlannerEvent(event.id, $event)">Delete</button>
-                      }
-                    </div>
-                  </li>
-                }
-              </ul>
-            }
-          </div>
+          </aside>
         </section>
       </section>
     </section>
-
-    @if (showEventModal) {
-      <div class="modal-backdrop" (click)="closeEventModal()">
-        <section class="event-modal panel" (click)="$event.stopPropagation()">
-          <h3>Create Study Event</h3>
-
-          <form (ngSubmit)="addPlannerEvent()">
-            <div class="form-field">
-              <label for="eventTitle">Event title</label>
-              <input id="eventTitle" name="eventTitle" [(ngModel)]="eventForm.title" required>
-            </div>
-
-            <div class="form-field">
-              <label for="eventDate">Date</label>
-              <input id="eventDate" name="eventDate" type="date" [(ngModel)]="eventForm.date" required>
-            </div>
-
-            <div class="form-grid">
-              <div class="form-field">
-                <label for="eventCourse">Course</label>
-                <select id="eventCourse" name="eventCourse" [(ngModel)]="eventForm.courseId">
-                  <option value="all">General</option>
-                  @for (course of dashboard.courses; track course.courseId) {
-                    <option [value]="course.courseId">{{ course.title }}</option>
-                  }
-                </select>
-              </div>
-
-              <div class="form-field">
-                <label for="eventCategory">Category</label>
-                <select id="eventCategory" name="eventCategory" [(ngModel)]="eventForm.category">
-                  <option value="TASK">Task</option>
-                  <option value="STUDY">Study</option>
-                  <option value="QUIZ">Quiz</option>
-                  <option value="VIDEO">Video</option>
-                </select>
-              </div>
-            </div>
-
-            <div class="modal-actions">
-              <button class="btn btn-outline" type="button" (click)="closeEventModal()">Cancel</button>
-              <button class="btn" type="submit">Add Event</button>
-            </div>
-          </form>
-        </section>
-      </div>
-    }
   }
 </div>

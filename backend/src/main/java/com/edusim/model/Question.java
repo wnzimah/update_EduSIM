@@ -42,11 +42,11 @@ public class Question {
     private String mediaType;
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String optionsJson;
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String correctAnswerJson;
 
     @Column(nullable = false)
@@ -54,6 +54,13 @@ public class Question {
 
     @Column(nullable = false)
     private Integer sortOrder;
+
+    @Column(length = 120)
+    private String topic;
+
+    @Enumerated(EnumType.STRING)
+    @Column(length = 10)
+    private DifficultyLevel difficultyLevel = DifficultyLevel.MEDIUM;
 
     public Long getId() {
         return id;
@@ -137,5 +144,21 @@ public class Question {
 
     public void setSortOrder(Integer sortOrder) {
         this.sortOrder = sortOrder;
+    }
+
+    public String getTopic() {
+        return topic;
+    }
+
+    public void setTopic(String topic) {
+        this.topic = topic;
+    }
+
+    public DifficultyLevel getDifficultyLevel() {
+        return difficultyLevel;
+    }
+
+    public void setDifficultyLevel(DifficultyLevel difficultyLevel) {
+        this.difficultyLevel = difficultyLevel;
     }
 }

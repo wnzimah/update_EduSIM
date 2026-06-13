@@ -1,142 +1,312 @@
-<div class="container">
+<div class="course-player-page">
   @if (loading) {
-    <p>Loading course...</p>
+    <p class="state-text">Loading course...</p>
   } @else if (errorMessage) {
     <p class="error">{{ errorMessage }}</p>
   } @else if (courseData) {
-    <section class="panel hero">
-      <h1>{{ courseData.course.title }}</h1>
-      <p>{{ courseData.course.description }}</p>
-      <p class="muted">
-        Mandatory video completed: {{ courseData.progress.mandatoryCompleted }}/{{ courseData.progress.mandatoryTotal }}
-        ({{ courseData.progress.percent }}%)
-      </p>
+    <header class="course-topbar">
+      <button class="course-brand" type="button" routerLink="/student/my-courses">
+        <span>EduSIM</span>
+        <strong>Study<br />Hub</strong>
+      </button>
+      <div class="course-title-block">
+        <p>Active Course</p>
+        <h1>{{ courseData.course.title }}</h1>
+      </div>
+      <div class="course-window-actions">
+        <button class="mini-action" type="button" routerLink="/student/my-courses">Hub</button>
+        <button type="button" routerLink="/student/my-courses" aria-label="Close course">×</button>
+      </div>
+    </header>
+
+    <section class="course-overview-strip">
+      <article>
+        <span>{{ completionPercent() }}%</span>
+        <p>Course progress</p>
+      </article>
+      <article>
+        <span>{{ courseData.progress.mandatoryCompleted }}/{{ courseData.progress.mandatoryTotal }}</span>
+        <p>Required lessons</p>
+      </article>
+      <article>
+        <span>{{ courseData.quizzes.length }}</span>
+        <p>Assessments</p>
+      </article>
+      <article>
+        <span>{{ courseData.materials.length }}</span>
+        <p>Resources</p>
+      </article>
     </section>
 
-    <section class="panel block activity-block">
-      <h2>Activity/Resources</h2>
+    <section class="course-workspace">
+      <main class="lesson-stage">
+        <div class="lesson-toolbar">
+          <button type="button" aria-label="Outline">☰</button>
+          <h2>
+            @if (selectedVideo) {
+              Lesson {{ selectedVideoPosition() }} · {{ selectedVideo.title }}
+            } @else {
+              Course Overview
+            }
+          </h2>
+          <div class="toolbar-icons" aria-hidden="true">
+            <span>Focus</span>
+            <span>MY</span>
+            <span>⛶</span>
+          </div>
+        </div>
 
-      @if (selectedVideo) {
-        <div class="featured-video">
-          @if (selectedVideoEmbedUrl) {
-            <iframe
-              [src]="selectedVideoEmbedUrl"
-              title="Course Video Player"
-              allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
-              allowfullscreen>
-            </iframe>
-          } @else {
-            <button class="video-fallback" type="button" (click)="openVideo(selectedVideo.videoUrl)">
-              <img [src]="thumbnailFor(selectedVideo.videoUrl)" [alt]="selectedVideo.title">
-              <span>Play {{ selectedVideo.title }}</span>
-            </button>
-          }
-
-          <div class="featured-meta">
-            <h3>{{ selectedVideo.title }}</h3>
-            <p>{{ selectedVideo.description }}</p>
-            <div class="video-action-row">
-              <span>{{ selectedVideo.durationMinutes }} min</span>
-              @if (selectedVideo.completed) {
-                <span class="badge">Completed</span>
-              } @else {
-                <span class="badge warn">Pending</span>
-              }
-              <button class="btn btn-outline" type="button" (click)="openVideo(selectedVideo.videoUrl)">
-                Open Video
+        @if (selectedVideo) {
+          <section class="lesson-hero">
+            @if (selectedVideoEmbedUrl) {
+              <iframe
+                [src]="selectedVideoEmbedUrl"
+                title="Course Video Player"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share"
+                allowfullscreen>
+              </iframe>
+            } @else if (selectedVideoFileUrl) {
+              <video
+                class="inline-video-player"
+                controls
+                preload="metadata"
+                playsinline
+                (timeupdate)="trackInlineVideoProgress($event)"
+                (ended)="completeVideo(selectedVideo.videoId)">
+                <source [src]="selectedVideoFileUrl">
+                Your browser does not support inline video playback.
+              </video>
+            } @else {
+              <button class="video-cover" type="button" (click)="openVideo(selectedVideo.videoUrl)">
+                <img [src]="thumbnailFor(selectedVideo.videoUrl)" [alt]="selectedVideo.title">
+                <span>Play lesson</span>
               </button>
-              <button
-                class="btn"
-                type="button"
-                [disabled]="selectedVideo.completed"
-                (click)="completeVideo(selectedVideo.videoId)">
+            }
+
+            <div class="lesson-overlay">
+              <p>Continue the lesson</p>
+            </div>
+          </section>
+
+          <section class="lesson-details">
+            <div>
+              <p class="lesson-eyebrow">Now studying</p>
+              <h3>{{ selectedVideo.title }}</h3>
+              <p>{{ selectedVideo.description || courseData.course.description }}</p>
+              <div class="lesson-chips">
+                <span>{{ selectedVideo.durationMinutes }} min</span>
+                <span>{{ selectedVideo.completed ? "Completed" : "Ready to continue" }}</span>
+                <span>Lesson {{ selectedVideoPosition() }} of {{ totalVideoCount() }}</span>
+              </div>
+            </div>
+            <div class="lesson-actions">
+              <button class="btn btn-outline" type="button" [disabled]="!hasPreviousVideo()" (click)="previousVideo()">Previous</button>
+              <button class="btn" type="button" [disabled]="!hasNextVideo()" (click)="nextVideo()">Next</button>
+              <button class="btn complete-btn" type="button" [disabled]="selectedVideo.completed" (click)="completeVideo(selectedVideo.videoId)">
                 {{ selectedVideo.completed ? "Completed" : "Mark Complete" }}
               </button>
             </div>
-          </div>
-        </div>
-      }
+          </section>
 
-      <div class="video-list">
-        @for (video of courseData.videos; track video.videoId) {
-          <button
-            class="video-item"
-            type="button"
-            [class.active]="video.videoId === selectedVideoId"
-            (click)="chooseVideo(video)">
-            <span class="order">#{{ video.sortOrder }}</span>
-            <span class="title">{{ video.title }}</span>
-            <span class="time">{{ video.durationMinutes }} min</span>
-            @if (video.completed) {
-              <span class="badge">Done</span>
-            } @else {
-              <span class="badge warn">Pending</span>
-            }
-          </button>
-        }
-      </div>
-    </section>
+          <section class="coach-panel">
+            <div class="coach-head">
+              <div>
+                <p class="lesson-eyebrow">Learning Coach</p>
+                <h3>Personal study checkpoint</h3>
+              </div>
+              <div class="coach-score">
+                <strong>{{ coachReadinessScore() }}%</strong>
+                <span>{{ coachReadinessLabel() }}</span>
+              </div>
+            </div>
 
-    <section class="panel block compact-section">
-      <button class="section-toggle" type="button" (click)="toggleResourceSection()">
-        <span>Resources / Material</span>
-        <span class="toggle-icon" [class.open]="resourceSectionOpen" aria-hidden="true"></span>
-      </button>
-      @if (resourceSectionOpen) {
-        @if (courseData.materials.length === 0) {
-          <p class="muted">Tiada resource lagi.</p>
-        } @else {
-          <ul class="resource-list">
-            @for (material of courseData.materials; track material.materialId) {
-              <li>
-                <strong>{{ material.title }}</strong>
-                <span class="badge">{{ material.materialType }}</span>
-                <a [href]="material.resourceUrl" target="_blank" rel="noopener">Open</a>
-              </li>
-            }
-          </ul>
-        }
-      }
-    </section>
+            <div class="coach-grid">
+              <article class="coach-insight">
+                <p>Recommended next step</p>
+                <h4>{{ coachAdviceTitle() }}</h4>
+                <span>{{ coachAdviceBody() }}</span>
+              </article>
 
-    <section class="panel block compact-section">
-      <button class="section-toggle" type="button" (click)="toggleQuizSection()">
-        <span>Quiz</span>
-        <span class="toggle-icon" [class.open]="quizSectionOpen" aria-hidden="true"></span>
-      </button>
-      @if (quizSectionOpen) {
-        @if (courseData.quizzes.length === 0) {
-      <p class="muted">No quiz has been published yet.</p>
-        } @else {
-          <div class="quiz-list">
-            @for (quiz of courseData.quizzes; track quiz.quizId) {
-              <div class="quiz-item">
-                <div>
-                  <h3>{{ quiz.title }}</h3>
-                  <p class="muted">Due date: {{ quiz.closeAt ? (quiz.closeAt | date: "medium") : "Not set" }}</p>
-                  <p class="muted">Attempts: {{ quiz.attemptsUsed ?? 0 }}/{{ quiz.maxAttempts ?? 1 }}</p>
-                  <p class="muted">{{ quiz.timeLimitMinutes }} min | Pass mark {{ quiz.passingMark }}%</p>
-                  @if (quiz.lockReason) {
-                    <p class="muted">{{ quiz.lockReason }}</p>
+              <article class="reflection-card">
+                <label>Confidence after this lesson</label>
+                <div class="confidence-row">
+                  @for (level of confidenceLevels; track level) {
+                    <button
+                      type="button"
+                      [class.active]="reflectionConfidence === level"
+                      (click)="setReflectionConfidence(level)">
+                      {{ level }}
+                    </button>
                   }
+                  <span>{{ confidenceLabel() }}</span>
                 </div>
-                <div class="quiz-actions">
-                  @if (quiz.alreadySubmitted) {
-                    <span class="badge">Completed</span>
-                  } @else if (quiz.locked) {
-                    <span class="badge warn">Locked</span>
-                  } @else {
-                    <span class="badge">Ready</span>
-                  }
-                  <button class="btn" [disabled]="quiz.locked || (quiz.attemptsRemaining ?? 0) <= 0" (click)="startQuiz(quiz)">
-                    {{ quiz.alreadySubmitted ? "Completed" : "Attempt Quiz" }}
+
+                <textarea
+                  rows="4"
+                  maxlength="700"
+                  placeholder="What did you understand? What still feels unclear?"
+                  [(ngModel)]="reflectionNote"></textarea>
+                <input
+                  type="text"
+                  maxlength="160"
+                  placeholder="Next action, e.g. review notes before quiz"
+                  [(ngModel)]="reflectionGoal">
+
+                <div class="reflection-actions">
+                  <small>{{ reflectionNote.length }}/700</small>
+                  <button class="btn" type="button" (click)="saveReflection()">Save Reflection</button>
+                </div>
+
+                @if (reflectionSavedMessage) {
+                  <p class="reflection-message">{{ reflectionSavedMessage }}</p>
+                }
+              </article>
+            </div>
+
+            @if (recentReflections().length > 0) {
+              <div class="reflection-history">
+                <p>Recent reflection notes</p>
+                @for (record of recentReflections(); track record.videoId) {
+                  <button type="button" (click)="openReflectionRecord(record)">
+                    <strong>{{ record.videoTitle }}</strong>
+                    <span>{{ record.confidence }}/5 confidence | {{ reflectionUpdatedLabel(record.updatedAt) }}</span>
                   </button>
-                </div>
+                }
               </div>
             }
-          </div>
+          </section>
+
+          <section class="comments-panel">
+            <div class="comment-head">
+              <div>
+                <p class="lesson-eyebrow">Class notes</p>
+                <h3>Lesson comments</h3>
+              </div>
+              <span>{{ commentCountLabel() }}</span>
+            </div>
+            <textarea
+              class="comment-input"
+              rows="3"
+              maxlength="1500"
+              placeholder="Write your comment about this lesson..."
+              [(ngModel)]="commentText"></textarea>
+            <div class="comment-actions">
+              <small>{{ commentText.length }}/1500</small>
+              <button class="btn btn-outline" type="button" [disabled]="commentSubmitting" (click)="submitVideoComment()">
+                {{ commentSubmitting ? "Submitting..." : "Post Comment" }}
+              </button>
+            </div>
+            @if (commentErrorMessage) {
+              <p class="comment-error">{{ commentErrorMessage }}</p>
+            }
+            @if (commentSuccessMessage) {
+              <p class="comment-success">{{ commentSuccessMessage }}</p>
+            }
+            @if (commentsLoading) {
+              <p class="comment-muted">Loading comments...</p>
+            } @else if (videoComments.length === 0) {
+              <p class="comment-muted">No comment yet. Be the first to share.</p>
+            } @else {
+              <ul class="comment-list">
+                @for (row of videoComments; track row.commentId) {
+                  <li>
+                    <div class="comment-meta">
+                      <p class="comment-author">{{ row.studentName }}{{ row.me ? " (You)" : "" }}</p>
+                      <span>{{ formatCommentDate(row.createdAt) }}</span>
+                    </div>
+                    <p class="comment-text">{{ row.comment }}</p>
+                  </li>
+                }
+              </ul>
+            }
+          </section>
         }
-      }
+      </main>
+
+      <aside class="outline-panel">
+        <div class="path-dock-head">
+          <div>
+            <p>Learning Path</p>
+            <h2>Course Navigator</h2>
+          </div>
+          <span>{{ completionPercent() }}%</span>
+        </div>
+
+        <label class="outline-search">
+          <input type="search" placeholder="Search lesson or resource" aria-label="Search course outline">
+          <span aria-hidden="true">⌕</span>
+        </label>
+
+        <section class="module-card open">
+          <div class="module-head">
+            <div>
+              <h2>Module 1: {{ courseData.course.title }}</h2>
+              <p>{{ courseData.progress.mandatoryCompleted }} of {{ courseData.progress.mandatoryTotal }} lessons completed</p>
+            </div>
+          </div>
+          <div class="module-progress">
+            <span [style.width.%]="completionPercent()"></span>
+          </div>
+
+          <div class="lesson-tree">
+            @for (video of courseVideos(); track video.videoId) {
+              <button
+                type="button"
+                class="lesson-row"
+                [class.done]="video.completed"
+                [class.current]="video.videoId === selectedVideoId"
+                (click)="chooseVideo(video)">
+                <span class="lesson-dot"></span>
+                <span>{{ video.sortOrder }}. {{ video.title }}</span>
+              </button>
+            }
+          </div>
+        </section>
+
+        <section class="dock-card">
+          <button class="dock-toggle" type="button" (click)="toggleQuizSection()">
+            <span>
+              <strong>Assessments</strong>
+              <small>{{ courseData.quizzes.length }} quiz available</small>
+            </span>
+            <b>{{ quizSectionOpen ? "−" : "+" }}</b>
+          </button>
+          @if (quizSectionOpen) {
+            <div class="quiz-outline-list">
+              @for (quiz of courseData.quizzes; track quiz.quizId) {
+                <button type="button" [disabled]="isQuizActionDisabled(quiz)" (click)="startQuiz(quiz)">
+                  <span>{{ quiz.title }}</span>
+                  <small>{{ quizStatusLabel(quiz) }}</small>
+                </button>
+              }
+            </div>
+          }
+        </section>
+
+        <section class="dock-card">
+          <button class="dock-toggle" type="button" (click)="toggleResourceSection()">
+            <span>
+              <strong>Resource Vault</strong>
+              <small>{{ courseData.materials.length }} material(s)</small>
+            </span>
+            <b>{{ resourceSectionOpen ? "−" : "+" }}</b>
+          </button>
+          @if (resourceSectionOpen) {
+            <div class="resource-drawer">
+              @if (courseData.materials.length === 0) {
+                <p>No resource has been published yet.</p>
+              } @else {
+                @for (material of courseData.materials; track material.materialId) {
+                  <button type="button" (click)="openMaterial(material)">
+                    <strong>{{ material.title }}</strong>
+                    <span>{{ material.materialType }}</span>
+                  </button>
+                }
+              }
+            </div>
+          }
+        </section>
+      </aside>
     </section>
   }
 </div>

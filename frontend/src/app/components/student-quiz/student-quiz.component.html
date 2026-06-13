@@ -1,63 +1,688 @@
 <div class="container">
   @if (loading) {
-    <p>Preparing quiz...</p>
+    <section class="quiz-loading-shell" aria-live="polite">
+      <div class="pulse-orb"></div>
+      <div>
+        <p class="loading-eyebrow">Loading assessment</p>
+        <h2>Preparing a smoother quiz space...</h2>
+        <p class="muted">We are syncing questions, timer, and saved answers.</p>
+      </div>
+      <div class="skeleton-lines">
+        <span></span>
+        <span></span>
+        <span></span>
+      </div>
+    </section>
   } @else if (errorMessage) {
     <p class="error">{{ errorMessage }}</p>
     <a class="btn btn-outline" [routerLink]="backRoute()">Back</a>
+  } @else if (blockedSummary) {
+    <a class="back-link" [routerLink]="backRoute()">&#8592; Back Course</a>
+    <section class="panel quiz-summary-view">
+      <header class="summary-head">
+        <h1>{{ blockedSummary.title }}</h1>
+        <p class="summary-note">{{ blockedSummaryMessage() }}</p>
+      </header>
+
+      <div class="summary-meta-cards">
+        <article class="summary-meta">
+          <p class="meta-label">Attempts allowed</p>
+          <p class="meta-value">{{ blockedSummary.attemptsAllowed || blockedSummary.attemptsUsed }}</p>
+        </article>
+        @if (blockedSummary.closeAt) {
+          <article class="summary-meta">
+            <p class="meta-label">Closed on</p>
+            <p class="meta-value">{{ blockedSummary.closeAt | date: "full" }}</p>
+          </article>
+        }
+        @if (blockedSummary.timeLimitMinutes) {
+          <article class="summary-meta">
+            <p class="meta-label">Time limit</p>
+            <p class="meta-value">{{ blockedSummary.timeLimitMinutes }} mins</p>
+          </article>
+        }
+      </div>
+
+      <h2>Summary of your previous attempts</h2>
+      @if (blockedSummary.attempts.length === 0) {
+        <p class="muted">No previous attempt found.</p>
+      } @else {
+        <div class="table-scroll summary-table">
+          <table>
+            <thead>
+              <tr>
+                <th>State</th>
+                <th>Marks</th>
+                <th>Grade / 10.00</th>
+                <th>Review</th>
+              </tr>
+            </thead>
+            <tbody>
+              @for (attempt of blockedSummary.attempts; track attempt.attemptId) {
+                <tr>
+                  <td>
+                    <strong>{{ blockedStateLabel(attempt) }}</strong>
+                    <p class="attempt-submitted">Submitted {{ blockedSubmittedLabel(attempt) }}</p>
+                  </td>
+                  <td>{{ attemptMarksLabel(attempt) }}</td>
+                  <td>{{ attemptGrade10Label(attempt) }}</td>
+                  <td>View history</td>
+                </tr>
+              }
+            </tbody>
+          </table>
+        </div>
+      }
+
+      <p class="final-grade-line">Your final grade for this quiz is <strong>{{ finalGrade10Label() }}</strong>.</p>
+
+      <div class="result-actions">
+        <a class="btn btn-outline" [routerLink]="backRoute()">Back to the course</a>
+        <a class="btn" routerLink="/student/history">View history</a>
+        <button class="btn request-reset-btn" type="button" [disabled]="resetRequesting || !(blockedSummary.courseId || courseId)" (click)="requestReset()">
+          {{ resetRequesting ? "Sending..." : "Request reset" }}
+        </button>
+      </div>
+      @if (resetRequestMessage) {
+        <p class="ok reset-request-note">{{ resetRequestMessage }}</p>
+      }
+      @if (resetRequestError) {
+        <p class="error reset-request-note">{{ resetRequestError }}</p>
+      }
+    </section>
+  } @else if (quizPreview) {
+    <a class="back-link" [routerLink]="backRoute()">&#8592; Back Course</a>
+    <section class="panel quiz-intro-view">
+      <header class="attempt-preview-head">
+        <h1>{{ quizPreview.title }}</h1>
+        @if (quizPreview.courseTitle) {
+          <p class="meta">Course: {{ quizPreview.courseTitle }}</p>
+        }
+      </header>
+
+      <div class="attempt-declaration">
+        <p>I declare that this quiz attempt is taken by me and is a result of my own work.</p>
+        <p>- does not refer to works of others</p>
+        <p>- does not refer to the text and any sources unless allowed by the lecturer</p>
+        <p>I am aware that violation of these clauses is regarded as cheating and may affect the examination or paper.</p>
+      </div>
+
+      <div class="attempt-preview-action">
+        <button class="btn" type="button" [disabled]="startingQuiz || (quizPreview.locked && !quizPreview.hasOpenAttempt)" (click)="beginQuiz()">
+          {{ previewPrimaryActionLabel() }}
+        </button>
+      </div>
+
+      <div class="attempt-rules">
+        <p>Attempts allowed: {{ quizPreview.maxAttempts || "Unlimited" }}</p>
+        <p>Time limit: {{ quizPreview.timeLimitMinutes ? (quizPreview.timeLimitMinutes + " mins") : "No time limit" }}</p>
+        @if (quizPreview.closeAt) {
+          <p>Due date: {{ quizPreview.closeAt | date: "medium" }}</p>
+        }
+        @if (quizPreview.passingMark) {
+          <p>Pass mark: {{ quizPreview.passingMark }}%</p>
+        }
+      </div>
+
+      @if (quizPreview.lockReason) {
+        <p class="muted">{{ quizPreview.lockReason }}</p>
+      }
+
+      <section class="attempt-history-preview">
+        <h2>Your attempts</h2>
+        <div class="attempt-table-card">
+          <h3>Attempt {{ (quizPreview.attemptsUsed ?? 0) > 0 ? quizPreview.attemptsUsed : 1 }}</h3>
+          <table>
+            <tbody>
+              <tr>
+                <th>Status</th>
+                <td>{{ previewAttemptStatus() }}</td>
+              </tr>
+              <tr>
+                <th>Started</th>
+                <td>{{ previewStartedLabel() }}</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+      </section>
+
+      <div class="result-actions intro-actions">
+        <a class="btn btn-outline" [routerLink]="backRoute()">Back to the course</a>
+      </div>
+    </section>
   } @else if (quizData) {
     <a class="back-link" [routerLink]="backRoute()">&#8592; Back Course</a>
-    @if (statusMessage) {
-      <p class="ok">{{ statusMessage }}</p>
-    }
 
     @if (result) {
-      <section class="panel result">
-        <h2>Quiz Submitted</h2>
-        <p class="ok">Your quiz has been answered successfully.</p>
-        @if (result.resultReleased) {
-          <p class="score">Score: <strong>{{ result.score }}%</strong></p>
-          <p>
-            Status:
-            <span class="badge" [class.fail]="!result.passed">
-              {{ result.passed ? "PASS" : "FAIL" }}
-            </span>
-          </p>
-          <p>Correct: {{ result.correctCount }}/{{ result.totalQuestions }}</p>
-          <p>{{ result.feedback }}</p>
-          @if (result.answers?.length) {
-            <div class="result-review">
-              <h3>Answer Review</h3>
-              <div class="table-scroll">
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Question</th>
-                      <th>Your Answer</th>
-                      <th>Correct Answer</th>
-                      <th>Explanation</th>
-                      <th>Status</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (answer of result.answers; track answer.questionId) {
-                      <tr [class.row-correct]="answer.correct" [class.row-wrong]="!answer.correct">
-                        <td>{{ answer.prompt }}</td>
-                        <td>{{ formatAnswer(answer.studentAnswer) }}</td>
-                        <td>{{ formatAnswer(answer.correctAnswer) }}</td>
-                        <td>{{ answer.explanation || "-" }}</td>
-                        <td>
-                          <span class="badge" [class.fail]="!answer.correct">
-                            {{ answer.correct ? "Correct" : "Incorrect" }}
-                          </span>
-                        </td>
-                      </tr>
+      <section class="panel result post-submit-review">
+        <header class="post-submit-head">
+          <div>
+            <p class="loading-eyebrow">Automated Grading</p>
+            <h1>{{ result.quizTitle || quizData.title }}</h1>
+            <span>{{ postSubmitReleaseMessage() }}</span>
+          </div>
+          <aside>
+            <small>Status</small>
+            <strong>{{ postSubmitStatusLabel() }}</strong>
+            <em>Submitted {{ result.submittedAt | date: "medium" }}</em>
+          </aside>
+        </header>
+
+        <div class="post-submit-stats">
+          <article>
+            <span>Score</span>
+            <strong>{{ postSubmitScoreLabel() }}</strong>
+          </article>
+          <article>
+            <span>Questions</span>
+            <strong>{{ submittedAnswerRows().length }}</strong>
+          </article>
+          <article>
+            <span>Feedback Release</span>
+            <strong>{{ result.resultReleased === false ? "Scheduled" : "Open" }}</strong>
+          </article>
+        </div>
+
+        @if (result.resultReleased && canShowLearningRecommendation()) {
+          <section class="learning-coach-summary">
+            <header>
+              <div>
+                <p class="loading-eyebrow">EduSIM Learning Coach</p>
+                <h2>Personalized Learning Recommendation</h2>
+                <span>Based on quiz performance, topic mastery, learning material engagement, confidence, and previous attempts.</span>
+              </div>
+              <aside>
+                <small>Weak topic</small>
+                <strong>{{ coachWeakTopics() }}</strong>
+              </aside>
+            </header>
+
+            @if (primaryRecommendations().length === 0) {
+              <p class="muted">No personalized recommendation is available yet.</p>
+            } @else {
+              <div class="learning-coach-grid">
+                @for (item of primaryRecommendations(); track item.topicTag) {
+                  <article class="learning-coach-card">
+                    <div class="coach-topic-line">
+                      <span>{{ item.weakTopic || item.topicTag }}</span>
+                      <strong>Mastery {{ topicMasteryLabel(item) }}</strong>
+                    </div>
+                    <h3>{{ item.title }}</h3>
+                    <p>{{ item.reason }}</p>
+                    <small>{{ materialStatusLine(item) }}</small>
+
+                    @if (engagementMessages(item).length > 0) {
+                      <ul class="coach-message-list">
+                        @for (message of engagementMessages(item); track message) {
+                          <li>{{ message }}</li>
+                        }
+                      </ul>
                     }
-                  </tbody>
-                </table>
+
+                    @if (confidenceReflections(item).length > 0) {
+                      <div class="confidence-reflection-box">
+                        <strong>Confidence reflection</strong>
+                        @for (message of confidenceReflections(item); track message) {
+                          <span>{{ message }}</span>
+                        }
+                      </div>
+                    }
+
+                    @if (suggestedLearningPath(item).length > 0) {
+                      <ol class="coach-path-list">
+                        @for (step of suggestedLearningPath(item); track step) {
+                          <li>{{ step }}</li>
+                        }
+                      </ol>
+                    }
+
+                    @if (recommendationMaterials(item).length > 0) {
+                      <div class="learning-material-list coach-materials">
+                        @for (material of recommendationMaterials(item); track material.title) {
+                          <a [href]="material.resourceUrl" target="_blank" rel="noopener">
+                            <span>{{ learningMaterialLabel(material) }}</span>
+                            <strong>{{ material.title }}</strong>
+                          </a>
+                        }
+                      </div>
+                    }
+                  </article>
+                }
+              </div>
+            }
+          </section>
+        }
+
+        @if (result.resultReleased === false) {
+          <aside class="release-waiting-note review-unavailable-card">
+            <div class="review-lock-illustration" aria-hidden="true">
+              <span></span>
+            </div>
+            <h2>Quiz review is currently unavailable</h2>
+            <p>Your quiz has been submitted successfully.</p>
+            <p>{{ postSubmitReleaseMessage() }}</p>
+            <dl>
+              <div>
+                <dt>Quiz Title</dt>
+                <dd>{{ result.quizTitle || quizData.title }}</dd>
+              </div>
+              <div>
+                <dt>Submitted At</dt>
+                <dd>{{ result.submittedAt | date: "medium" }}</dd>
+              </div>
+              <div>
+                <dt>Attempt</dt>
+                <dd>{{ result.attemptNumber || quizData.attemptNumber || 1 }}</dd>
+              </div>
+            </dl>
+            <a class="btn btn-outline" [routerLink]="backRoute()">Back to My Quizzes</a>
+          </aside>
+        }
+
+        @if (canShowSubmittedAnswerList()) {
+          <section class="submitted-answer-section">
+            <div class="review-heading">
+              <div>
+                <p class="loading-eyebrow">Submitted answer review</p>
+                <h3>Questions and answers selected by student</h3>
+              </div>
+            </div>
+
+            <div class="submitted-answer-list">
+              @for (answer of submittedAnswerRows(); track answer.questionId; let answerIndex = $index) {
+                <article class="submitted-answer-card">
+                  <header>
+                    <span>Question {{ answer.sortOrder || (answerIndex + 1) }}</span>
+                    @if (result.resultReleased && canShowScoreFeedback() && answer.correct !== undefined) {
+                      <b [class.fail]="!answer.correct">{{ answer.correct ? "Correct" : "Review" }}</b>
+                    } @else {
+                      <b>Recorded</b>
+                    }
+                  </header>
+                  <h4>{{ answer.prompt }}</h4>
+                  <div>
+                    <small>Student selected answer</small>
+                    <p>{{ formatAnswer(answer.studentAnswer) }}</p>
+                  </div>
+                </article>
+              }
+            </div>
+          </section>
+        }
+
+        <section class="attempt-flow-actions" aria-label="Next attempt flow">
+          <a class="btn" [routerLink]="attemptInsightRoute('feedback')">Review Feedback</a>
+          <a class="btn btn-outline" [routerLink]="attemptInsightRoute('recommendation')">Learning Recommendation</a>
+          <a class="btn btn-outline" [routerLink]="attemptInsightRoute('improvement')">Performance Improvement</a>
+          <a class="btn btn-outline" routerLink="/student/history">Attempt History</a>
+        </section>
+      </section>
+    } @else if (false) {
+      <section class="panel result assessment-debrief">
+        <div class="student-review-layout">
+          <aside class="student-review-sidebar" aria-label="Quiz review menu">
+            <p>Quiz menu</p>
+            <a href="#my-attempts" class="active">My Attempts</a>
+            <a href="#review-quiz">Review Quiz</a>
+            <a routerLink="/student/history">Answer History</a>
+            <a href="#feedback-summary">Feedback</a>
+          </aside>
+          <div class="student-review-content">
+        @if (result.resultReleased) {
+          <div id="my-attempts" class="debrief-hero">
+            @if (canShowScoreFeedback()) {
+              <div class="score-ring" [class.fail]="!result.passed" [style.--score]="resultScore() + '%'">
+                <strong>{{ resultScore() }}%</strong>
+                <span>{{ result.passed ? "Pass" : "Retry" }}</span>
+              </div>
+            }
+            <div class="debrief-copy">
+              <p class="loading-eyebrow">Assessment debrief</p>
+              <h2>{{ resultHeadline() }}</h2>
+              <p>{{ result.feedback }}</p>
+              @if (canShowScoreFeedback()) {
+                <div class="debrief-badges">
+                  <span class="mini-badge">Achievement: {{ resultAchievement() }}</span>
+                  <span class="mini-badge">Best streak: {{ resultStreak() }}</span>
+                  <span class="mini-badge">Correct: {{ result.correctCount }}/{{ result.totalQuestions }}</span>
+                </div>
+              }
+            </div>
+          </div>
+
+          <aside id="feedback-summary" class="coach-note">
+            <span>Coach</span>
+            <p>{{ coachMessage() }}</p>
+          </aside>
+
+          @if (canShowLearningRecommendation()) {
+            <section class="ai-coach-panel">
+              <div class="ai-coach-head">
+                <div>
+                  <p class="loading-eyebrow">AI Learning Coach</p>
+                  <h3>{{ aiFeedbackHeadline() }}</h3>
+                  <p>{{ aiFeedbackSummary() }}</p>
+                </div>
+                <div class="ai-coach-actions">
+                  <span>{{ aiFeedbackSourceLabel() }}</span>
+                  <button class="btn" type="button" [disabled]="aiFeedbackLoading" (click)="loadAiFeedback()">
+                    {{ aiFeedbackLoading ? "Generating..." : (aiFeedbackReady() ? "Regenerate" : "Generate AI Feedback") }}
+                  </button>
+                </div>
+              </div>
+
+              @if (aiFeedbackError) {
+                <p class="error">{{ aiFeedbackError }}</p>
+              }
+
+              @if (aiFeedbackReady()) {
+                @if (aiApiStatus()) {
+                  <p class="ai-status">{{ aiApiStatus() }}</p>
+                }
+                <div class="ai-feedback-grid">
+                  <article>
+                    <h4>Priority topics</h4>
+                    @if (aiPriorityTopics().length === 0) {
+                      <p class="muted">No weak topic detected.</p>
+                    } @else {
+                      @for (topic of aiPriorityTopics(); track topic.topicTag) {
+                        <div class="ai-mini-row">
+                          <strong>{{ topic.topicTag }}</strong>
+                          <p>{{ topic.reason }}</p>
+                          <span>{{ topic.action }}</span>
+                        </div>
+                      }
+                    }
+                  </article>
+                  <article>
+                    <h4>Study plan</h4>
+                    @for (step of aiStudyPlan(); track step.step) {
+                      <div class="ai-mini-row">
+                        <strong>{{ step.step }}</strong>
+                        <p>{{ step.details }}</p>
+                      </div>
+                    }
+                  </article>
+                </div>
+
+                @if (aiAnswerExplanations().length > 0) {
+                  <div class="ai-answer-list">
+                    <h4>AI explanation for wrong answers</h4>
+                    @for (item of aiAnswerExplanations(); track item.questionId) {
+                      <article>
+                        <span>Question {{ item.questionId }} | {{ item.topicTag }}</span>
+                        <p>{{ item.explanation }}</p>
+                        <small>Correct concept: {{ item.correctConcept }}</small>
+                        <small>Next step: {{ item.nextStep }}</small>
+                      </article>
+                    }
+                  </div>
+                }
+              }
+            </section>
+          }
+
+          @if (canShowScoreFeedback()) {
+            <div class="debrief-stats-grid">
+              <article>
+                <span>Score</span>
+                <strong>{{ resultScore() }}%</strong>
+                <p>{{ result.passed ? "Passed attempt" : "Retry recommended" }}</p>
+              </article>
+              <article>
+                <span>Correct answers</span>
+                <strong>{{ resultStrongCount() }}/{{ result.totalQuestions }}</strong>
+                <p>{{ resultWeakCount() }} question(s) need review</p>
+              </article>
+              <article>
+                <span>Next best action</span>
+                <strong>{{ resultWeakCount() === 0 ? "Challenge" : "Review" }}</strong>
+                <p>{{ nextBestAction() }}</p>
+              </article>
+            </div>
+          }
+
+          @if (resultSummaryPoints().length > 0) {
+            <div class="result-summary-grid">
+              @for (point of resultSummaryPoints(); track point) {
+                <article class="summary-point">
+                  <span>Key</span>
+                  <p>{{ point }}</p>
+                </article>
+              }
+            </div>
+          }
+
+          <section class="lecturer-link-panel">
+            <div>
+              <p class="loading-eyebrow">Lecturer connected feedback</p>
+              <h3>Your learning signals are shared for support</h3>
+              <p>Lecturer can review weak topics, confidence risk, timing pattern, and your reflection to plan better intervention.</p>
+            </div>
+            <div class="lecturer-signal-grid">
+              @for (signal of lecturerSignalCards(); track signal.label) {
+                <article>
+                  <span>{{ signal.label }}</span>
+                  <strong>{{ signal.value }}</strong>
+                  <p>{{ signal.note }}</p>
+                </article>
+              }
+            </div>
+          </section>
+
+          <div class="assessment-insight-grid">
+            @if (canShowRelatedConcept()) {
+            <article class="insight-panel">
+              <h3>Skill Mastery</h3>
+              @if (effectiveMasteryRows().length === 0) {
+                <p class="muted">No mastery breakdown available.</p>
+              } @else {
+                @for (item of effectiveMasteryRows(); track item.topicTag) {
+                  <div class="mastery-row enhanced" [class.strong]="masteryClass(item.score) === 'strong'" [class.developing]="masteryClass(item.score) === 'developing'" [class.weak]="masteryClass(item.score) === 'weak'">
+                    <div>
+                      <span>{{ item.topicTag }}</span>
+                      <small>{{ item.status }} @if (item.total) { · {{ item.correct }}/{{ item.total }} correct }</small>
+                    </div>
+                    <strong>{{ item.score }}%</strong>
+                    <div class="mastery-meter"><i [style.width.%]="item.score"></i></div>
+                  </div>
+                }
+              }
+            </article>
+            }
+
+            @if (canShowLearningRecommendation()) {
+            <article class="insight-panel">
+              <h3>Recommended Learning Materials</h3>
+              @for (item of effectiveRecommendations(); track item.topicTag) {
+                <div class="recommendation-row">
+                  <small>Weak topic: {{ item.weakTopic || item.topicTag }}</small>
+                  <strong>{{ item.title }}</strong>
+                  <p>{{ item.reason }}</p>
+                  @if (recommendationConcepts(item).length > 0) {
+                    <div class="concept-chip-row">
+                      @for (concept of recommendationConcepts(item); track concept) {
+                        <span>{{ concept }}</span>
+                      }
+                    </div>
+                  }
+                  @if (recommendationMaterials(item).length > 0) {
+                    <div class="learning-material-list">
+                      @for (material of recommendationMaterials(item); track material.title) {
+                        <a [href]="material.resourceUrl" target="_blank" rel="noopener">
+                          <span>{{ learningMaterialLabel(material) }}</span>
+                          <strong>{{ material.title }}</strong>
+                        </a>
+                      }
+                    </div>
+                  } @else {
+                    <span>{{ item.actionLabel }}</span>
+                  }
+                </div>
+              }
+            </article>
+            }
+
+            <article class="insight-panel">
+              <h3>Time Analysis</h3>
+              <p>{{ timeMessage() }}</p>
+              <div class="mini-stat-row">
+                <span>Average time</span>
+                <strong>{{ timeStats().averageSeconds }}s</strong>
+              </div>
+              <div class="mini-stat-row">
+                <span>Slow questions</span>
+                <strong>{{ timeStats().slowCount }}</strong>
+              </div>
+              <div class="mini-stat-row">
+                <span>Fast but wrong</span>
+                <strong>{{ timeStats().fastWrong }}</strong>
+              </div>
+            </article>
+          </div>
+
+          @if (canShowLearningRecommendation()) {
+            <section class="retake-panel">
+              <div>
+                <p class="loading-eyebrow">Personalized retake</p>
+                <h3>{{ result.retakePlan?.title ?? "Retake Plan" }}</h3>
+                <p>{{ retakeMessage() }}</p>
+              </div>
+              @if (effectiveRetakeQuestions().length > 0) {
+                <ul>
+                  @for (item of effectiveRetakeQuestions(); track item.questionId) {
+                    <li><strong>{{ item.topicTag }}</strong>: {{ item.focus }}</li>
+                  }
+                </ul>
+              }
+            </section>
+          }
+
+          @if (reviewAnswers().length) {
+            <div id="review-quiz" class="result-review">
+              <div class="review-heading">
+                <div>
+                  <p class="loading-eyebrow">Answer review</p>
+                  <h3>Learn from every decision</h3>
+                </div>
+                <div class="review-tools" role="group" aria-label="Review filter">
+                  <button
+                    type="button"
+                    [class.active]="reviewFilter === 'all'"
+                    (click)="setReviewFilter('all')">
+                    All
+                  </button>
+                  @if (canShowScoreFeedback()) {
+                    <button
+                      type="button"
+                      [class.active]="reviewFilter === 'mistakes'"
+                      (click)="setReviewFilter('mistakes')">
+                      Mistakes only
+                    </button>
+                  }
+                  <span class="review-count">{{ reviewFilterCount() }} shown</span>
+                </div>
+              </div>
+
+              <div class="review-card-list">
+                @for (answer of filteredReviewAnswers(); track answer.questionId; let reviewIndex = $index) {
+                  <article class="review-card" [class.correct]="canShowScoreFeedback() && answer.correct" [class.partial]="isPartiallyCorrect(answer)" [class.wrong]="canShowScoreFeedback() && !answer.correct && !isPartiallyCorrect(answer)">
+                    <header class="review-card-head">
+                      <span class="question-chip">Question {{ answer.sortOrder || (reviewIndex + 1) }}</span>
+                      @if (canShowScoreFeedback()) {
+                        <span class="status-pill" [class.partial]="isPartiallyCorrect(answer)" [class.fail]="!answer.correct && !isPartiallyCorrect(answer)">{{ answerStatusLabel(answer) }}</span>
+                      }
+                    </header>
+                    <div class="question-block">
+                      <p class="compare-label">Question</p>
+                      <h4>{{ answer.prompt }}</h4>
+                    </div>
+                    <div class="answer-compare">
+                      @if (canShowSelectedAnswer()) {
+                        <div [class.answer-wrong]="canShowScoreFeedback() && !answer.correct && !isPartiallyCorrect(answer)" [class.answer-partial]="isPartiallyCorrect(answer)">
+                          <p class="compare-label">Your answer</p>
+                          <p>{{ formatAnswer(answer.studentAnswer) }}</p>
+                        </div>
+                      }
+                      @if (canShowCorrectAnswer()) {
+                        <div class="answer-correct">
+                          <p class="compare-label">Correct answer</p>
+                          <p>{{ formatAnswer(answer.correctAnswer) }}</p>
+                        </div>
+                      }
+                    </div>
+                    @if (canShowExplanation() || canShowRelatedConcept()) {
+                      <div class="feedback-grid">
+                        @if (canShowExplanation()) {
+                          <div class="feedback-box">
+                            <strong>Explanation</strong>
+                            <p>{{ answerFeedbackDetail(answer) }}</p>
+                          </div>
+                        }
+                        @if (canShowRelatedConcept()) {
+                          <div class="concept-box">
+                            <span>Related Concept</span>
+                            <p>{{ answerRelatedConcept(answer) }}</p>
+                            <small>{{ answerMeta(answer) }}</small>
+                          </div>
+                        }
+                      </div>
+                    }
+                    @if (canShowExplanation() && optionFeedbackRows(answer).length > 0) {
+                      <div class="option-feedback-box">
+                        <strong>{{ optionFeedbackTitle(answer) }}</strong>
+                        <ul>
+                          @for (option of optionFeedbackRows(answer); track option.option) {
+                            <li>
+                              <span>{{ option.option }}</span>
+                              <p>{{ option.reason }}</p>
+                            </li>
+                          }
+                        </ul>
+                      </div>
+                    }
+                    @if (canShowConfidence() && answer.confidenceReflection) {
+                      <div class="impact-box">
+                        <span>Confidence Reflection</span>
+                        <p>{{ answer.confidenceReflection }}</p>
+                      </div>
+                    }
+                    @if (canShowExplanation()) {
+                      <div class="impact-box">
+                        <span>Impact</span>
+                        <p>{{ answerSimulationImpact(answer) }}</p>
+                      </div>
+                    }
+                    @if (canShowLearningRecommendation()) {
+                      <div class="learning-next-step">
+                        <p><strong>Study tip:</strong> {{ answerLearningTip(answer) }}</p>
+                        <p><strong>Recommendation:</strong> {{ answerRecommendation(answer) }}</p>
+                        @if (firstReviewMaterial(answer); as material) {
+                          @if (material.resourceUrl) {
+                            <a class="review-material-btn" [href]="material.resourceUrl" target="_blank" rel="noopener">
+                              Review Material
+                            </a>
+                          } @else {
+                            <span class="review-material-btn muted-action">{{ reviewMaterialLabel(answer) }}</span>
+                          }
+                        }
+                      </div>
+                    }
+                  </article>
+                }
               </div>
             </div>
           }
+
+          @if (!canShowStudentAnswerReview()) {
+            <aside class="review-hidden-note">
+              <strong>Quiz and answer review is hidden</strong>
+              <p>Your lecturer has not enabled viewing submitted questions and your answers for this quiz.</p>
+            </aside>
+          }
         } @else {
+          <h2>Quiz Submitted</h2>
           <p class="muted">Result is submitted and will be released by lecturer settings.</p>
           @if (result.releaseAt) {
             <p class="muted">Release time: {{ result.releaseAt | date: "medium" }}</p>
@@ -67,95 +692,153 @@
           <a class="btn btn-outline" [routerLink]="backRoute()">Back Course</a>
           <a class="btn" routerLink="/student/history">View Attempt History</a>
         </div>
+          </div>
+        </div>
       </section>
     } @else {
-      <section class="panel quiz-layout">
+      <section class="panel quiz-layout answer-quiz-layout" [class.quiz-nav-collapsed]="!showQuizNavigation">
+        <header class="quiz-player-toolbar">
+          <button class="nav-arrow" type="button" [disabled]="currentIndex === 0" (click)="previousQuestion()">&#8249;</button>
+          <div class="quiz-pill-strip" aria-label="Question navigation">
+            @for (question of allQuestions(); track question.questionId; let i = $index) {
+              <button
+                type="button"
+                [class.current]="currentIndex === i"
+                [class.answered]="isQuestionAnswered(i)"
+                (click)="goToQuestion(i)">
+                Q{{ i + 1 }}
+              </button>
+            }
+          </div>
+          <button class="btn toolbar-submit" type="button" [disabled]="submitting" (click)="submitQuiz()">Submit Page</button>
+          <button class="nav-arrow" type="button" [disabled]="isCurrentLastQuestion()" (click)="nextQuestion()">&#8250;</button>
+        </header>
+
         <div class="quiz-main">
+          <div class="attempt-main-tools">
+            <span></span>
+            @if (quizData.timeLimitMinutes) {
+              <div class="attempt-timer-inline" [class.hidden-timer]="!showTimer">
+                @if (showTimer) {
+                  <span [class.critical]="remainingSeconds <= 60">Time left {{ timeLabel() }}</span>
+                  <button type="button" (click)="toggleTimerVisibility()">Hide</button>
+                } @else {
+                  <button type="button" (click)="toggleTimerVisibility()">Show timer</button>
+                }
+              </div>
+            }
+          </div>
+
           <div class="quiz-heading">
             <h1>{{ quizData.title }}</h1>
             <p class="meta">Attempt {{ quizData.attemptNumber }} | {{ quizData.timeLimitMinutes }} minutes</p>
             <p class="meta">Due date: {{ quizData.closeAt ? (quizData.closeAt | date: "medium") : "Not set" }}</p>
-            @if (quizData.description) {
-              <p class="meta">{{ quizData.description }}</p>
-            }
+            <div class="quiz-progress-strip">
+              <span>{{ answeredCount() }} of {{ quizData.questions?.length ?? 0 }} answered</span>
+              <div><i [style.width.%]="answeredPercent()"></i></div>
+              <span>{{ quizDifficultyLabel() }}</span>
+            </div>
           </div>
 
           @if (isAllAtOnce) {
             <div class="all-questions">
               @for (question of allQuestions(); track question.questionId; let questionIndex = $index) {
                 <section class="question-card">
-                  <h2 class="question-title">Q{{ questionIndex + 1 }}. {{ question.prompt }}</h2>
-                  @if (question.mediaUrl) {
-                    <p class="media-line">Media ({{ question.mediaType || "link" }}): <a [href]="question.mediaUrl" target="_blank">{{ question.mediaUrl }}</a></p>
-                  }
+                  <div class="question-attempt-header">
+                    <strong>Question {{ questionIndex + 1 }}</strong>
+                    <span>{{ isQuestionAnswered(questionIndex) ? "Answered" : "Not yet answered" }}</span>
+                    <span>Marked out of {{ questionMarks(question) }}</span>
+                    <button type="button">Flag question</button>
+                  </div>
+                  <div class="question-attempt-body">
+                    <p class="question-prompt">{{ question.prompt }}</p>
+                    <p class="question-instruction">{{ questionTypeInstruction(question) }}</p>
+                    @if (question.mediaUrl) {
+                      <p class="media-line">Media ({{ question.mediaType || "link" }}): <a [href]="question.mediaUrl" target="_blank">{{ question.mediaUrl }}</a></p>
+                    }
 
-                  @if (question.questionType === "MCQ" || question.questionType === "TRUE_FALSE") {
-                    <div class="answers">
-                      @for (option of optionsArray(question); track option; let optionIndex = $index) {
-                        <button
-                          type="button"
-                          class="option-btn"
-                          [class.selected]="answerText(question.questionId) === option"
-                          (click)="updateAnswer(question.questionId, option)">
-                          <span class="option-tag">{{ optionLabel(optionIndex) }}</span>
-                          <span>{{ option }}</span>
-                        </button>
-                      }
-                    </div>
-                  }
-
-                  @if (question.questionType === "MULTI_SELECT") {
-                    <div class="answers">
-                      @for (option of optionsArray(question); track option) {
-                        <label class="option-line">
-                          <input
-                            type="checkbox"
-                            [checked]="isMultiChecked(question.questionId, option)"
-                            (change)="toggleMulti(question.questionId, option, $any($event.target).checked)">
-                          <span>{{ option }}</span>
-                        </label>
-                      }
-                    </div>
-                  }
-
-                  @if (question.questionType === "SHORT_ANSWER") {
-                    <textarea
-                      rows="4"
-                      [ngModel]="answerText(question.questionId)"
-                      (ngModelChange)="updateAnswer(question.questionId, $event)"
-                      placeholder="Type your answer..."></textarea>
-                  }
-
-                  @if (question.questionType === "MATCHING") {
-                    <table>
-                      <thead>
-                        <tr>
-                          <th>Left</th>
-                          <th>Match With</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        @for (left of matchingLeft(question); track left) {
-                          <tr>
-                            <td>{{ left }}</td>
-                            <td>
-                              <select
-                                [ngModel]="matchingValue(question.questionId, left)"
-                                (ngModelChange)="updateMatching(question.questionId, left, $event)">
-                                <option value="">Select...</option>
-                                @for (right of matchingRight(question); track right) {
-                                  <option [value]="right">{{ right }}</option>
-                                }
-                              </select>
-                            </td>
-                          </tr>
+                    @if (question.questionType === "MCQ" || question.questionType === "TRUE_FALSE") {
+                      <div class="answers">
+                        @for (option of optionsArray(question); track option; let optionIndex = $index) {
+                          <button
+                            type="button"
+                            class="option-btn"
+                            [class.selected]="answerText(question.questionId) === option"
+                            (click)="updateAnswer(question.questionId, option)">
+                            <span class="option-tag">{{ optionLabel(optionIndex) }}</span>
+                            <span>{{ option }}</span>
+                          </button>
                         }
-                      </tbody>
-                    </table>
-                  }
+                      </div>
+                    }
+
+                    @if (question.questionType === "MULTI_SELECT") {
+                      <div class="answers">
+                        @for (option of optionsArray(question); track option) {
+                          <label class="option-line" [class.selected]="isMultiChecked(question.questionId, option)">
+                            <input
+                              type="checkbox"
+                              [checked]="isMultiChecked(question.questionId, option)"
+                              (change)="toggleMulti(question.questionId, option, $any($event.target).checked)">
+                            <span>{{ option }}</span>
+                          </label>
+                        }
+                      </div>
+                    }
+
+                    @if (question.questionType === "SHORT_ANSWER") {
+                      <textarea
+                        rows="4"
+                        [ngModel]="answerText(question.questionId)"
+                        (ngModelChange)="updateAnswer(question.questionId, $event)"
+                        placeholder="Type your answer..."></textarea>
+                    }
+
+                    @if (question.questionType === "MATCHING") {
+                      <div class="matching-answer-list">
+                        @for (left of matchingLeft(question); track left) {
+                          <label class="matching-answer-row">
+                            <span class="matching-label">{{ left }}</span>
+                            <select
+                              [ngModel]="matchingValue(question.questionId, left)"
+                              (ngModelChange)="updateMatching(question.questionId, left, $event)">
+                              <option value="">Please select an option</option>
+                              @for (right of matchingRight(question); track right) {
+                                <option [value]="right">{{ right }}</option>
+                              }
+                            </select>
+                          </label>
+                        }
+                      </div>
+                    }
+
+                    <div class="assessment-meta-panel">
+                      <p>Confidence</p>
+                      <div class="confidence-buttons">
+                        @for (option of confidenceOptions(); track option.value) {
+                          <button
+                            type="button"
+                            [class.active]="confidenceValue(question.questionId) === option.value"
+                            (click)="updateConfidence(question.questionId, option.value)">
+                            {{ option.label }}
+                          </button>
+                        }
+                      </div>
+                    </div>
+                  </div>
                 </section>
               }
             </div>
+
+            <label class="reflection-box">
+              <span>Attempt reflection</span>
+              <textarea
+                rows="4"
+                name="quizReflectionAll"
+                [(ngModel)]="reflection"
+                (ngModelChange)="persistAnswers()"
+                placeholder="What confused you, and what will you review next?"></textarea>
+            </label>
 
             <div class="actions">
               <button class="btn" type="button" [disabled]="submitting" (click)="submitQuiz()">
@@ -164,75 +847,100 @@
             </div>
           } @else {
             @if (currentQuestion) {
-              <h2 class="question-title">Q{{ currentIndex + 1 }}. {{ currentQuestion.prompt }}</h2>
-              @if (currentQuestion.mediaUrl) {
-                <p class="media-line">Media ({{ currentQuestion.mediaType || "link" }}): <a [href]="currentQuestion.mediaUrl" target="_blank">{{ currentQuestion.mediaUrl }}</a></p>
-              }
-
-              @if (currentQuestion.questionType === "MCQ" || currentQuestion.questionType === "TRUE_FALSE") {
-                <div class="answers">
-                  @for (option of optionsArray(currentQuestion); track option; let optionIndex = $index) {
-                    <button
-                      type="button"
-                      class="option-btn"
-                      [class.selected]="answerText(currentQuestion.questionId) === option"
-                      (click)="updateAnswer(currentQuestion.questionId, option)">
-                      <span class="option-tag">{{ optionLabel(optionIndex) }}</span>
-                      <span>{{ option }}</span>
-                    </button>
-                  }
+              <section class="question-card">
+                <div class="question-attempt-header">
+                  <strong>Question {{ currentIndex + 1 }}</strong>
+                  <span>{{ isQuestionAnswered(currentIndex) ? "Answered" : "Not yet answered" }}</span>
+                  <span>Marked out of {{ questionMarks(currentQuestion) }}</span>
+                  <button type="button">Flag question</button>
                 </div>
-              }
-
-              @if (currentQuestion.questionType === "MULTI_SELECT") {
-                <div class="answers">
-                  @for (option of optionsArray(currentQuestion); track option) {
-                    <label class="option-line">
-                      <input
-                        type="checkbox"
-                        [checked]="isMultiChecked(currentQuestion.questionId, option)"
-                        (change)="toggleMulti(currentQuestion.questionId, option, $any($event.target).checked)">
-                      <span>{{ option }}</span>
-                    </label>
+                <div class="question-attempt-body">
+                  <p class="question-prompt">{{ currentQuestion.prompt }}</p>
+                  <p class="question-instruction">{{ questionTypeInstruction(currentQuestion) }}</p>
+                  @if (currentQuestion.mediaUrl) {
+                    <p class="media-line">Media ({{ currentQuestion.mediaType || "link" }}): <a [href]="currentQuestion.mediaUrl" target="_blank">{{ currentQuestion.mediaUrl }}</a></p>
                   }
-                </div>
-              }
 
-              @if (currentQuestion.questionType === "SHORT_ANSWER") {
-                <textarea
-                  rows="5"
-                  [ngModel]="answerText(currentQuestion.questionId)"
-                  (ngModelChange)="updateAnswer(currentQuestion.questionId, $event)"
-                  placeholder="Type your answer..."></textarea>
-              }
+                  @if (currentQuestion.questionType === "MCQ" || currentQuestion.questionType === "TRUE_FALSE") {
+                    <div class="answers">
+                      @for (option of optionsArray(currentQuestion); track option; let optionIndex = $index) {
+                        <button
+                          type="button"
+                          class="option-btn"
+                          [class.selected]="answerText(currentQuestion.questionId) === option"
+                          (click)="updateAnswer(currentQuestion.questionId, option)">
+                          <span class="option-tag">{{ optionLabel(optionIndex) }}</span>
+                          <span>{{ option }}</span>
+                        </button>
+                      }
+                    </div>
+                  }
 
-              @if (currentQuestion.questionType === "MATCHING") {
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Left</th>
-                      <th>Match With</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    @for (left of matchingLeft(currentQuestion); track left) {
-                      <tr>
-                        <td>{{ left }}</td>
-                        <td>
+                  @if (currentQuestion.questionType === "MULTI_SELECT") {
+                    <div class="answers">
+                      @for (option of optionsArray(currentQuestion); track option) {
+                        <label class="option-line" [class.selected]="isMultiChecked(currentQuestion.questionId, option)">
+                          <input
+                            type="checkbox"
+                            [checked]="isMultiChecked(currentQuestion.questionId, option)"
+                            (change)="toggleMulti(currentQuestion.questionId, option, $any($event.target).checked)">
+                          <span>{{ option }}</span>
+                        </label>
+                      }
+                    </div>
+                  }
+
+                  @if (currentQuestion.questionType === "SHORT_ANSWER") {
+                    <textarea
+                      rows="5"
+                      [ngModel]="answerText(currentQuestion.questionId)"
+                      (ngModelChange)="updateAnswer(currentQuestion.questionId, $event)"
+                      placeholder="Type your answer..."></textarea>
+                  }
+
+                  @if (currentQuestion.questionType === "MATCHING") {
+                    <div class="matching-answer-list">
+                      @for (left of matchingLeft(currentQuestion); track left) {
+                        <label class="matching-answer-row">
+                          <span class="matching-label">{{ left }}</span>
                           <select
                             [ngModel]="matchingValue(currentQuestion.questionId, left)"
                             (ngModelChange)="updateMatching(currentQuestion.questionId, left, $event)">
-                            <option value="">Select...</option>
+                            <option value="">Please select an option</option>
                             @for (right of matchingRight(currentQuestion); track right) {
                               <option [value]="right">{{ right }}</option>
                             }
                           </select>
-                        </td>
-                      </tr>
-                    }
-                  </tbody>
-                </table>
-              }
+                        </label>
+                      }
+                    </div>
+                  }
+
+                  <div class="assessment-meta-panel">
+                    <p>Confidence</p>
+                    <div class="confidence-buttons">
+                      @for (option of confidenceOptions(); track option.value) {
+                        <button
+                          type="button"
+                          [class.active]="confidenceValue(currentQuestion.questionId) === option.value"
+                          (click)="updateConfidence(currentQuestion.questionId, option.value)">
+                          {{ option.label }}
+                        </button>
+                      }
+                    </div>
+                  </div>
+                </div>
+              </section>
+
+              <label class="reflection-box">
+                <span>Attempt reflection</span>
+                <textarea
+                  rows="4"
+                  name="quizReflection"
+                  [(ngModel)]="reflection"
+                  (ngModelChange)="persistAnswers()"
+                  placeholder="What confused you, and what will you review next?"></textarea>
+              </label>
 
               <div class="actions">
                 <button class="btn btn-outline" type="button" [disabled]="currentIndex === 0" (click)="previousQuestion()">
@@ -252,30 +960,65 @@
           }
         </div>
 
-        <aside class="quiz-side">
-            <div class="timer-card">
-              <div class="timer-circle" [class.critical]="remainingSeconds <= 60">{{ timeLabel() }}</div>
-              <p>Timer remaining</p>
-              <p class="answered">{{ answeredCount() }} / {{ quizData.questions?.length ?? 0 }} answered</p>
-            </div>
+        <footer class="quiz-bottom-bar">
+          <span>{{ currentIndex + 1 }} of {{ quizData.questions?.length ?? 0 }}</span>
+          <button type="button" class="bottom-link" (click)="skipAll()">Skip All</button>
+          <button type="button" class="bottom-link" [disabled]="isCurrentLastQuestion()" (click)="skipQuestion()">Skip Question</button>
+          <button class="btn" type="button" [disabled]="submitting" (click)="submitQuiz()">
+            {{ submitting ? "Submitting..." : "Submit" }}
+          </button>
+        </footer>
 
-          @if (!isAllAtOnce) {
-            <div class="question-list">
-              @for (question of quizData.questions; track question.questionId; let i = $index) {
-                <button
-                  type="button"
-                  class="question-item"
-                  [class.current]="currentIndex === i"
-                  [class.answered]="isQuestionAnswered(i)"
-                  (click)="goToQuestion(i)">
-                  <span>Question {{ i + 1 }}</span>
-                  <span class="state">{{ isQuestionAnswered(i) ? "Answered" : "Pending" }}</span>
+        <aside class="quiz-side" [class.closed]="!showQuizNavigation">
+          @if (showQuizNavigation) {
+            <section class="attempt-navigation-card" aria-label="Quiz navigation">
+              <div class="attempt-nav-head">
+                <p class="attempt-nav-kicker">Quiz navigation</p>
+                <button type="button" class="attempt-nav-close" (click)="showQuizNavigation = false" aria-label="Close quiz navigation">
+                  &times;
                 </button>
-              }
-            </div>
+              </div>
+              <h2>{{ quizData.title }}</h2>
+              <div class="attempt-nav-grid">
+                @for (question of quizData.questions; track question.questionId; let i = $index) {
+                  <button
+                    type="button"
+                    [class.current]="currentIndex === i"
+                    [class.answered]="isQuestionAnswered(i)"
+                    (click)="goToQuestion(i)">
+                    {{ i + 1 }}
+                  </button>
+                }
+              </div>
+              <div class="attempt-nav-summary">
+                <span>{{ answeredCount() }} / {{ quizData.questions?.length ?? 0 }} answered</span>
+                <strong>{{ answeredPercent() }}%</strong>
+              </div>
+              <button type="button" class="finish-attempt-link" [disabled]="submitting" (click)="submitQuiz()">
+                Finish attempt ...
+              </button>
+            </section>
+          } @else {
+            <button type="button" class="attempt-nav-open" (click)="showQuizNavigation = true" aria-label="Open quiz navigation">
+              <span>&lsaquo;</span>
+              <strong>Quiz navigation</strong>
+            </button>
           }
         </aside>
       </section>
     }
+  }
+
+  @if (showSubmitConfirm) {
+    <div class="submit-modal-backdrop" role="presentation" (click)="cancelSubmitConfirm()">
+      <section class="submit-modal" role="dialog" aria-modal="true" aria-labelledby="submit-confirm-title" (click)="$event.stopPropagation()">
+        <h3 id="submit-confirm-title">Confirm submission</h3>
+        <p>{{ submitConfirmMessage }}</p>
+        <div class="submit-modal-actions">
+          <button class="btn btn-outline" type="button" (click)="cancelSubmitConfirm()">Cancel</button>
+          <button class="btn" type="button" (click)="confirmSubmitQuiz()">OK</button>
+        </div>
+      </section>
+    </div>
   }
 </div>

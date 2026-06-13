@@ -1,0 +1,85 @@
+<div class="container reset-page">
+  <section class="reset-panel">
+    <header class="reset-head">
+      <h1>Reset Requests</h1>
+      <div class="bulk-actions">
+        <select [(ngModel)]="bulkAction" name="bulkAction" [disabled]="working || selectedCount() === 0">
+          <option value="">Bulk Actions</option>
+          <option value="approve">Approve selected</option>
+          <option value="reject">Reject selected</option>
+          <option value="delete">Delete selected</option>
+        </select>
+        <button class="apply-btn" type="button" [disabled]="working || !bulkAction || selectedCount() === 0" (click)="applyBulkAction()">
+          Apply
+        </button>
+      </div>
+    </header>
+
+    @if (statusMessage) {
+      <p class="ok">{{ statusMessage }}</p>
+    }
+    @if (errorMessage) {
+      <p class="error">{{ errorMessage }}</p>
+    }
+
+    @if (loading) {
+      <p class="muted">Loading reset requests...</p>
+    } @else {
+      <div class="request-table-wrap">
+        <table>
+          <thead>
+            <tr>
+              <th class="select-col">
+                <input type="checkbox" [checked]="allSelected()" (change)="toggleAll($any($event.target).checked)" aria-label="Select all reset requests">
+              </th>
+              <th>User Name</th>
+              <th>User Email</th>
+              <th>Course</th>
+              <th>Request Date</th>
+              <th>Status</th>
+              <th>Actions</th>
+            </tr>
+          </thead>
+          <tbody>
+            @if (requests.length === 0) {
+              <tr>
+                <td colspan="7" class="empty-cell">No reset request yet.</td>
+              </tr>
+            } @else {
+              @for (request of requests; track request.requestId) {
+                <tr>
+                  <td class="select-col">
+                    <input
+                      type="checkbox"
+                      [checked]="isSelected(request.requestId)"
+                      (change)="toggleRequest(request.requestId, $any($event.target).checked)"
+                      [attr.aria-label]="'Select request from ' + request.userName">
+                  </td>
+                  <td>{{ request.userName }}</td>
+                  <td>{{ request.userEmail }}</td>
+                  <td class="course-cell">{{ request.course }}</td>
+                  <td>{{ request.requestDate | date: "yyyy-MM-dd HH:mm:ss" }}</td>
+                  <td>
+                    <span class="status-pill" [class.pending]="request.status === 'PENDING'" [class.approved]="request.status === 'APPROVED'" [class.rejected]="request.status === 'REJECTED'">
+                      {{ statusLabel(request.status) }}
+                    </span>
+                  </td>
+                  <td>
+                    <div class="row-actions">
+                      @if (isPending(request)) {
+                        <button class="approve-btn" type="button" [disabled]="working" (click)="approve(request)">Approve</button>
+                        <button class="reject-btn" type="button" [disabled]="working" (click)="reject(request)">Reject</button>
+                      } @else {
+                        <button class="delete-btn" type="button" [disabled]="working" (click)="delete(request)">Delete</button>
+                      }
+                    </div>
+                  </td>
+                </tr>
+              }
+            }
+          </tbody>
+        </table>
+      </div>
+    }
+  </section>
+</div>

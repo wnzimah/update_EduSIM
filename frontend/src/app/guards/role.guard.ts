@@ -13,7 +13,7 @@ export const roleGuard: CanActivateFn = (route) => {
   }
 
   if (currentRole === "STUDENT") {
-    return router.parseUrl("/student/dashboard");
+    return router.parseUrl("/student/my-courses");
   }
   if (currentRole === "LECTURER") {
     return router.parseUrl("/lecturer/dashboard");

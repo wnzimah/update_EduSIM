@@ -1,6 +1,8 @@
 package com.edusim.controller;
 
 import com.edusim.dto.StudentDtos.SubmitQuizRequest;
+import com.edusim.dto.StudentDtos.LessonProgressRequest;
+import com.edusim.dto.StudentDtos.VideoCommentRequest;
 import com.edusim.model.UserAccount;
 import com.edusim.service.AuthService;
 import com.edusim.service.StudentService;
@@ -47,6 +49,44 @@ public class StudentController {
         return studentService.completeVideo(videoId, student);
     }
 
+    @PostMapping("/lessons/{lessonId}/progress")
+    public Map<String, Object> updateLessonProgress(
+        @PathVariable Long lessonId,
+        @RequestBody LessonProgressRequest request,
+        Authentication authentication
+    ) {
+        UserAccount student = authService.getCurrentUser(authentication);
+        return studentService.updateLessonProgress(lessonId, request, student);
+    }
+
+    @PostMapping("/lessons/{lessonId}/notes/open")
+    public Map<String, Object> openLessonNotes(@PathVariable Long lessonId, Authentication authentication) {
+        UserAccount student = authService.getCurrentUser(authentication);
+        return studentService.openLessonNotes(lessonId, student);
+    }
+
+    @GetMapping("/videos/{videoId}/comments")
+    public List<Map<String, Object>> videoComments(@PathVariable Long videoId, Authentication authentication) {
+        UserAccount student = authService.getCurrentUser(authentication);
+        return studentService.getVideoComments(videoId, student);
+    }
+
+    @PostMapping("/videos/{videoId}/comments")
+    public Map<String, Object> addVideoComment(
+        @PathVariable Long videoId,
+        @Valid @RequestBody VideoCommentRequest request,
+        Authentication authentication
+    ) {
+        UserAccount student = authService.getCurrentUser(authentication);
+        return studentService.addVideoComment(videoId, request, student);
+    }
+
+    @PostMapping("/courses/{courseId}/reset-request")
+    public Map<String, Object> requestCourseReset(@PathVariable Long courseId, Authentication authentication) {
+        UserAccount student = authService.getCurrentUser(authentication);
+        return studentService.requestCourseReset(courseId, student);
+    }
+
     @PostMapping("/quizzes/{quizId}/start")
     public Map<String, Object> startQuiz(@PathVariable Long quizId, Authentication authentication) {
         UserAccount student = authService.getCurrentUser(authentication);
@@ -73,5 +113,11 @@ public class StudentController {
     public Map<String, Object> attempt(@PathVariable Long attemptId, Authentication authentication) {
         UserAccount student = authService.getCurrentUser(authentication);
         return studentService.getAttemptResult(attemptId, student);
+    }
+
+    @GetMapping("/attempts/{attemptId}/ai-feedback")
+    public Map<String, Object> aiFeedback(@PathVariable Long attemptId, Authentication authentication) {
+        UserAccount student = authService.getCurrentUser(authentication);
+        return studentService.getAiFeedback(attemptId, student);
     }
 }

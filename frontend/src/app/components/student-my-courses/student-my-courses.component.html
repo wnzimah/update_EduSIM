@@ -1,0 +1,327 @@
+<div class="learning-page">
+  @if (loading) {
+    <p class="state-text">Loading dashboard...</p>
+  } @else if (errorMessage) {
+    <p class="error">{{ errorMessage }}</p>
+  } @else if (dashboard) {
+    <section class="learning-main">
+      <div class="learning-title">
+        <span class="book-icon" aria-hidden="true"></span>
+        <div>
+          <h1>Study Hub</h1>
+          <p>Welcome back</p>
+        </div>
+      </div>
+
+      <section class="study-hero-card">
+        <div>
+          <p class="hero-label">Current focus</p>
+          <h2>{{ completionHeadline() }}</h2>
+          <p>Use this space to continue your lessons, review pending quizzes, and keep your learning momentum visible.</p>
+        </div>
+        <div class="hero-metrics" aria-label="Learning summary">
+          <article>
+            <strong>{{ dashboard.courses?.length ?? 0 }}</strong>
+            <span>Courses</span>
+          </article>
+          <article>
+            <strong>{{ activitiesDueCount() }}</strong>
+            <span>Due</span>
+          </article>
+          <article>
+            <strong>{{ completedCoursesCount() }}</strong>
+            <span>Done</span>
+          </article>
+        </div>
+      </section>
+
+      <section class="course-section">
+        <div class="section-heading">
+          <h2>Continue Learning</h2>
+          <span>{{ courseCountLabel(filteredCourses().length) }}</span>
+        </div>
+
+        <div class="learning-filters">
+          <label class="search-field">
+            <svg viewBox="0 0 24 24" aria-hidden="true">
+              <path d="M10.5 4a6.5 6.5 0 0 1 5.16 10.45l4.45 4.44-1.42 1.42-4.44-4.45A6.5 6.5 0 1 1 10.5 4Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z" />
+            </svg>
+            <input type="text" name="courseSearchTop" placeholder="Search course, training" [(ngModel)]="searchText">
+          </label>
+
+          <label>
+            <span>Academy</span>
+            <select name="courseSort" [(ngModel)]="courseSort">
+              <option value="name">All</option>
+              <option value="progressDesc">Highest progress</option>
+              <option value="progressAsc">Lowest progress</option>
+            </select>
+          </label>
+
+          <label>
+            <span>Type</span>
+            <select name="courseTab" [(ngModel)]="courseTab">
+              <option value="all">All</option>
+              <option value="inProgress">In progress</option>
+              <option value="completed">Completed</option>
+            </select>
+          </label>
+
+          <div class="view-toggle" aria-label="View mode">
+            <button
+              type="button"
+              aria-label="Grid view"
+              [class.active]="courseViewMode === 'grid'"
+              [attr.aria-pressed]="courseViewMode === 'grid'"
+              (click)="setCourseViewMode('grid')">
+              <span class="grid-mark" aria-hidden="true"></span>
+            </button>
+            <button
+              type="button"
+              aria-label="List view"
+              [class.active]="courseViewMode === 'list'"
+              [attr.aria-pressed]="courseViewMode === 'list'"
+              (click)="setCourseViewMode('list')">
+              <span class="list-mark" aria-hidden="true"></span>
+            </button>
+          </div>
+        </div>
+
+        <div class="course-catalog" [class.list-view]="courseViewMode === 'list'">
+          @for (course of filteredCourses(); track course.courseId; let i = $index) {
+            <article class="learning-card" [ngClass]="{ 'demo-subject': course.demo, 'subject-violet': course.accent === 'violet', 'subject-coral': course.accent === 'coral', 'subject-amber': course.accent === 'amber' }">
+              <a class="learning-media" [class.demo-media]="course.demo" [routerLink]="course.demo ? [] : ['/student/courses', course.courseId]" [attr.aria-label]="'Open course ' + course.title" (click)="course.demo && $event.preventDefault()">
+                <img [src]="courseImage(course, i)" [alt]="course.title">
+                <span class="level-pill">{{ course.demo ? (course.status || "COMING SOON") : ((course.progress ?? 0) > 0 ? "IN PROGRESS" : "BEGINNER") }}</span>
+                <span class="play-button" aria-hidden="true"></span>
+              </a>
+
+              <div class="learning-card-body">
+                <div class="provider-row">
+                <p>EduSIM <strong>Study Hub</strong></p>
+                  <button type="button" aria-label="Course options">⋮</button>
+                </div>
+                <p class="course-meta">Guided course <span></span> {{ course.demo ? "Enrichment" : "Self-paced" }}</p>
+                <h3>
+                  @if (course.demo) {
+                    <span>{{ course.title }}</span>
+                  } @else {
+                    <a [routerLink]="['/student/courses', course.courseId]">{{ course.title }}</a>
+                  }
+                </h3>
+                <p class="course-summary">{{ courseDescription(course) }}</p>
+                <div class="progress-row">
+                  <span>{{ courseProgress(course) }}% complete</span>
+                  <span>{{ quizCountForCourse(course) }} quiz</span>
+                </div>
+                <div class="progress-track">
+                  <span class="progress-fill" [style.width.%]="courseProgress(course)"></span>
+                </div>
+                @if (course.demo) {
+                  <button class="demo-action" type="button">Coming soon</button>
+                }
+              </div>
+            </article>
+          } @empty {
+            <div class="empty-card">
+              <h3>No courses found</h3>
+              <p>Try another search keyword or filter.</p>
+            </div>
+          }
+        </div>
+      </section>
+    </section>
+
+    <aside class="learning-rail">
+      <section class="rail-panel">
+        <div class="rail-head">
+          <h2>Milestones</h2>
+          <a routerLink="/student/dashboard/grades">Show all</a>
+        </div>
+
+        @if (completedCoursesCount() === 0) {
+          <div class="empty-achievement">
+            <span class="achievement-icon" aria-hidden="true"></span>
+            <h3>No milestone unlocked yet</h3>
+            <p>Finish lessons and quizzes to build your EduSIM achievement record.</p>
+            <a class="primary-action" routerLink="/student/my-courses">Explore courses</a>
+          </div>
+        } @else {
+          <div class="achievement-summary">
+            <span class="achievement-icon earned" aria-hidden="true"></span>
+            <h3>{{ courseCountLabel(completedCoursesCount()) }} completed</h3>
+            <p>Your completed learning records are ready in the transcript.</p>
+            <a class="primary-action" routerLink="/student/dashboard/grades">View transcript</a>
+          </div>
+        }
+      </section>
+
+      <section class="rail-panel">
+        <div class="rail-head">
+          <h2>Next Tasks</h2>
+          <a routerLink="/student/history">Show all</a>
+        </div>
+
+        @if (upcomingPlannerEvents(4).length === 0) {
+          <div class="empty-assignments">
+            <span class="assignment-art" aria-hidden="true"></span>
+            <h3>No upcoming tasks for now</h3>
+            <p>Your next quiz, video, or revision slot will appear here.</p>
+          </div>
+        } @else {
+          <ul class="assignment-list">
+            @for (event of upcomingPlannerEvents(4); track event.id) {
+              <li [class]="eventClass(event)" (click)="openPlannerEvent(event)">
+                <div>
+                  <strong>{{ event.title }}</strong>
+                  <span>{{ event.date }} · {{ event.category }}</span>
+                </div>
+                <button type="button" [disabled]="!canOpenPlannerEvent(event)">Open</button>
+              </li>
+            }
+          </ul>
+        }
+      </section>
+
+      <section class="rail-panel planner-panel">
+        <div class="rail-head">
+          <h2>Study Planner</h2>
+          <button type="button" class="planner-today-link" (click)="goToToday()">Today</button>
+        </div>
+
+        <div class="planner-filter-row">
+          <select name="calendarCourseFilter" [(ngModel)]="calendarCourseFilter">
+            <option value="all">All courses</option>
+            @for (course of dashboard.courses; track course.courseId) {
+              <option [value]="course.courseId">{{ course.title }}</option>
+            }
+          </select>
+          <button type="button" class="planner-add-btn" (click)="openEventModal(selectedDay)">Add</button>
+        </div>
+
+        <div class="planner-calendar">
+          <div class="planner-month">
+            <button type="button" (click)="previousMonth()" aria-label="Previous month">‹</button>
+            <strong>{{ monthLabel }}</strong>
+            <button type="button" (click)="nextMonth()" aria-label="Next month">›</button>
+          </div>
+
+          <div class="planner-grid">
+            @for (dayLabel of weekDays; track dayLabel) {
+              <span class="weekday">{{ dayLabel }}</span>
+            }
+            @for (week of monthGrid; track $index) {
+              @for (day of week; track $index) {
+                <button
+                  type="button"
+                  class="planner-day"
+                  [class.today]="isToday(day)"
+                  [class.has-event]="eventsForDay(day).length > 0"
+                  [class.selected]="day === selectedDay"
+                  [disabled]="!day"
+                  (click)="selectDay(day)">
+                  <span>{{ day ?? "" }}</span>
+                </button>
+              }
+            }
+          </div>
+        </div>
+
+        <div class="selected-events">
+          <div class="selected-events-head">
+            <strong>{{ selectedDayLabel() }}</strong>
+            <span>{{ selectedDayEvents().length }} event(s)</span>
+          </div>
+
+          @if (selectedDayEvents().length === 0) {
+            <p class="planner-empty">No planned activity on this date.</p>
+          } @else {
+            <ul class="planner-event-list">
+              @for (event of selectedDayEvents(); track event.id) {
+                <li [class]="eventClass(event)">
+                  <div>
+                    <strong>{{ event.title }}</strong>
+                    <span>{{ event.category }} · {{ event.auto ? "Auto" : "Custom" }}</span>
+                  </div>
+                  <div class="planner-event-actions">
+                    @if (canOpenPlannerEvent(event)) {
+                      <button type="button" (click)="openPlannerEvent(event)">Open</button>
+                    }
+                    @if (!event.auto) {
+                      <button type="button" (click)="removePlannerEvent(event.id, $event)">Delete</button>
+                    }
+                  </div>
+                </li>
+              }
+            </ul>
+          }
+        </div>
+      </section>
+
+      <section class="rail-panel compact-stats">
+        <h2>Today's Snapshot</h2>
+        <div>
+          <span>{{ activitiesCompletedCount() }}</span>
+          <p>Activities completed</p>
+        </div>
+        <div>
+          <span>{{ activitiesDueCount() }}</span>
+          <p>Activities due</p>
+        </div>
+      </section>
+    </aside>
+
+    @if (showEventModal) {
+      <div class="planner-modal-backdrop" (click)="closeEventModal()">
+        <section class="planner-modal" (click)="$event.stopPropagation()">
+          <div class="planner-modal-head">
+            <div>
+              <p>Study Planner</p>
+              <h2>Create event</h2>
+            </div>
+            <button type="button" aria-label="Close event form" (click)="closeEventModal()">×</button>
+          </div>
+
+          <form (ngSubmit)="addPlannerEvent()">
+            <label>
+              Event title
+              <input name="eventTitle" [(ngModel)]="eventForm.title" required>
+            </label>
+
+            <label>
+              Date
+              <input name="eventDate" type="date" [(ngModel)]="eventForm.date" required>
+            </label>
+
+            <div class="planner-modal-grid">
+              <label>
+                Course
+                <select name="eventCourse" [(ngModel)]="eventForm.courseId">
+                  <option value="all">General</option>
+                  @for (course of dashboard.courses; track course.courseId) {
+                    <option [value]="course.courseId">{{ course.title }}</option>
+                  }
+                </select>
+              </label>
+
+              <label>
+                Category
+                <select name="eventCategory" [(ngModel)]="eventForm.category">
+                  <option value="TASK">Task</option>
+                  <option value="STUDY">Study</option>
+                  <option value="QUIZ">Quiz</option>
+                  <option value="VIDEO">Video</option>
+                </select>
+              </label>
+            </div>
+
+            <div class="planner-modal-actions">
+              <button type="button" class="secondary" (click)="closeEventModal()">Cancel</button>
+              <button type="submit">Save event</button>
+            </div>
+          </form>
+        </section>
+      </div>
+    }
+  }
+</div>

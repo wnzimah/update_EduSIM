@@ -31,11 +31,28 @@ public class QuizAttemptAnswer {
     @Column(nullable = false)
     private String answerJson;
 
+    @Lob
+    private String correctAnswerJson;
+
     @Column(nullable = false)
     private boolean correct;
 
     @Column(nullable = false)
     private Double awardedPoints;
+
+    @Column(length = 80)
+    private String topicTag;
+
+    @Column(length = 40)
+    private String confidenceLevel;
+
+    private Integer timeSpentSeconds;
+
+    @Column(length = 80)
+    private String timeSignal;
+
+    @Column(length = 500)
+    private String misconception;
 
     public Long getId() {
         return id;
@@ -65,6 +82,14 @@ public class QuizAttemptAnswer {
         this.answerJson = answerJson;
     }
 
+    public String getCorrectAnswerJson() {
+        return correctAnswerJson;
+    }
+
+    public void setCorrectAnswerJson(String correctAnswerJson) {
+        this.correctAnswerJson = correctAnswerJson;
+    }
+
     public boolean isCorrect() {
         return correct;
     }
@@ -79,5 +104,45 @@ public class QuizAttemptAnswer {
 
     public void setAwardedPoints(Double awardedPoints) {
         this.awardedPoints = awardedPoints;
+    }
+
+    public String getTopicTag() {
+        return topicTag;
+    }
+
+    public void setTopicTag(String topicTag) {
+        this.topicTag = topicTag;
+    }
+
+    public String getConfidenceLevel() {
+        return confidenceLevel;
+    }
+
+    public void setConfidenceLevel(String confidenceLevel) {
+        this.confidenceLevel = confidenceLevel;
+    }
+
+    public Integer getTimeSpentSeconds() {
+        return timeSpentSeconds;
+    }
+
+    public void setTimeSpentSeconds(Integer timeSpentSeconds) {
+        this.timeSpentSeconds = timeSpentSeconds;
+    }
+
+    public String getTimeSignal() {
+        return timeSignal;
+    }
+
+    public void setTimeSignal(String timeSignal) {
+        this.timeSignal = timeSignal;
+    }
+
+    public String getMisconception() {
+        return misconception;
+    }
+
+    public void setMisconception(String misconception) {
+        this.misconception = misconception;
     }
 }

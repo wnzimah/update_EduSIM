@@ -1,0 +1,177 @@
+.reset-page {
+  width: min(1400px, 98%);
+}
+
+.reset-panel {
+  border: 1px solid #e6ebf3;
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 26px rgba(15, 23, 42, 0.08);
+  overflow: hidden;
+}
+
+.reset-head {
+  min-height: 64px;
+  padding: 14px 18px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+.reset-head h1 {
+  margin: 0;
+  color: #526681;
+  font-size: 24px;
+  font-weight: 800;
+}
+
+.bulk-actions,
+.row-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.bulk-actions select {
+  min-width: 170px;
+  height: 34px;
+  border: 1px solid #d8e0ec;
+  border-radius: 4px;
+  background: #ffffff;
+  color: #475569;
+  padding: 0 10px;
+}
+
+.apply-btn,
+.approve-btn,
+.reject-btn,
+.delete-btn {
+  min-width: 84px;
+  height: 34px;
+  border: 0;
+  border-radius: 4px;
+  color: #ffffff;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.apply-btn {
+  background: #3d73d8;
+}
+
+.approve-btn {
+  background: #21b35b;
+}
+
+.reject-btn {
+  background: #dc3545;
+}
+
+.delete-btn {
+  background: #5e6f7f;
+}
+
+button:disabled,
+select:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+
+.request-table-wrap {
+  width: 100%;
+  overflow-x: auto;
+}
+
+table {
+  width: 100%;
+  min-width: 980px;
+  border-collapse: collapse;
+  color: #344054;
+}
+
+thead th {
+  background: #ffffff;
+  color: #475569;
+  font-size: 13px;
+  font-weight: 800;
+  text-align: left;
+  padding: 13px 14px;
+  border-bottom: 1px solid #eef2f7;
+}
+
+tbody td {
+  padding: 12px 14px;
+  border-bottom: 1px solid #edf1f6;
+  font-size: 13px;
+  vertical-align: middle;
+}
+
+tbody tr:nth-child(even) {
+  background: #f8fafc;
+}
+
+.select-col {
+  width: 44px;
+}
+
+.select-col input {
+  width: 16px;
+  height: 16px;
+}
+
+.course-cell {
+  min-width: 280px;
+  color: #475569;
+}
+
+.status-pill {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 92px;
+  padding: 7px 12px;
+  border-radius: 999px;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.status-pill.pending {
+  background: #f3f4f6;
+  color: #374151;
+}
+
+.status-pill.approved {
+  background: #e7f8ef;
+  color: #15804a;
+}
+
+.status-pill.rejected {
+  background: #fff0f0;
+  color: #c02d3b;
+}
+
+.empty-cell {
+  padding: 32px;
+  text-align: center;
+  color: #64748b;
+}
+
+.ok,
+.error,
+.muted {
+  margin: 12px 18px;
+}
+
+@media (max-width: 760px) {
+  .reset-head {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .bulk-actions {
+    justify-content: flex-start;
+  }
+}

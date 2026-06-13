@@ -1,40 +1,136 @@
-<div class="login-shell">
-  <section class="login-layout">
-    <aside class="visual-panel">
-      <div class="visual-slider">
-        @for (slide of visualSlides; track slide.image; let i = $index) {
-          <img
-            class="slide-image"
-            [class.active]="i === currentSlideIndex"
-            [src]="slide.image"
-            [alt]="slide.alt">
-        }
+<div class="homepage-shell">
+  <header class="home-nav" aria-label="EduSIM homepage navigation">
+    <button class="home-brand" type="button" (click)="scrollHome()" aria-label="EduSIM home">
+      <span class="brand-mark">ES</span>
+      <span>
+        <strong>EduSIM</strong>
+        <small>Learning Hub</small>
+      </span>
+    </button>
+
+    <nav class="home-links" aria-label="Homepage sections">
+      <a href="#home">Home</a>
+      <a href="#class">Class</a>
+      <a href="#about">About Us</a>
+    </nav>
+
+    <button class="blue-login-cta nav-login-cta" type="button" (click)="focusLogin()">
+      <span>Login</span>
+    </button>
+  </header>
+
+  <main id="home" class="home-main">
+    <section class="hero-section" aria-labelledby="hero-title">
+      <div class="hero-copy">
+        <p class="hero-kicker">Open Distance Learning</p>
+        <h1 id="hero-title">Learn Virtually With EduSIM</h1>
+        <p class="hero-text">
+          Study materials, virtual classes, quizzes, feedback, and progress insights in one calm learning space.
+        </p>
+
+        <div class="hero-actions">
+          <a class="video-link" href="#class" aria-label="View learning features">
+            <span class="play-mark" aria-hidden="true"></span>
+            View Features
+          </a>
+        </div>
       </div>
-      <div class="visual-overlay">
-        <p>{{ visualSlides[currentSlideIndex].title }}</p>
-        <span>{{ visualSlides[currentSlideIndex].caption }}</span>
-        <div class="visual-dots">
-          @for (slide of visualSlides; track slide.image; let i = $index) {
+
+      <div class="hero-visual" aria-label="EduSIM virtual learning preview">
+        <button
+          class="slide-arrow slide-arrow-left"
+          type="button"
+          aria-label="Previous EduSIM preview"
+          (click)="previousVisualSlide()">
+        </button>
+
+        <div class="visual-grid">
+          <article class="slide-spotlight">
+            <img [src]="activeVisualSlide.image" [alt]="activeVisualSlide.alt">
+            <div>
+              <small>{{ activeVisualSlide.title }}</small>
+              <strong>{{ activeVisualSlide.caption }}</strong>
+            </div>
+          </article>
+          <div class="shape-tile blue-tile-main"></div>
+          <img class="student-photo photo-two" [src]="visualSlideAt(1).image" [alt]="visualSlideAt(1).alt">
+          <div class="shape-tile blue-tile-deep"></div>
+          <div class="mini-stat">
+            <strong>{{ activeVisualSlide.metric }}</strong>
+            <span>{{ activeVisualSlide.metricLabel }}</span>
+          </div>
+          <div class="shape-tile blue-tile-sky"></div>
+          <img class="student-photo photo-three" [src]="visualSlideAt(2).image" [alt]="visualSlideAt(2).alt">
+          <div class="shape-tile blue-tile-ice"></div>
+          <div class="class-card">
+            <small>Live today</small>
+            <strong>{{ activeVisualSlide.sessionTitle }}</strong>
+            <span>{{ activeVisualSlide.sessionMeta }}</span>
+          </div>
+        </div>
+
+        <button
+          class="slide-arrow slide-arrow-right"
+          type="button"
+          aria-label="Next EduSIM preview"
+          (click)="nextVisualSlide()">
+        </button>
+
+        <div class="slide-dots" aria-label="EduSIM preview slides">
+          @for (slide of visualSlides; track slide.title; let index = $index) {
             <button
               type="button"
-              [class.active]="i === currentSlideIndex"
-              aria-label="Show slide"
-              (click)="goToSlide(i)">
+              [class.active]="index === activeVisualSlideIndex"
+              [attr.aria-label]="'Show ' + slide.title"
+              (click)="setVisualSlide(index)">
             </button>
           }
         </div>
       </div>
-    </aside>
 
-    <section class="auth-panel">
-      <div class="auth-inner">
-        <p class="kicker">EduSIM Access Portal</p>
-        <img class="brand-logo" src="assets/edusim-logo.svg" alt="EduSIM logo">
-        <h2>Sign in to your account</h2>
-        <p class="intro">
-          Educational Self-Instructional Material System (EduSIM) supports Open and Distance Learning through
-          interactive digital materials and self-assessment.
-        </p>
+    </section>
+
+    <section id="class" class="feature-strip" aria-label="EduSIM learning features">
+      <article>
+        <span class="feature-icon audio-icon" aria-hidden="true"></span>
+        <div>
+          <h3>Audio & Video</h3>
+          <p>Learning media for every course.</p>
+        </div>
+      </article>
+      <article>
+        <span class="feature-icon classroom-icon" aria-hidden="true"></span>
+        <div>
+          <h3>Virtual Classroom</h3>
+          <p>Course content, videos, and quizzes.</p>
+        </div>
+      </article>
+      <article>
+        <span class="feature-icon group-icon" aria-hidden="true"></span>
+        <div>
+          <h3>Progress Insight</h3>
+          <p>Track marks, attempts, and feedback.</p>
+        </div>
+      </article>
+    </section>
+
+    <section id="about" class="goals-section">
+      <h2>Achieve Your Goals With EduSIM</h2>
+      <p>Built for students and lecturers who need one focused place for learning, assessment, and improvement.</p>
+    </section>
+  </main>
+
+  @if (showLoginModal) {
+    <div class="login-modal-backdrop" (click)="closeLoginModal()">
+      <section id="login-panel" class="auth-card" role="dialog" aria-modal="true" aria-labelledby="login-title" (click)="$event.stopPropagation()">
+        <button class="login-modal-close" type="button" aria-label="Close login" (click)="closeLoginModal()">&#10005;</button>
+        <div class="auth-head">
+          <img class="brand-logo" src="assets/edusim-logo.svg" alt="EduSIM logo">
+          <div>
+            <p>Welcome back</p>
+            <h2 id="login-title">Login</h2>
+          </div>
+        </div>
 
         <form class="login-form" (ngSubmit)="submit()">
           <div class="field-wrap">
@@ -51,34 +147,36 @@
             <p class="error">{{ errorMessage }}</p>
           }
 
-          <button class="btn login-btn" type="submit" [disabled]="isLoading">
+          <button class="blue-login-cta login-submit-cta" type="submit" [disabled]="isLoading">
             {{ isLoading ? "Signing in..." : "Login" }}
           </button>
+
+          <button class="forgot-link" type="button" (click)="openForgotPasswordModal()">
+            Forgot password?
+          </button>
         </form>
+      </section>
+    </div>
+  }
 
-        <div class="extra-actions">
-          <a href="#" class="info-link" (click)="$event.preventDefault(); toggleAbout()">
-            {{ showAbout ? "Hide EduSIM Details" : "About EduSIM ODL System" }}
-          </a>
-        </div>
-
-        @if (showAbout) {
-          <div class="about-box">
-            <p>
-              Educational Self-Instructional Material System (EduSIM) is designed to support Open and Distance Learning
-              by providing an interactive digital platform for students to access learning materials and perform self-assessment.
-              The system improves the efficiency of self-directed learning through automatic marking, instant feedback,
-              and continuous progress tracking.
-            </p>
-          </div>
+  @if (showForgotPasswordModal) {
+    <div class="forgot-modal-backdrop" (click)="closeForgotPasswordModal()">
+      <section class="forgot-modal" role="dialog" aria-modal="true" aria-labelledby="forgot-password-title" (click)="$event.stopPropagation()">
+        <h3 id="forgot-password-title">Forgot password</h3>
+        <p>Enter your email and we will send reset instructions.</p>
+        <input
+          type="email"
+          name="forgotPasswordEmail"
+          placeholder="you@example.com"
+          [(ngModel)]="forgotPasswordEmail">
+        @if (forgotPasswordMessage) {
+          <p class="forgot-note">{{ forgotPasswordMessage }}</p>
         }
-
-        <div class="demo-box">
-          <p class="demo-title">Quick Demo Accounts</p>
-          <p><strong>Student:</strong> student&#64;edusim.com / password123</p>
-          <p><strong>Lecturer:</strong> lecturer&#64;edusim.com / password123</p>
+        <div class="forgot-actions">
+          <button class="btn btn-outline" type="button" (click)="closeForgotPasswordModal()">Close</button>
+          <button class="btn" type="button" (click)="sendPasswordReset()">Send</button>
         </div>
-      </div>
-    </section>
-  </section>
+      </section>
+    </div>
+  }
 </div>

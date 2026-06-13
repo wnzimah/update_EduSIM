@@ -57,11 +57,11 @@ public class QuestionBankItem {
     private String mediaType;
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String optionsJson;
 
     @Lob
-    @Column(nullable = false)
+    @Column(nullable = false, columnDefinition = "LONGTEXT")
     private String correctAnswerJson;
 
     @Column(nullable = false)

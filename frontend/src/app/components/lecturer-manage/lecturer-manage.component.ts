@@ -8,7 +8,8 @@ import { LecturerService } from "../../services/lecturer.service";
 type ContentItemType = "VIDEO" | "MATERIAL";
 type AddMode = "VIDEO" | "MATERIAL";
 type SettingsSection = "COURSE_CONTENT" | "LEARNING_RESOURCES" | "UPDATING_VIDEO";
-type ManageTab = "CREATE" | "EDIT" | "CONTENT";
+type ManageTab = "CREATE" | "EDIT" | "CONTENT" | "STUDENTS";
+type CourseImageTarget = "CREATE" | "EDIT";
 
 type ContentItem = {
   itemType: ContentItemType;
@@ -38,6 +39,7 @@ export class LecturerManageComponent implements OnInit {
   courses: any[] = [];
   quizzes: any[] = [];
   contentItems: ContentItem[] = [];
+  courseStudents: any[] = [];
 
   selectedCourseId: number | null = null;
   selectedContentItem: ContentItem | null = null;
@@ -60,12 +62,14 @@ export class LecturerManageComponent implements OnInit {
 
   courseForm = {
     title: "",
-    description: ""
+    description: "",
+    imageUrl: ""
   };
 
   courseEditForm = {
     title: "",
-    description: ""
+    description: "",
+    imageUrl: ""
   };
 
   videoForm = {
@@ -98,17 +102,16 @@ export class LecturerManageComponent implements OnInit {
     resourceUrl: ""
   };
 
+  studentForm = {
+    email: ""
+  };
+
   ngOnInit(): void {
     this.route.queryParamMap.subscribe((params) => {
       const requestedCourseId = Number(params.get("courseId"));
       this.selectedCourseId = Number.isFinite(requestedCourseId) && requestedCourseId > 0
         ? requestedCourseId
         : this.selectedCourseId;
-
-      const flash = String(params.get("flash") ?? "").trim();
-      if (flash) {
-        this.statusMessage = flash;
-      }
       this.loadCourses();
     });
   }
@@ -136,6 +139,18 @@ export class LecturerManageComponent implements OnInit {
     return [...videos, ...materials];
   }
 
+  mandatoryLessonCount(): number {
+    return this.videoItems.filter((item) => item.mandatory).length;
+  }
+
+  lessonPathPercent(): number {
+    const total = this.videoItems.length;
+    if (total === 0) {
+      return 0;
+    }
+    return Math.round((this.mandatoryLessonCount() * 100) / total);
+  }
+
   loadCourses(): void {
     this.lecturerService.courses().subscribe({
       next: (courses) => {
@@ -157,6 +172,7 @@ export class LecturerManageComponent implements OnInit {
         this.syncCourseEditor();
         this.loadQuizzes();
         this.loadCourseContent();
+        this.loadCourseStudents();
       },
       error: (error) => this.errorMessage = error?.error?.message ?? "Failed to load courses"
     });
@@ -205,6 +221,7 @@ export class LecturerManageComponent implements OnInit {
     this.syncCourseEditor();
     this.loadQuizzes();
     this.loadCourseContent();
+    this.loadCourseStudents();
   }
 
   openCourseWorkspace(courseId: number): void {
@@ -215,6 +232,7 @@ export class LecturerManageComponent implements OnInit {
     this.syncCourseEditor();
     this.loadQuizzes();
     this.loadCourseContent();
+    this.loadCourseStudents();
   }
 
   setManageTab(tab: ManageTab): void {
@@ -222,6 +240,9 @@ export class LecturerManageComponent implements OnInit {
     if (tab === "CONTENT") {
       this.jumpToSection("content");
       return;
+    }
+    if (tab === "STUDENTS") {
+      this.loadCourseStudents();
     }
     this.jumpToSection("course");
   }
@@ -241,7 +262,7 @@ export class LecturerManageComponent implements OnInit {
           this.selectedCourseId = Number(response.courseId);
         }
         this.manageTab = "EDIT";
-        this.courseForm = { title: "", description: "" };
+        this.courseForm = { title: "", description: "", imageUrl: "" };
         this.loadCourses();
       },
       error: (error) => this.errorMessage = error?.error?.message ?? "Failed to create course"
@@ -261,6 +282,42 @@ export class LecturerManageComponent implements OnInit {
       },
       error: (error) => this.errorMessage = error?.error?.message ?? "Failed to update course"
     });
+  }
+
+  onCourseImageSelected(event: Event, target: CourseImageTarget): void {
+    this.clearMessages();
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    input.value = "";
+    if (!file) {
+      return;
+    }
+
+    if (!file.type.startsWith("image/")) {
+      this.errorMessage = "Please choose an image file only.";
+      return;
+    }
+
+    this.resizeCourseImage(file)
+      .then((imageData) => {
+        if (target === "CREATE") {
+          this.courseForm.imageUrl = imageData;
+          return;
+        }
+        this.courseEditForm.imageUrl = imageData;
+      })
+      .catch(() => {
+        this.errorMessage = "Could not read this image. Please choose another image.";
+      });
+  }
+
+  removeCourseImage(target: CourseImageTarget): void {
+    this.clearMessages();
+    if (target === "CREATE") {
+      this.courseForm.imageUrl = "";
+      return;
+    }
+    this.courseEditForm.imageUrl = "";
   }
 
   deleteCourse(courseId: number): void {
@@ -347,6 +404,48 @@ export class LecturerManageComponent implements OnInit {
       },
       error: (error) => this.errorMessage = error?.error?.message ?? "Failed to add material"
     });
+  }
+
+  loadCourseStudents(): void {
+    if (!this.selectedCourseId) {
+      this.courseStudents = [];
+      return;
+    }
+    this.lecturerService.courseStudents(this.selectedCourseId).subscribe({
+      next: (students) => this.courseStudents = students,
+      error: (error) => this.errorMessage = error?.error?.message ?? "Failed to load course students"
+    });
+  }
+
+  addCourseStudent(): void {
+    this.clearMessages();
+    if (!this.selectedCourseId) {
+      this.errorMessage = "Select a course first.";
+      return;
+    }
+    const email = this.studentForm.email.trim();
+    if (!email) {
+      this.errorMessage = "Enter a student email.";
+      return;
+    }
+    this.lecturerService.addCourseStudent(this.selectedCourseId, { email }).subscribe({
+      next: () => {
+        this.statusMessage = "Student added to course.";
+        this.studentForm.email = "";
+        this.loadCourseStudents();
+        this.loadCourses();
+      },
+      error: (error) => this.errorMessage = error?.error?.message ?? "Failed to add student"
+    });
+  }
+
+  studentInitials(student: any): string {
+    const name = String(student?.fullName ?? student?.email ?? "S").trim();
+    return name
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part.charAt(0).toUpperCase())
+      .join("") || "S";
   }
 
   contentKey(item: ContentItem): string {
@@ -440,6 +539,28 @@ export class LecturerManageComponent implements OnInit {
         this.loadCourseContent();
       },
       error: (error) => this.errorMessage = error?.error?.message ?? "Failed to reorder video"
+    });
+  }
+
+  toggleVideoRequirement(item: ContentItem): void {
+    if (item.itemType !== "VIDEO") {
+      return;
+    }
+
+    this.clearMessages();
+    this.actionMenuKey = null;
+
+    const nextMandatory = !Boolean(item.mandatory);
+    this.lecturerService.updateVideo(
+      item.id,
+      this.videoPayloadFromItem(item, Number(item.sortOrder ?? 1), nextMandatory)
+    ).subscribe({
+      next: () => {
+        this.statusMessage = nextMandatory ? "Lesson set as required." : "Lesson set as optional.";
+        this.loadCourseContent();
+        this.loadCourses();
+      },
+      error: (error) => this.errorMessage = error?.error?.message ?? "Failed to update lesson requirement"
     });
   }
 
@@ -549,14 +670,16 @@ export class LecturerManageComponent implements OnInit {
     if (!this.currentCourse) {
       this.courseEditForm = {
         title: "",
-        description: ""
+        description: "",
+        imageUrl: ""
       };
       return;
     }
 
     this.courseEditForm = {
       title: this.currentCourse.title,
-      description: this.currentCourse.description
+      description: this.currentCourse.description,
+      imageUrl: this.currentCourse.imageUrl ?? ""
     };
   }
 
@@ -569,19 +692,49 @@ export class LecturerManageComponent implements OnInit {
     return Math.max(1, highest + 1);
   }
 
-  private videoPayloadFromItem(item: ContentItem, sortOrder: number): any {
+  private videoPayloadFromItem(item: ContentItem, sortOrder: number, mandatory = Boolean(item.mandatory)): any {
     return {
       title: (item.title ?? "").trim() || "Video Lesson",
       description: (item.description ?? "").trim() || "Video lesson content",
       videoUrl: (item.videoUrl ?? "").trim(),
       durationMinutes: Math.max(1, Number(item.durationMinutes ?? 1)),
       sortOrder: Math.max(1, Number(sortOrder)),
-      mandatory: Boolean(item.mandatory)
+      mandatory
     };
   }
 
   private clearMessages(): void {
     this.statusMessage = "";
     this.errorMessage = "";
+  }
+
+  private resizeCourseImage(file: File): Promise<string> {
+    return new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onerror = () => reject(new Error("read-failed"));
+      reader.onload = () => {
+        const image = new Image();
+        image.onerror = () => reject(new Error("image-failed"));
+        image.onload = () => {
+          const maxWidth = 1200;
+          const maxHeight = 720;
+          const scale = Math.min(1, maxWidth / image.width, maxHeight / image.height);
+          const width = Math.max(1, Math.round(image.width * scale));
+          const height = Math.max(1, Math.round(image.height * scale));
+          const canvas = document.createElement("canvas");
+          canvas.width = width;
+          canvas.height = height;
+          const context = canvas.getContext("2d");
+          if (!context) {
+            reject(new Error("canvas-failed"));
+            return;
+          }
+          context.drawImage(image, 0, 0, width, height);
+          resolve(canvas.toDataURL("image/jpeg", 0.82));
+        };
+        image.src = String(reader.result ?? "");
+      };
+      reader.readAsDataURL(file);
+    });
   }
 }

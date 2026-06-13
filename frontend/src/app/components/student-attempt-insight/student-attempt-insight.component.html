@@ -1,0 +1,297 @@
+<div class="container attempt-insight-shell">
+  @if (loading) {
+    <section class="panel insight-state">
+      <p>Loading attempt page...</p>
+    </section>
+  } @else if (errorMessage) {
+    <section class="panel insight-state">
+      <p class="error">{{ errorMessage }}</p>
+      <a class="btn btn-outline" routerLink="/student/history">Back to Attempt History</a>
+    </section>
+  } @else {
+    <a class="back-link" routerLink="/student/history">Back to Attempt History</a>
+
+    <section class="panel attempt-insight-page">
+      <header class="insight-hero">
+        <div>
+          <p>{{ pageKicker() }}</p>
+          <h1>{{ pageTitle() }}</h1>
+          <span>{{ summary().quizTitle }}</span>
+        </div>
+        <aside>
+          <small>Score</small>
+          <strong>{{ scoreLabel() }}</strong>
+          <em>{{ summary().submittedAt | date: "medium" }}</em>
+        </aside>
+      </header>
+
+      @if (!isReleased()) {
+        <section class="release-locked review-unavailable-card">
+          <div class="review-lock-illustration" aria-hidden="true">
+            <span></span>
+          </div>
+          <h2>Quiz review is currently unavailable</h2>
+          <p>Your quiz has been submitted successfully.</p>
+          <p>{{ releaseMessage() }}</p>
+          <dl>
+            <div>
+              <dt>Quiz Title</dt>
+              <dd>{{ summary().quizTitle }}</dd>
+            </div>
+            <div>
+              <dt>Submitted At</dt>
+              <dd>{{ summary().submittedAt | date: "medium" }}</dd>
+            </div>
+            <div>
+              <dt>Attempt</dt>
+              <dd>{{ summary().attemptNumber || 1 }}</dd>
+            </div>
+          </dl>
+          <a class="btn btn-outline" routerLink="/student/history">Back to My Quizzes</a>
+        </section>
+      } @else {
+        @if (mode === 'feedback') {
+          <section class="result-overview-card">
+            <div class="result-score-panel">
+              <div class="score-orbit" [class.fail]="summary().passed === false">
+                <span>Your Score</span>
+                <strong>{{ scoreLabel() }}</strong>
+              </div>
+              <p>{{ summary().feedback }}</p>
+            </div>
+            <div class="result-facts">
+              <div>
+                <span>Quiz Title</span>
+                <strong>{{ summary().quizTitle }}</strong>
+              </div>
+              <div>
+                <span>Completed On</span>
+                <strong>{{ completedOnLabel() | date: "medium" }}</strong>
+              </div>
+              <div>
+                <span>Time Taken</span>
+                <strong>{{ summary().durationSeconds || 0 }}s</strong>
+              </div>
+              <div>
+                <span>Status</span>
+                <strong>{{ completionStatusLabel() }}</strong>
+              </div>
+            </div>
+          </section>
+
+          <section class="section-head">
+            <h2>Detailed Feedback</h2>
+            <p>{{ summary().feedback }}</p>
+          </section>
+
+          @if (!canShowStudentAnswerReview()) {
+            <aside class="release-locked compact">
+              <h2>Question review hidden</h2>
+              <p>Your lecturer has not enabled question review details for this quiz.</p>
+            </aside>
+          } @else if (answers().length === 0) {
+            <p class="muted">No detailed answer rows available.</p>
+          } @else {
+            <section class="detailed-review-board">
+              <main class="question-detail-panel">
+                <nav class="question-review-toolbar">
+                  <a routerLink="/student/history">Back to Summary</a>
+                  <strong>{{ currentQuestionLabel() }}</strong>
+                  <div>
+                    <button type="button" class="nav-square" [disabled]="currentQuestionIndex === 0" (click)="previousQuestion()">‹</button>
+                    <button type="button" class="nav-square" [disabled]="currentQuestionIndex >= answers().length - 1" (click)="nextQuestion()">›</button>
+                  </div>
+                </nav>
+
+                @if (currentAnswer(); as answer) {
+                  <article class="single-feedback-card">
+                    <header>
+                      <h3>{{ answer.sortOrder || (currentQuestionIndex + 1) }}. {{ answer.prompt }}</h3>
+                      @if (canShowScoreFeedback()) {
+                        <span [class.incorrect]="answer.correct === false">{{ answer.correct ? "Correct" : "Incorrect" }}</span>
+                      }
+                    </header>
+
+                    @if (canShowSelectedAnswer()) {
+                      <section class="answer-review-block selected" [class.wrong]="canShowScoreFeedback() && answer.correct === false">
+                        <small>Your Answer</small>
+                        <div>
+                          <b>{{ formatAnswer(answer.studentAnswer).slice(0, 1) || "-" }}</b>
+                          <p>{{ formatAnswer(answer.studentAnswer) }}</p>
+                          @if (canShowScoreFeedback() && answer.correct === false) {
+                            <strong>×</strong>
+                          }
+                        </div>
+                      </section>
+                    }
+
+                    @if (canShowCorrectAnswer()) {
+                      <section class="answer-review-block correct">
+                        <small>Correct Answer</small>
+                        <div>
+                          <b>{{ formatAnswer(answer.correctAnswer).slice(0, 1) || "-" }}</b>
+                          <p>{{ formatAnswer(answer.correctAnswer) }}</p>
+                          <strong>✓</strong>
+                        </div>
+                      </section>
+                    }
+
+                    @if (canShowExplanation()) {
+                      <section class="explanation-panel">
+                        <strong>Explanation</strong>
+                        <p>{{ answerFeedbackDetail(answer) }}</p>
+                      </section>
+                    }
+
+                    @if (canShowConfidence() && answer.confidenceLevel) {
+                      <section class="confidence-line">
+                        <span>Your Confidence</span>
+                        <b [class.high]="answer.confidenceLevel === 'HIGH'">{{ answer.confidenceLevel }}</b>
+                      </section>
+                    }
+
+                    @if (canShowConfidence() && answer.confidenceReflection) {
+                      <section class="confidence-reflection-panel">
+                        <strong>Confidence Reflection</strong>
+                        <p>{{ answer.confidenceReflection }}</p>
+                      </section>
+                    }
+                  </article>
+                }
+              </main>
+
+              <aside class="question-navigator-panel">
+                <h3>Question Navigator</h3>
+                <div class="navigator-grid">
+                  @for (answer of answers(); track answer.questionId; let navIndex = $index) {
+                    <button
+                      type="button"
+                      [class.current]="navIndex === currentQuestionIndex"
+                      [class.correct]="answer.correct === true"
+                      [class.wrong]="answer.correct === false"
+                      (click)="selectQuestion(navIndex)">
+                      {{ answer.sortOrder || (navIndex + 1) }}
+                    </button>
+                  }
+                </div>
+                <dl class="navigator-legend">
+                  <div><dt class="dot correct"></dt><dd>Correct</dd></div>
+                  <div><dt class="dot wrong"></dt><dd>Incorrect</dd></div>
+                  <div><dt class="dot blank"></dt><dd>Not Answered</dd></div>
+                  <div><dt class="box current"></dt><dd>Current</dd></div>
+                </dl>
+              </aside>
+            </section>
+          }
+        }
+
+        @if (mode === 'recommendation') {
+          @if (!canShowLearningRecommendation()) {
+            <aside class="release-locked compact">
+              <h2>Recommendation hidden</h2>
+              <p>Your lecturer has not enabled learning recommendations for this quiz.</p>
+            </aside>
+          } @else if (recommendations().length === 0) {
+            <p class="muted">No weak topic detected. Continue with the next lesson or a harder practice quiz.</p>
+          } @else {
+            <section class="learning-recommendation-card">
+              <header>
+                <span class="recommendation-icon">R</span>
+                <div>
+                  <h2>Learning Recommendation</h2>
+                  <p>Based on your performance, we found some topics that you may need more practice on.</p>
+                </div>
+              </header>
+
+              <div class="weak-topic-box">
+                <strong>Weak Topic Detected</strong>
+                <div>
+                  <span>{{ primaryWeakTopic().topic }}</span>
+                  @if (primaryWeakTopic().mastery !== null) {
+                    <b>Mastery: {{ primaryWeakTopic().mastery }}%</b>
+                  }
+                </div>
+              </div>
+
+              <section class="recommended-material-box">
+                <h3>Recommended for You</h3>
+                @for (material of primaryRecommendationMaterials(); track material.title) {
+                  <article>
+                    <span class="material-type-icon">{{ materialIconLabel(material) }}</span>
+                    <div>
+                      <strong>{{ material.title }}</strong>
+                      @if (material.description) {
+                        <p>{{ material.description }}</p>
+                      }
+                    </div>
+                    @if (material.resourceUrl) {
+                      <a [href]="material.resourceUrl" target="_blank" rel="noopener">{{ learningMaterialLabel(material) }}</a>
+                    } @else {
+                      <button type="button">{{ learningMaterialLabel(material) }}</button>
+                    }
+                  </article>
+                }
+              </section>
+
+              <aside>
+                Keep practicing and reviewing the recommended materials to improve your understanding.
+              </aside>
+            </section>
+          }
+        }
+
+        @if (mode === 'improvement') {
+          <section class="section-head">
+            <h2>Performance Improvement</h2>
+            <p>{{ improvementLead() }}</p>
+          </section>
+
+          <div class="improvement-grid">
+            <article>
+              <small>Score</small>
+              <strong>{{ scoreLabel() }}</strong>
+              <p>{{ summary().feedback }}</p>
+            </article>
+            <article>
+              <small>Average Time</small>
+              <strong>{{ timeAnalysis().averageSeconds || 0 }}s</strong>
+              <p>{{ timeAnalysis().message || "Timing pattern will appear when tracked." }}</p>
+            </article>
+            <article>
+              <small>Confidence Risk</small>
+              <strong>{{ confidenceSummary().highWrong || 0 }}</strong>
+              <p>{{ confidenceSummary().message || "Confidence data will appear when provided." }}</p>
+            </article>
+          </div>
+
+          @if (masteryRows().length > 0) {
+            <section class="mastery-panel">
+              <h3>Topic Mastery</h3>
+              @for (item of masteryRows(); track item.topicTag) {
+                <div class="mastery-row">
+                  <span>{{ item.topicTag }}</span>
+                  <strong>{{ item.score }}%</strong>
+                  <div><i [style.width.%]="item.score"></i></div>
+                </div>
+              }
+            </section>
+          }
+
+          @if (retakeQuestions().length > 0) {
+            <section class="retake-panel">
+              <h3>Next Practice Focus</h3>
+              @for (item of retakeQuestions(); track item.questionId || item.topicTag) {
+                <p><strong>{{ item.topicTag }}</strong>: {{ item.focus }}</p>
+              }
+            </section>
+          }
+        }
+      }
+
+      <footer class="flow-actions">
+        <a class="btn btn-outline" [routerLink]="previousFlowRoute()">{{ previousFlowLabel() }}</a>
+        <a class="btn" [routerLink]="nextFlowRoute()">{{ nextFlowLabel() }}</a>
+      </footer>
+    </section>
+  }
+</div>

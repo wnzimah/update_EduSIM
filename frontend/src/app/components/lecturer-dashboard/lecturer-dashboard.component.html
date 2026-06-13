@@ -1,7 +1,7 @@
 <div class="container lecturer-shell">
   @if (loading) {
     <p>Loading dashboard...</p>
-  } @else if (errorMessage) {
+  } @else if (errorMessage && !dashboard) {
     <p class="error">{{ errorMessage }}</p>
   } @else if (dashboard) {
     <section class="panel lecturer-layout">
@@ -74,7 +74,7 @@
                       <a
                         class="action-link"
                         [routerLink]="['/lecturer/manage']"
-                        [queryParams]="{ courseId: course.courseId, flash: 'Course workspace opened.' }">
+                        [queryParams]="{ courseId: course.courseId }">
                         <span class="action-icon" aria-hidden="true">
                           <svg viewBox="0 0 24 24">
                             <path d="M3 7.5A1.5 1.5 0 0 1 4.5 6h5l2 2h8A1.5 1.5 0 0 1 21 9.5v8A1.5 1.5 0 0 1 19.5 19h-15A1.5 1.5 0 0 1 3 17.5z"></path>
@@ -98,7 +98,7 @@
                       </a>
                       <a
                         class="action-link"
-                        [routerLink]="['/lecturer/monitoring']"
+                        [routerLink]="['/lecturer/student-attempts']"
                         [queryParams]="{ courseId: course.courseId, courseTitle: course.title }">
                         <span class="action-icon" aria-hidden="true">
                           <svg viewBox="0 0 24 24">
@@ -110,7 +110,7 @@
                             <path d="M20 16v-9"></path>
                           </svg>
                         </span>
-                        <span>Performance Dashboard</span>
+                        <span>Student Attempts</span>
                         <span class="action-arrow" aria-hidden="true">↗</span>
                       </a>
                     </div>
@@ -125,7 +125,7 @@
           <div class="heading">
             <h2>Recent Submission</h2>
           </div>
-          @if (dashboard.recentActivity.length === 0) {
+          @if (filteredRecentActivity().length === 0) {
             <p class="muted">No submission yet.</p>
           } @else {
             <table>
@@ -140,7 +140,7 @@
                 </tr>
               </thead>
               <tbody>
-                @for (item of dashboard.recentActivity; track item.attemptId) {
+                @for (item of filteredRecentActivity(); track item.attemptId) {
                   <tr>
                     <td>{{ item.studentName }}</td>
                     <td>{{ item.quizTitle }}</td>
@@ -176,12 +176,103 @@
             }
             @for (week of monthGrid; track $index) {
               @for (day of week; track $index) {
-                <div class="day-cell" [class.today]="isToday(day)" [class.has-entry]="entriesForDay(day).length > 0">
-                  {{ day ?? "" }}
-                </div>
+                <button
+                  type="button"
+                  class="day-cell"
+                  [class.today]="isToday(day)"
+                  [class.selected]="isSelectedDay(day)"
+                  [class.has-entry]="entriesForDay(day).length > 0"
+                  [disabled]="!day"
+                  (click)="selectCalendarDay(day)">
+                  <span class="day-number">{{ day ?? "" }}</span>
+                  @if (entriesForDay(day).length > 0) {
+                    <div class="day-entries">
+                      @for (entry of entriesForDay(day); track entry.id) {
+                        <span class="day-entry" [class.event]="entry.type === 'EVENT'" [class.marking]="entry.type === 'MARKING'">
+                          {{ timelineTypeLabel(entry.type) }}
+                        </span>
+                      }
+                    </div>
+                  }
+                </button>
               }
             }
           </div>
+
+          <div class="selected-day-panel">
+            <div class="selected-day-head">
+              <div>
+                <p>Selected date</p>
+                <h4>{{ selectedDateLabel() }}</h4>
+              </div>
+              <button type="button" class="mini-add-btn" (click)="openEventFormForSelectedDate()">+ Event</button>
+            </div>
+
+            @if (selectedDateEntries().length === 0) {
+              <p class="muted selected-empty">No event for this date.</p>
+            } @else {
+              <ul class="selected-event-list">
+                @for (item of selectedDateEntries(); track item.id) {
+                  <li [class.manual]="item.type === 'EVENT'" [class.marking]="item.type === 'MARKING'">
+                    <div>
+                      <span>{{ timelineTypeLabel(item.type) }}</span>
+                      <strong>{{ item.title }}</strong>
+                      <p>{{ item.subtitle }}</p>
+                      <small>{{ item.occurredAt | date: "shortTime" }}</small>
+                    </div>
+                    @if (item.type === "EVENT") {
+                      <button type="button" class="icon-btn" title="Remove event" (click)="deleteCalendarEvent(item.id)">x</button>
+                    }
+                  </li>
+                }
+              </ul>
+            }
+          </div>
+
+          <div class="calendar-actions">
+            <button type="button" class="btn" (click)="toggleEventForm()">
+              {{ showEventForm ? "Close Event Form" : "Add Calendar Event" }}
+            </button>
+          </div>
+
+          @if (errorMessage) {
+            <p class="inline-message error">{{ errorMessage }}</p>
+          }
+          @if (statusMessage) {
+            <p class="inline-message ok">{{ statusMessage }}</p>
+          }
+
+          @if (showEventForm) {
+            <form class="event-form" (ngSubmit)="addCalendarEvent()">
+              <label>
+                Event title
+                <input
+                  type="text"
+                  name="eventTitle"
+                  placeholder="Consultation, briefing, marking"
+                  [(ngModel)]="eventForm.title">
+              </label>
+              <div class="event-form-row">
+                <label>
+                  Date
+                  <input type="date" name="eventDate" [(ngModel)]="eventForm.date">
+                </label>
+                <label>
+                  Time
+                  <input type="time" name="eventTime" [(ngModel)]="eventForm.time">
+                </label>
+              </div>
+              <label>
+                Note
+                <textarea
+                  name="eventNote"
+                  rows="3"
+                  placeholder="Optional note"
+                  [(ngModel)]="eventForm.note"></textarea>
+              </label>
+              <button type="submit" class="btn">Save Event</button>
+            </form>
+          }
         </section>
 
         <section class="timeline-card">
@@ -192,10 +283,15 @@
             <ul class="timeline-list">
               @for (item of timelineEntries(); track item.id) {
                 <li>
-                  <p class="timeline-title">{{ item.title }}</p>
+                  <div class="timeline-row">
+                    <p class="timeline-title">{{ item.title }}</p>
+                    @if (item.type === "EVENT") {
+                      <button type="button" class="icon-btn" title="Remove event" (click)="deleteCalendarEvent(item.id)">x</button>
+                    }
+                  </div>
                   <p class="timeline-sub">{{ item.subtitle }}</p>
                   <p class="timeline-meta">
-                    {{ item.occurredAt | date: "shortTime" }}
+                    {{ item.occurredAt | date: "mediumDate" }} at {{ item.occurredAt | date: "shortTime" }}
                     @if (item.type === "MARKING") {
                       - {{ item.score ?? 0 }}%
                     } @else {

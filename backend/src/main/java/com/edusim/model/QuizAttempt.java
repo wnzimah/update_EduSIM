@@ -7,6 +7,7 @@ import jakarta.persistence.GeneratedValue;
 import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
+import jakarta.persistence.Lob;
 import jakarta.persistence.ManyToOne;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
@@ -41,6 +42,24 @@ public class QuizAttempt {
 
     @Column(length = 500)
     private String feedback;
+
+    @Column(length = 2000)
+    private String reflection;
+
+    @Lob
+    private String masteryJson;
+
+    @Lob
+    private String recommendationJson;
+
+    @Lob
+    private String retakePlanJson;
+
+    @Lob
+    private String timeAnalysisJson;
+
+    @Lob
+    private String confidenceSummaryJson;
 
     public Long getId() {
         return id;
@@ -108,5 +127,53 @@ public class QuizAttempt {
 
     public void setFeedback(String feedback) {
         this.feedback = feedback;
+    }
+
+    public String getReflection() {
+        return reflection;
+    }
+
+    public void setReflection(String reflection) {
+        this.reflection = reflection;
+    }
+
+    public String getMasteryJson() {
+        return masteryJson;
+    }
+
+    public void setMasteryJson(String masteryJson) {
+        this.masteryJson = masteryJson;
+    }
+
+    public String getRecommendationJson() {
+        return recommendationJson;
+    }
+
+    public void setRecommendationJson(String recommendationJson) {
+        this.recommendationJson = recommendationJson;
+    }
+
+    public String getRetakePlanJson() {
+        return retakePlanJson;
+    }
+
+    public void setRetakePlanJson(String retakePlanJson) {
+        this.retakePlanJson = retakePlanJson;
+    }
+
+    public String getTimeAnalysisJson() {
+        return timeAnalysisJson;
+    }
+
+    public void setTimeAnalysisJson(String timeAnalysisJson) {
+        this.timeAnalysisJson = timeAnalysisJson;
+    }
+
+    public String getConfidenceSummaryJson() {
+        return confidenceSummaryJson;
+    }
+
+    public void setConfidenceSummaryJson(String confidenceSummaryJson) {
+        this.confidenceSummaryJson = confidenceSummaryJson;
     }
 }

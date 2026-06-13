@@ -86,6 +86,7 @@ public class DataSeeder implements CommandLineRunner {
             seedAcademicData(lecturer, student);
         }
 
+        ensureDefaultCourseCatalog(lecturer, student);
         ensureDataIntegrationVideoLink();
         ensureDataIntegrationMaterials();
     }
@@ -264,6 +265,378 @@ public class DataSeeder implements CommandLineRunner {
             });
     }
 
+    private void ensureDefaultCourseCatalog(UserAccount lecturer, UserAccount student) throws JsonProcessingException {
+        Course dataCourse = ensureCourse(
+            lecturer,
+            DATA_INTEGRATION_COURSE_TITLE,
+            "Concept, process, and tools for data integration architecture."
+        );
+        Course webCourse = ensureCourse(
+            lecturer,
+            "Web Application Development",
+            "Frontend and backend integration for real-world web systems."
+        );
+        Course dbCourse = ensureCourse(
+            lecturer,
+            "Database Management",
+            "Relational modeling, optimization, and transaction fundamentals."
+        );
+
+        enroll(student, dataCourse);
+        enroll(student, webCourse);
+        enroll(student, dbCourse);
+
+        ensureCourseBundle(
+            lecturer,
+            dataCourse,
+            List.of(
+                new VideoSeed(
+                    "Lesson 1: Integration Concepts",
+                    "Understand ETL, ELT, and integration patterns.",
+                    DATA_INTEGRATION_VIDEO_URL,
+                    4,
+                    1,
+                    true
+                ),
+                new VideoSeed(
+                    "Lesson 2: Data Pipelines",
+                    "Build reliable pipelines and orchestration flow.",
+                    "https://www.youtube.com/watch?v=UZ7TVRjxa10",
+                    22,
+                    2,
+                    true
+                ),
+                new VideoSeed(
+                    "Lesson 3: Practical Demo",
+                    "Applying integration logic in a case study.",
+                    "https://www.youtube.com/watch?v=ZrV6Lr6E3iY",
+                    18,
+                    3,
+                    false
+                )
+            ),
+            List.of(
+                new MaterialSeed(DATA_SLIDE_TITLE, DATA_SLIDE_TYPE, DATA_SLIDE_URL),
+                new MaterialSeed(DATA_READING_TITLE, DATA_READING_TYPE, DATA_READING_URL)
+            ),
+            "Quiz 1: Data Integration Concepts",
+            "This quiz covers key concepts from lesson videos and materials.",
+            List.of(
+                new QuestionSeed(
+                    QuestionType.MCQ,
+                    "What is the main goal of ETL?",
+                    List.of("To move and transform data", "To design UI", "To secure network", "To compile code"),
+                    "To move and transform data",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.TRUE_FALSE,
+                    "Data warehouse is commonly used for analytics.",
+                    List.of("True", "False"),
+                    "True",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.MULTI_SELECT,
+                    "Select valid integration styles.",
+                    List.of("Batch", "Streaming", "Drawing", "File Transfer"),
+                    List.of("Batch", "Streaming"),
+                    2
+                ),
+                new QuestionSeed(
+                    QuestionType.SHORT_ANSWER,
+                    "What does API stand for?",
+                    List.of(),
+                    "application programming interface",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.MATCHING,
+                    "Match tool to function.",
+                    Map.of(
+                        "left", List.of("Kafka", "MySQL"),
+                        "right", List.of("Streaming", "Relational Database")
+                    ),
+                    Map.of(
+                        "Kafka", "Streaming",
+                        "MySQL", "Relational Database"
+                    ),
+                    2
+                )
+            )
+        );
+
+        ensureCourseBundle(
+            lecturer,
+            webCourse,
+            List.of(
+                new VideoSeed(
+                    "Lesson 1: Web Architecture",
+                    "Explore client, server, API, and deployment responsibilities.",
+                    "https://www.youtube.com/watch?v=nu_pCVPKzTk",
+                    12,
+                    1,
+                    true
+                ),
+                new VideoSeed(
+                    "Lesson 2: REST API Flow",
+                    "Connect Angular screens to backend endpoints safely.",
+                    "https://www.youtube.com/watch?v=-MTSQjw5DrM",
+                    16,
+                    2,
+                    true
+                ),
+                new VideoSeed(
+                    "Lesson 3: Frontend Integration Demo",
+                    "Review form handling, HTTP calls, and response states.",
+                    "https://www.youtube.com/watch?v=3dHNOWTI7H8",
+                    18,
+                    3,
+                    false
+                )
+            ),
+            List.of(
+                new MaterialSeed("Slide Week 1: Web Architecture", "SLIDE", "https://developer.mozilla.org/en-US/docs/Learn/Common_questions/Web_mechanics/How_does_the_Internet_work"),
+                new MaterialSeed("Reading: REST API Design", "PDF", "https://restfulapi.net/")
+            ),
+            "Quiz 1: Web Application Basics",
+            "This quiz checks core concepts in web architecture and API integration.",
+            List.of(
+                new QuestionSeed(
+                    QuestionType.MCQ,
+                    "Which layer usually renders the user interface in a web app?",
+                    List.of("Frontend", "Database", "DNS", "Firewall"),
+                    "Frontend",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.TRUE_FALSE,
+                    "A REST API can return JSON data to a frontend application.",
+                    List.of("True", "False"),
+                    "True",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.MULTI_SELECT,
+                    "Select common HTTP methods used by APIs.",
+                    List.of("GET", "POST", "MERGE", "DELETE"),
+                    List.of("GET", "POST", "DELETE"),
+                    2
+                ),
+                new QuestionSeed(
+                    QuestionType.SHORT_ANSWER,
+                    "What does URL stand for?",
+                    List.of(),
+                    "uniform resource locator",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.MATCHING,
+                    "Match web component to its role.",
+                    Map.of(
+                        "left", List.of("Frontend", "Backend"),
+                        "right", List.of("Business logic", "User interface")
+                    ),
+                    Map.of(
+                        "Frontend", "User interface",
+                        "Backend", "Business logic"
+                    ),
+                    2
+                )
+            )
+        );
+
+        ensureCourseBundle(
+            lecturer,
+            dbCourse,
+            List.of(
+                new VideoSeed(
+                    "Lesson 1: Relational Model",
+                    "Understand tables, rows, primary keys, and relationships.",
+                    "https://www.youtube.com/watch?v=HXV3zeQKqGY",
+                    18,
+                    1,
+                    true
+                ),
+                new VideoSeed(
+                    "Lesson 2: SQL Queries",
+                    "Practice selection, filtering, joins, and grouping.",
+                    "https://www.youtube.com/watch?v=7S_tz1z_5bA",
+                    20,
+                    2,
+                    true
+                ),
+                new VideoSeed(
+                    "Lesson 3: Transactions and Indexes",
+                    "Review reliability and performance foundations.",
+                    "https://www.youtube.com/watch?v=HubezKbFL7E",
+                    15,
+                    3,
+                    false
+                )
+            ),
+            List.of(
+                new MaterialSeed("Slide Week 1: Database Fundamentals", "SLIDE", "https://www.oracle.com/database/what-is-database/"),
+                new MaterialSeed("Reading: SQL Introduction", "PDF", "https://www.w3schools.com/sql/sql_intro.asp")
+            ),
+            "Quiz 1: Database Fundamentals",
+            "This quiz checks relational database concepts and SQL basics.",
+            List.of(
+                new QuestionSeed(
+                    QuestionType.MCQ,
+                    "What identifies each row uniquely in a relational table?",
+                    List.of("Primary key", "Paragraph", "Browser cache", "Style sheet"),
+                    "Primary key",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.TRUE_FALSE,
+                    "A foreign key can link records between two tables.",
+                    List.of("True", "False"),
+                    "True",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.MULTI_SELECT,
+                    "Select common SQL clauses.",
+                    List.of("SELECT", "WHERE", "ROUTE", "JOIN"),
+                    List.of("SELECT", "WHERE", "JOIN"),
+                    2
+                ),
+                new QuestionSeed(
+                    QuestionType.SHORT_ANSWER,
+                    "What does SQL stand for?",
+                    List.of(),
+                    "structured query language",
+                    1
+                ),
+                new QuestionSeed(
+                    QuestionType.MATCHING,
+                    "Match database term to meaning.",
+                    Map.of(
+                        "left", List.of("Table", "Index"),
+                        "right", List.of("Speeds lookup", "Stores rows")
+                    ),
+                    Map.of(
+                        "Table", "Stores rows",
+                        "Index", "Speeds lookup"
+                    ),
+                    2
+                )
+            )
+        );
+    }
+
+    private Course ensureCourse(UserAccount lecturer, String title, String description) {
+        return courseRepository.findByLecturerId(lecturer.getId()).stream()
+            .filter(course -> title.equalsIgnoreCase(course.getTitle()))
+            .findFirst()
+            .orElseGet(() -> createCourse(lecturer, title, description));
+    }
+
+    private void ensureCourseBundle(
+        UserAccount lecturer,
+        Course course,
+        List<VideoSeed> videos,
+        List<MaterialSeed> materials,
+        String quizTitle,
+        String quizDescription,
+        List<QuestionSeed> questions
+    ) throws JsonProcessingException {
+        List<LessonVideo> existingVideos = lessonVideoRepository.findByCourseIdOrderBySortOrder(course.getId());
+        for (VideoSeed video : videos) {
+            upsertVideo(course, existingVideos, video);
+        }
+
+        List<CourseMaterial> existingMaterials = courseMaterialRepository.findByCourseId(course.getId());
+        for (MaterialSeed material : materials) {
+            upsertMaterial(course, existingMaterials, material.title(), material.materialType(), material.url());
+        }
+
+        Quiz quiz = quizRepository.findByCourseId(course.getId()).stream()
+            .filter(item -> quizTitle.equalsIgnoreCase(item.getTitle()))
+            .findFirst()
+            .orElseGet(() -> createQuiz(course, quizTitle, quizDescription));
+
+        if (questionRepository.findByQuizIdOrderBySortOrder(quiz.getId()).isEmpty()) {
+            int sortOrder = 1;
+            for (QuestionSeed question : questions) {
+                QuestionBankItem bankItem = createQuestion(
+                    lecturer,
+                    course,
+                    question.type(),
+                    question.prompt(),
+                    question.options(),
+                    question.answer(),
+                    question.points()
+                );
+                saveQuizQuestion(quiz, bankItem, sortOrder++);
+            }
+        }
+    }
+
+    private void upsertVideo(Course course, List<LessonVideo> videos, VideoSeed seed) {
+        LessonVideo existing = videos.stream()
+            .filter(video -> seed.title().equalsIgnoreCase(video.getTitle()))
+            .findFirst()
+            .orElse(null);
+
+        if (existing == null) {
+            createVideo(
+                course,
+                seed.title(),
+                seed.description(),
+                seed.url(),
+                seed.durationMinutes(),
+                seed.sortOrder(),
+                seed.mandatory()
+            );
+            return;
+        }
+
+        boolean changed = false;
+        if (!seed.description().equals(existing.getDescription())) {
+            existing.setDescription(seed.description());
+            changed = true;
+        }
+        if (!seed.url().equals(existing.getVideoUrl())) {
+            existing.setVideoUrl(seed.url());
+            changed = true;
+        }
+        if (existing.getDurationMinutes() != seed.durationMinutes()) {
+            existing.setDurationMinutes(seed.durationMinutes());
+            changed = true;
+        }
+        if (existing.getSortOrder() != seed.sortOrder()) {
+            existing.setSortOrder(seed.sortOrder());
+            changed = true;
+        }
+        if (existing.isMandatory() != seed.mandatory()) {
+            existing.setMandatory(seed.mandatory());
+            changed = true;
+        }
+        if (changed) {
+            lessonVideoRepository.save(existing);
+        }
+    }
+
+    private Quiz createQuiz(Course course, String title, String description) {
+        Quiz quiz = new Quiz();
+        quiz.setCourse(course);
+        quiz.setTitle(title);
+        quiz.setDescription(description);
+        quiz.setTimeLimitMinutes(10);
+        quiz.setMaxAttempts(2);
+        quiz.setPassingMark(50.0);
+        quiz.setPublished(true);
+        quiz.setUnlockAfterVideos(true);
+        quiz.setShuffleQuestions(false);
+        quiz.setShuffleAnswers(false);
+        quiz.setQuestionDisplayMode(QuizDisplayMode.ONE_BY_ONE);
+        quiz.setShowResultImmediately(true);
+        return quizRepository.save(quiz);
+    }
+
     private void upsertMaterial(
         Course course,
         List<CourseMaterial> materials,
@@ -370,4 +743,23 @@ public class DataSeeder implements CommandLineRunner {
         question.setSortOrder(sortOrder);
         questionRepository.save(question);
     }
+
+    private record VideoSeed(
+        String title,
+        String description,
+        String url,
+        int durationMinutes,
+        int sortOrder,
+        boolean mandatory
+    ) {}
+
+    private record MaterialSeed(String title, String materialType, String url) {}
+
+    private record QuestionSeed(
+        QuestionType type,
+        String prompt,
+        Object options,
+        Object answer,
+        int points
+    ) {}
 }

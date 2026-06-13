@@ -10,11 +10,14 @@ import jakarta.persistence.GenerationType;
 import jakarta.persistence.Id;
 import jakarta.persistence.JoinColumn;
 import jakarta.persistence.ManyToOne;
+import jakarta.persistence.PrimaryKeyJoinColumn;
+import jakarta.persistence.SecondaryTable;
 import jakarta.persistence.Table;
 import java.time.LocalDateTime;
 
 @Entity
 @Table(name = "quizzes")
+@SecondaryTable(name = "quiz_feedback_settings", pkJoinColumns = @PrimaryKeyJoinColumn(name = "quiz_id"))
 public class Quiz {
 
     @Id
@@ -64,6 +67,40 @@ public class Quiz {
 
     @Column(nullable = false)
     private boolean showResultImmediately = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean showScoreAfterSubmission = true;
+
+    @Column(table = "quiz_feedback_settings", name = "show_correct_answer", nullable = false, columnDefinition = "boolean default true")
+    private Boolean showCorrectAnswer = true;
+
+    @Column(table = "quiz_feedback_settings", name = "show_explanation", nullable = false, columnDefinition = "boolean default true")
+    private Boolean showExplanation = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean showRelatedConcept = true;
+
+    @Column(table = "quiz_feedback_settings", name = "show_recommendation", nullable = false, columnDefinition = "boolean default true")
+    private Boolean showLearningRecommendation = true;
+
+    @Column(nullable = false, columnDefinition = "boolean default true")
+    private boolean showStudentAnswerReview = true;
+
+    @Enumerated(EnumType.STRING)
+    @Column(table = "quiz_feedback_settings", name = "review_timing", nullable = false, length = 40, columnDefinition = "varchar(40) default 'IMMEDIATE_AFTER_SUBMISSION'")
+    private ReviewTiming reviewTiming = ReviewTiming.IMMEDIATE_AFTER_SUBMISSION;
+
+    @Column(table = "quiz_feedback_settings", name = "manual_release_status", nullable = false, columnDefinition = "boolean default false")
+    private Boolean manualReleaseStatus = false;
+
+    @Column(table = "quiz_feedback_settings", name = "show_selected_answer", nullable = false, columnDefinition = "boolean default true")
+    private Boolean showSelectedAnswer = true;
+
+    @Column(table = "quiz_feedback_settings", name = "show_confidence", nullable = false, columnDefinition = "boolean default true")
+    private Boolean showConfidenceReflection = true;
+
+    @Column(table = "quiz_feedback_settings", name = "show_score_breakdown", nullable = false, columnDefinition = "boolean default true")
+    private Boolean showScoreBreakdown = true;
 
     @Column(nullable = false)
     private LocalDateTime createdAt = LocalDateTime.now();
@@ -190,6 +227,104 @@ public class Quiz {
 
     public void setShowResultImmediately(boolean showResultImmediately) {
         this.showResultImmediately = showResultImmediately;
+    }
+
+    public boolean isShowScoreAfterSubmission() {
+        return showScoreAfterSubmission;
+    }
+
+    public void setShowScoreAfterSubmission(boolean showScoreAfterSubmission) {
+        this.showScoreAfterSubmission = showScoreAfterSubmission;
+        this.showScoreBreakdown = showScoreAfterSubmission;
+    }
+
+    public boolean isShowCorrectAnswer() {
+        return showCorrectAnswer == null ? true : showCorrectAnswer;
+    }
+
+    public void setShowCorrectAnswer(boolean showCorrectAnswer) {
+        this.showCorrectAnswer = showCorrectAnswer;
+    }
+
+    public boolean isShowExplanation() {
+        return showExplanation == null ? true : showExplanation;
+    }
+
+    public void setShowExplanation(boolean showExplanation) {
+        this.showExplanation = showExplanation;
+    }
+
+    public boolean isShowRelatedConcept() {
+        return showRelatedConcept;
+    }
+
+    public void setShowRelatedConcept(boolean showRelatedConcept) {
+        this.showRelatedConcept = showRelatedConcept;
+    }
+
+    public boolean isShowLearningRecommendation() {
+        return showLearningRecommendation == null ? true : showLearningRecommendation;
+    }
+
+    public void setShowLearningRecommendation(boolean showLearningRecommendation) {
+        this.showLearningRecommendation = showLearningRecommendation;
+    }
+
+    public boolean isShowStudentAnswerReview() {
+        return showStudentAnswerReview;
+    }
+
+    public void setShowStudentAnswerReview(boolean showStudentAnswerReview) {
+        this.showStudentAnswerReview = showStudentAnswerReview;
+    }
+
+    public ReviewTiming getReviewTiming() {
+        return reviewTiming == null ? (showResultImmediately ? ReviewTiming.IMMEDIATE_AFTER_SUBMISSION : ReviewTiming.AFTER_DUE_DATE) : reviewTiming;
+    }
+
+    public void setReviewTiming(ReviewTiming reviewTiming) {
+        this.reviewTiming = reviewTiming == null ? ReviewTiming.IMMEDIATE_AFTER_SUBMISSION : reviewTiming;
+    }
+
+    public boolean isManualReleaseStatus() {
+        return manualReleaseStatus == null ? false : manualReleaseStatus;
+    }
+
+    public void setManualReleaseStatus(boolean manualReleaseStatus) {
+        this.manualReleaseStatus = manualReleaseStatus;
+    }
+
+    public boolean isShowSelectedAnswer() {
+        return showSelectedAnswer == null ? isShowStudentAnswerReview() : showSelectedAnswer;
+    }
+
+    public void setShowSelectedAnswer(boolean showSelectedAnswer) {
+        this.showSelectedAnswer = showSelectedAnswer;
+    }
+
+    public boolean isShowConfidenceReflection() {
+        return showConfidenceReflection == null ? true : showConfidenceReflection;
+    }
+
+    public boolean isShowConfidence() {
+        return isShowConfidenceReflection();
+    }
+
+    public void setShowConfidenceReflection(boolean showConfidenceReflection) {
+        this.showConfidenceReflection = showConfidenceReflection;
+    }
+
+    public void setShowConfidence(boolean showConfidence) {
+        this.showConfidenceReflection = showConfidence;
+    }
+
+    public boolean isShowScoreBreakdown() {
+        return showScoreBreakdown == null ? isShowScoreAfterSubmission() : showScoreBreakdown;
+    }
+
+    public void setShowScoreBreakdown(boolean showScoreBreakdown) {
+        this.showScoreBreakdown = showScoreBreakdown;
+        this.showScoreAfterSubmission = showScoreBreakdown;
     }
 
     public LocalDateTime getCreatedAt() {

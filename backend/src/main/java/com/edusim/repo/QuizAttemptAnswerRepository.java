@@ -11,7 +11,9 @@ import org.springframework.data.repository.query.Param;
 
 public interface QuizAttemptAnswerRepository extends JpaRepository<QuizAttemptAnswer, Long> {
     List<QuizAttemptAnswer> findByAttemptId(Long attemptId);
+    List<QuizAttemptAnswer> findByAttemptIdIn(List<Long> attemptIds);
     Optional<QuizAttemptAnswer> findByIdAndAttemptQuizCourseLecturerId(Long answerId, Long lecturerId);
+    void deleteByAttemptIdIn(List<Long> attemptIds);
     void deleteByAttemptQuizId(Long quizId);
     void deleteByAttemptQuizCourseId(Long courseId);
 

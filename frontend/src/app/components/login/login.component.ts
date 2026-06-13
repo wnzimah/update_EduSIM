@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, OnDestroy, OnInit, inject } from "@angular/core";
+import { Component, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { Router } from "@angular/router";
 import { AuthService } from "../../services/auth.service";
@@ -9,9 +9,9 @@ import { AuthService } from "../../services/auth.service";
   standalone: true,
   imports: [CommonModule, FormsModule],
   templateUrl: "./login.component.html",
-  styleUrl: "./login.component.css"
+  styleUrls: ["./login.component.css"]
 })
-export class LoginComponent implements OnInit, OnDestroy {
+export class LoginComponent {
   private readonly authService = inject(AuthService);
   private readonly router = inject(Router);
 
@@ -19,36 +19,73 @@ export class LoginComponent implements OnInit, OnDestroy {
   password = "password123";
   isLoading = false;
   errorMessage = "";
-  showAbout = false;
-  currentSlideIndex = 0;
+  showLoginModal = false;
+  showForgotPasswordModal = false;
+  forgotPasswordEmail = "";
+  forgotPasswordMessage = "";
+  activeVisualSlideIndex = 0;
   readonly visualSlides = [
     {
-      image: "https://images.unsplash.com/photo-1498243691581-b145c3f54a5a?auto=format&fit=crop&w=2200&q=80",
-      alt: "Student studying using laptop and books",
-      title: "Open and Distance Learning Experience",
-      caption: "Flexible learning paths with digital self-instructional materials."
+      image: "https://images.unsplash.com/photo-1522202176988-66273c2fd55f?auto=format&fit=crop&w=900&q=80",
+      alt: "Students learning together with laptops",
+      title: "Virtual Learning",
+      caption: "Study anywhere with guided digital lessons.",
+      metric: "4.8",
+      metricLabel: "Learner rating",
+      sessionTitle: "SIM Session",
+      sessionMeta: "2 quizzes ready"
     },
     {
-      image: "https://images.unsplash.com/photo-1434030216411-0b793f4b4173?auto=format&fit=crop&w=2200&q=80",
-      alt: "Students collaborating in a digital classroom",
-      title: "Interactive Learning Resources",
-      caption: "Access course content, videos, and resources in one place."
+      image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=900&q=80",
+      alt: "Student attending an online class",
+      title: "Course Hub",
+      caption: "Access videos, notes, and class resources in one place.",
+      metric: "12",
+      metricLabel: "Learning resources",
+      sessionTitle: "Class Room",
+      sessionMeta: "Live content ready"
     },
     {
-      image: "https://images.unsplash.com/photo-1513258496099-48168024aec0?auto=format&fit=crop&w=2200&q=80",
-      alt: "Online assessment and learning analytics",
-      title: "Smart Assessment and Feedback",
-      caption: "Track progress with quizzes, instant feedback, and clear insights."
+      image: "https://images.unsplash.com/photo-1509062522246-3755977927d7?auto=format&fit=crop&w=900&q=80",
+      alt: "Learner writing notes during a class",
+      title: "Smart Feedback",
+      caption: "Review quiz attempts with clear improvement insight.",
+      metric: "86%",
+      metricLabel: "Progress tracked",
+      sessionTitle: "Quiz Review",
+      sessionMeta: "Feedback unlocked"
+    },
+    {
+      image: "https://images.unsplash.com/photo-1552664730-d307ca884978?auto=format&fit=crop&w=900&q=80",
+      alt: "Lecturer guiding a digital learning session",
+      title: "Lecturer Tools",
+      caption: "Create quizzes, monitor attempts, and support students faster.",
+      metric: "24/7",
+      metricLabel: "Learning access",
+      sessionTitle: "EduSIM Lab",
+      sessionMeta: "Progress visible"
     }
   ];
-  private slideTimer: ReturnType<typeof setInterval> | null = null;
 
-  ngOnInit(): void {
-    this.startSlideShow();
+  get activeVisualSlide() {
+    return this.visualSlides[this.activeVisualSlideIndex];
   }
 
-  ngOnDestroy(): void {
-    this.stopSlideShow();
+  visualSlideAt(offset: number) {
+    return this.visualSlides[(this.activeVisualSlideIndex + offset + this.visualSlides.length) % this.visualSlides.length];
+  }
+
+  previousVisualSlide(): void {
+    this.activeVisualSlideIndex =
+      (this.activeVisualSlideIndex - 1 + this.visualSlides.length) % this.visualSlides.length;
+  }
+
+  nextVisualSlide(): void {
+    this.activeVisualSlideIndex = (this.activeVisualSlideIndex + 1) % this.visualSlides.length;
+  }
+
+  setVisualSlide(index: number): void {
+    this.activeVisualSlideIndex = index;
   }
 
   submit(): void {
@@ -58,46 +95,57 @@ export class LoginComponent implements OnInit, OnDestroy {
       next: (session) => {
         this.isLoading = false;
         if (session.role === "STUDENT") {
-          this.router.navigateByUrl("/student/dashboard");
+          this.router.navigateByUrl("/student/my-courses");
           return;
         }
         this.router.navigateByUrl("/lecturer/dashboard");
       },
       error: (error) => {
         this.isLoading = false;
-        this.errorMessage = error?.error?.message ?? "Login failed";
+        const statusCode = Number(error?.status ?? 0);
+        const apiMessage = String(error?.error?.message ?? "").toLowerCase();
+        if (statusCode === 401 || apiMessage.includes("invalid credentials") || apiMessage.includes("validation failed")) {
+          this.errorMessage = "password or username is wrong";
+          return;
+        }
+        this.errorMessage = "password or username is wrong";
       }
     });
   }
 
-  toggleAbout(): void {
-    this.showAbout = !this.showAbout;
+  openForgotPasswordModal(): void {
+    this.forgotPasswordEmail = this.email.trim();
+    this.forgotPasswordMessage = "";
+    this.showForgotPasswordModal = true;
   }
 
-  goToSlide(index: number): void {
-    if (index < 0 || index >= this.visualSlides.length) {
+  closeForgotPasswordModal(): void {
+    this.showForgotPasswordModal = false;
+  }
+
+  sendPasswordReset(): void {
+    const email = this.forgotPasswordEmail.trim();
+    if (!email || !email.includes("@")) {
+      this.forgotPasswordMessage = "Please enter a valid email address.";
       return;
     }
-    this.currentSlideIndex = index;
-    this.restartSlideShow();
+    this.forgotPasswordMessage = "If your account exists, reset instructions have been sent to your email.";
   }
 
-  private startSlideShow(): void {
-    this.stopSlideShow();
-    this.slideTimer = setInterval(() => {
-      this.currentSlideIndex = (this.currentSlideIndex + 1) % this.visualSlides.length;
-    }, 5000);
+  focusLogin(): void {
+    this.showLoginModal = true;
+    window.setTimeout(() => document.getElementById("email")?.focus(), 80);
   }
 
-  private stopSlideShow(): void {
-    if (!this.slideTimer) {
+  closeLoginModal(): void {
+    if (this.isLoading) {
       return;
     }
-    clearInterval(this.slideTimer);
-    this.slideTimer = null;
+    this.showLoginModal = false;
+    this.errorMessage = "";
   }
 
-  private restartSlideShow(): void {
-    this.startSlideShow();
+  scrollHome(): void {
+    document.getElementById("home")?.scrollIntoView({ behavior: "smooth", block: "start" });
   }
 }
