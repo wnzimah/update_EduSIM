@@ -102,7 +102,7 @@
 
       <section class="attempt-table-card">
         @if (loading) {
-          <p class="muted attempt-empty">Loading results...</p>
+          <ng-container></ng-container>
         } @else if (filteredResults().length === 0) {
           <p class="muted attempt-empty">No attempt records yet.</p>
         } @else {

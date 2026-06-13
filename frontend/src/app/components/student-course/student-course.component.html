@@ -1,6 +1,6 @@
 <div class="course-player-page">
   @if (loading) {
-    <p class="state-text">Loading course...</p>
+    <ng-container></ng-container>
   } @else if (errorMessage) {
     <p class="error">{{ errorMessage }}</p>
   } @else if (courseData) {
@@ -203,7 +203,7 @@
               <p class="comment-success">{{ commentSuccessMessage }}</p>
             }
             @if (commentsLoading) {
-              <p class="comment-muted">Loading comments...</p>
+              <ng-container></ng-container>
             } @else if (videoComments.length === 0) {
               <p class="comment-muted">No comment yet. Be the first to share.</p>
             } @else {

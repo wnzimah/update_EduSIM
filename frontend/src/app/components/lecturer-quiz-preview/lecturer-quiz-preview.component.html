@@ -1,10 +1,6 @@
 <div class="quiz-preview-page">
   @if (loading) {
-    <section class="preview-state" aria-live="polite">
-      <p>Loading preview</p>
-      <h1>Preparing quiz details...</h1>
-      <span>Questions, answers, release rules, and marking setup are being synced.</span>
-    </section>
+    <ng-container></ng-container>
   } @else if (errorMessage) {
     <section class="preview-state error-state">
       <p>Preview unavailable</p>

@@ -1,13 +1,14 @@
 import { HttpErrorResponse, HttpInterceptorFn } from "@angular/common/http";
 import { inject } from "@angular/core";
 import { Router } from "@angular/router";
-import { catchError, throwError } from "rxjs";
+import { TimeoutError, catchError, throwError, timeout } from "rxjs";
 import { AuthService } from "./auth.service";
 
 export const authInterceptor: HttpInterceptorFn = (req, next) => {
   const authService = inject(AuthService);
   const router = inject(Router);
   const token = authService.getToken();
+  const requestTimeoutMs = req.url.includes("/api/auth/login") ? 60000 : 30000;
   const request = token
     ? req.clone({
     setHeaders: {
@@ -17,16 +18,27 @@ export const authInterceptor: HttpInterceptorFn = (req, next) => {
     : req;
 
   return next(request).pipe(
-    catchError((error: HttpErrorResponse) => {
+    timeout({ first: requestTimeoutMs }),
+    catchError((error: unknown) => {
+      if (error instanceof TimeoutError) {
+        return throwError(() => ({
+          status: 0,
+          error: {
+            message: "Server is taking too long to respond. Please wait a moment and refresh this page."
+          }
+        }));
+      }
+
+      const httpError = error as HttpErrorResponse;
       const isLoginRequest = req.url.includes("/api/auth/login");
-      const shouldResetSession = error.status === 401 || (error.status === 403 && !token);
+      const shouldResetSession = httpError.status === 401 || (httpError.status === 403 && !token);
       if (!isLoginRequest && shouldResetSession) {
         authService.logout();
         if (router.url !== "/login") {
           void router.navigateByUrl("/login");
         }
       }
-      return throwError(() => error);
+      return throwError(() => httpError);
     })
   );
 };

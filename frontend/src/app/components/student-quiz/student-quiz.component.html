@@ -1,18 +1,6 @@
 <div class="container">
   @if (loading) {
-    <section class="quiz-loading-shell" aria-live="polite">
-      <div class="pulse-orb"></div>
-      <div>
-        <p class="loading-eyebrow">Loading assessment</p>
-        <h2>Preparing a smoother quiz space...</h2>
-        <p class="muted">We are syncing questions, timer, and saved answers.</p>
-      </div>
-      <div class="skeleton-lines">
-        <span></span>
-        <span></span>
-        <span></span>
-      </div>
-    </section>
+    <ng-container></ng-container>
   } @else if (errorMessage) {
     <p class="error">{{ errorMessage }}</p>
     <a class="btn btn-outline" [routerLink]="backRoute()">Back</a>

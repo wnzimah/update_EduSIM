@@ -1,6 +1,6 @@
 <div class="container profile-page">
   @if (loading) {
-    <p>Loading profile...</p>
+    <ng-container></ng-container>
   } @else if (errorMessage) {
     <p class="error">{{ errorMessage }}</p>
   } @else {

@@ -1,6 +1,6 @@
 <div class="container lecturer-shell">
   @if (loading) {
-    <p>Loading dashboard...</p>
+    <ng-container></ng-container>
   } @else if (errorMessage && !dashboard) {
     <p class="error">{{ errorMessage }}</p>
   } @else if (dashboard) {

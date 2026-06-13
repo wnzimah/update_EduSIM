@@ -1,6 +1,6 @@
 <div class="learning-page">
   @if (loading) {
-    <p class="state-text">Loading dashboard...</p>
+    <ng-container></ng-container>
   } @else if (errorMessage) {
     <p class="error">{{ errorMessage }}</p>
   } @else if (dashboard) {

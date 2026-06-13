@@ -1,6 +1,6 @@
 <div class="dashboard-shell">
   @if (loading) {
-    <section class="dashboard-state">Loading dashboard...</section>
+    <ng-container></ng-container>
   } @else if (errorMessage) {
     <section class="dashboard-state error">{{ errorMessage }}</section>
   } @else if (dashboard) {

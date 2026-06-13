@@ -1,8 +1,6 @@
 <div class="container history-shell">
   @if (loading) {
-    <section class="history-state-card">
-      <p>Loading attempt history...</p>
-    </section>
+    <ng-container></ng-container>
   } @else if (errorMessage) {
     <section class="history-state-card error">
       <p>{{ errorMessage }}</p>

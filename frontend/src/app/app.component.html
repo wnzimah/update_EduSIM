@@ -154,7 +154,7 @@
                 </header>
 
                 @if (notificationLoading) {
-                  <p class="notification-state">Loading notifications...</p>
+                  <ng-container></ng-container>
                 } @else if (notificationError) {
                   <p class="notification-state error">{{ notificationError }}</p>
                 } @else if (notifications.length === 0) {
@@ -306,10 +306,6 @@
 
     @if (isStudent()) {
       <nav class="sidebar-links">
-        <a routerLink="/student/dashboard" routerLinkActive="active-link">
-          <span class="sidebar-link-icon dashboard-icon" aria-hidden="true"></span>
-          <span>Dashboard</span>
-        </a>
         <a routerLink="/student/my-courses" routerLinkActive="active-link">
           <span class="sidebar-link-icon courses-icon" aria-hidden="true"></span>
           <span>My Courses</span>
@@ -317,10 +313,6 @@
         <a routerLink="/student/history" routerLinkActive="active-link">
           <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
           <span>Attempt History</span>
-        </a>
-        <a routerLink="/student/dashboard/grades" routerLinkActive="active-link">
-          <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
-          <span>My Progress</span>
         </a>
         <a routerLink="/student/profile" routerLinkActive="active-link">
           <span class="sidebar-link-icon settings-icon" aria-hidden="true"></span>
