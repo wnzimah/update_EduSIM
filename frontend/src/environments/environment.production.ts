@@ -1,4 +1,4 @@
 export const environment = {
   production: true,
-  apiBaseUrl: "/api"
+  apiBaseUrl: "https://edusim-api.onrender.com/api"
 };
