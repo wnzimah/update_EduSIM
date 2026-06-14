@@ -15,8 +15,7 @@
 
     <nav class="academy-nav" aria-label="Main menu">
       <button class="academy-brand" type="button" (click)="navigateHome()" aria-label="Go to EduSIM home">
-        <span>EduSIM</span>
-        <strong>Learning<br />Hub</strong>
+        <img src="assets/edusim-brand-logo.png" alt="EduSIM Educational Self-Instructional Material System" />
       </button>
 
       <button
@@ -81,6 +80,11 @@
               </svg>
             </button>
           </div>
+
+          <button class="nav-icon language-trigger" type="button" aria-label="Language" (click)="toggleLanguageMenu($event)">
+            <span class="globe-icon" aria-hidden="true"></span>
+            <strong>{{ currentLanguage }}</strong>
+          </button>
 
           <div class="menu-wrap utility-wrap" (click)="$event.stopPropagation()">
             <button
@@ -241,11 +245,7 @@
     aria-label="Main sidebar navigation">
     <div class="sidebar-head">
       <button class="sidebar-logo" type="button" (click)="navigateHome()" aria-label="Go to EduSIM home">
-        <span class="sidebar-logo-mark" aria-hidden="true"></span>
-        <span>
-          <strong>EduSIM</strong>
-          <small>Learning Hub</small>
-        </span>
+        <img src="assets/edusim-brand-logo.png" alt="EduSIM" />
       </button>
       <button
         class="sidebar-close-btn"
@@ -306,18 +306,38 @@
 
     @if (isStudent()) {
       <nav class="sidebar-links">
+        <a routerLink="/student/dashboard" routerLinkActive="active-link">
+          <span class="sidebar-link-icon dashboard-icon" aria-hidden="true"></span>
+          <span>Dashboard</span>
+        </a>
         <a routerLink="/student/my-courses" routerLinkActive="active-link">
           <span class="sidebar-link-icon courses-icon" aria-hidden="true"></span>
           <span>My Courses</span>
         </a>
         <a routerLink="/student/history" routerLinkActive="active-link">
+          <span class="sidebar-link-icon quiz-icon" aria-hidden="true"></span>
+          <span>Quizzes</span>
+        </a>
+        <a routerLink="/student/my-courses" routerLinkActive="active-link">
+          <span class="sidebar-link-icon content-icon" aria-hidden="true"></span>
+          <span>Materials</span>
+        </a>
+        <a routerLink="/student/history" routerLinkActive="active-link">
           <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
-          <span>Attempt History</span>
+          <span>Attempts</span>
+        </a>
+        <a routerLink="/student/dashboard" routerLinkActive="active-link">
+          <span class="sidebar-link-icon messages-icon" aria-hidden="true"></span>
+          <span>Messages</span>
         </a>
         <a routerLink="/student/profile" routerLinkActive="active-link">
-          <span class="sidebar-link-icon settings-icon" aria-hidden="true"></span>
-          <span>Settings</span>
+          <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
+          <span>Profile</span>
         </a>
+        <button class="sidebar-logout-link" type="button" (click)="logout()">
+          <span class="sidebar-link-icon logout-icon" aria-hidden="true"></span>
+          <span>Logout</span>
+        </button>
       </nav>
       <aside class="sidebar-course-card">
         <span class="sidebar-card-visual" aria-hidden="true"></span>

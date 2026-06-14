@@ -4,7 +4,7 @@ services:
     restart: unless-stopped
     environment:
       MYSQL_ROOT_PASSWORD: ${MYSQL_ROOT_PASSWORD:-change-this-root-password}
-      MYSQL_DATABASE: edusim
+      MYSQL_DATABASE: ${EDUSIM_DB_NAME:-edusim}
       MYSQL_USER: ${EDUSIM_DB_USER:-edusim}
       MYSQL_PASSWORD: ${EDUSIM_DB_PASSWORD:-1234}
     volumes:
@@ -26,8 +26,10 @@ services:
     environment:
       EDUSIM_DB_HOST: mysql
       EDUSIM_DB_PORT: 3306
+      EDUSIM_DB_NAME: ${EDUSIM_DB_NAME:-edusim}
       EDUSIM_DB_USER: ${EDUSIM_DB_USER:-edusim}
       EDUSIM_DB_PASSWORD: ${EDUSIM_DB_PASSWORD:-1234}
+      EDUSIM_DB_SSL_MODE: ${EDUSIM_DB_SSL_MODE:-DISABLED}
       EDUSIM_JWT_SECRET: ${EDUSIM_JWT_SECRET:-change-this-to-a-very-long-secure-key-for-edusim-app}
       EDUSIM_ALLOWED_ORIGIN_PATTERNS: ${EDUSIM_ALLOWED_ORIGIN_PATTERNS:-http://localhost:4200,http://127.0.0.1:4200,http://*:4200}
 

@@ -2328,3 +2328,340 @@ main.page {
     margin-left: var(--portal-sidebar-width) !important;
   }
 }
+
+/* Latest EduSIM shell: restored top bar and indigo student sidebar. */
+:host {
+  --portal-sidebar-width: 176px;
+  --portal-nav-height: 126px;
+}
+
+:host .academy-shell {
+  display: block !important;
+  height: auto !important;
+  min-height: 0 !important;
+  overflow: visible !important;
+  visibility: visible !important;
+  position: sticky;
+  top: 0;
+  z-index: 160;
+  background: #ffffff;
+  box-shadow: none;
+}
+
+:host .updates-strip {
+  min-height: 58px;
+  padding: 10px 18px;
+  background:
+    repeating-linear-gradient(132deg, rgba(255, 255, 255, 0.11) 0 1px, transparent 1px 18px),
+    linear-gradient(115deg, #081a42 0%, #1559dd 55%, #9d43ef 100%);
+}
+
+:host .updates-copy strong {
+  font-size: 18px;
+}
+
+:host .updates-copy span {
+  font-size: 12px;
+  font-weight: 800;
+}
+
+:host .academy-nav {
+  min-height: 70px;
+  gap: 12px;
+  padding: 0 18px;
+  border-bottom: 1px solid #e6ebf3;
+}
+
+:host .academy-brand {
+  min-width: 90px;
+  width: 92px;
+  height: 44px;
+  display: flex;
+  align-items: center;
+  overflow: hidden;
+}
+
+:host .academy-brand img {
+  width: 184px;
+  max-width: none;
+  height: auto;
+  transform: translateX(-5px);
+}
+
+:host .sidebar-toggle {
+  display: none;
+}
+
+:host .explore-btn {
+  min-height: 38px;
+  border-radius: 7px;
+  padding: 0 14px;
+  font-size: 13px;
+}
+
+:host .academy-search {
+  width: min(560px, 38vw);
+  height: 38px;
+  border-radius: 7px;
+}
+
+:host .academy-search input {
+  min-height: 36px;
+  font-size: 13px;
+}
+
+:host .academy-search button {
+  font-size: 12px;
+}
+
+:host .academy-links,
+:host .home-trigger,
+:host .zoom-controls {
+  display: none !important;
+}
+
+:host .top-actions {
+  margin-left: auto;
+  gap: 0;
+  align-items: stretch;
+  min-height: 70px;
+}
+
+:host .nav-icon,
+:host .profile-trigger,
+:host .language-trigger {
+  min-height: 70px;
+  border: 0;
+  border-left: 1px solid #eef2f7;
+  border-radius: 0;
+  background: #ffffff;
+  color: #0f172a;
+  box-shadow: none;
+}
+
+:host .language-trigger {
+  min-width: 76px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+}
+
+:host .language-trigger strong {
+  font-size: 12px;
+  font-weight: 900;
+}
+
+:host .globe-icon {
+  width: 20px;
+  height: 20px;
+  border: 2px solid currentcolor;
+  border-radius: 999px;
+  display: inline-block;
+  position: relative;
+}
+
+:host .globe-icon::before,
+:host .globe-icon::after {
+  content: "";
+  position: absolute;
+  inset: 3px 7px;
+  border-left: 1.5px solid currentcolor;
+  border-right: 1.5px solid currentcolor;
+  border-radius: 999px;
+}
+
+:host .globe-icon::after {
+  inset: 8px 3px auto;
+  height: 1.5px;
+  border: 0;
+  background: currentcolor;
+}
+
+:host .nav-icon.only-icon {
+  min-width: 62px;
+  font-size: 21px;
+  font-weight: 900;
+}
+
+:host .notify-icon svg {
+  width: 21px;
+  height: 21px;
+}
+
+:host .profile-trigger {
+  min-width: 160px;
+  padding: 0 14px;
+  gap: 8px;
+}
+
+:host .profile-icon {
+  width: 32px;
+  height: 32px;
+  border: 2px solid #2f63ff;
+  background: #eef4ff;
+  color: #2f63ff;
+}
+
+:host .profile-copy strong {
+  color: #1d4ed8;
+  font-size: 13px;
+}
+
+:host .profile-copy small {
+  color: #0f172a;
+  font-size: 11px;
+}
+
+:host .portal-sidebar {
+  z-index: 220;
+  width: var(--portal-sidebar-width) !important;
+  padding: 22px 12px !important;
+  border-right: 1px solid rgba(90, 131, 255, 0.18);
+  background:
+    radial-gradient(circle at 16% 0%, rgba(54, 88, 255, 0.26), transparent 32%),
+    linear-gradient(180deg, #020d37 0%, #031548 46%, #021033 100%);
+  box-shadow: 12px 0 28px rgba(11, 24, 60, 0.22);
+}
+
+:host .sidebar-head {
+  margin-bottom: 24px;
+}
+
+:host .sidebar-logo {
+  width: 126px;
+  height: 34px;
+  overflow: hidden;
+  display: flex !important;
+  align-items: center;
+}
+
+:host .sidebar-logo img {
+  width: 134px;
+  max-width: none;
+  height: auto;
+}
+
+:host .sidebar-close-btn {
+  display: none;
+}
+
+:host .sidebar-links {
+  gap: 8px;
+}
+
+:host .sidebar-links > a,
+:host .sidebar-logout-link,
+:host .sidebar-group-label {
+  min-height: 38px;
+  grid-template-columns: 20px minmax(0, 1fr);
+  gap: 11px;
+  padding: 0 12px;
+  border-radius: 7px;
+  color: #e4ecff;
+  font-size: 12px;
+  font-weight: 850;
+}
+
+:host .sidebar-logout-link {
+  width: 100%;
+  border: 0;
+  background: transparent;
+  display: grid;
+  align-items: center;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+}
+
+:host .sidebar-links > a:hover,
+:host .sidebar-links > a.active-link,
+:host .sidebar-logout-link:hover,
+:host .sidebar-group-label:hover,
+:host .sidebar-group-label.active-link,
+:host .sidebar-group.active-group > .sidebar-group-label {
+  background: #2f63ff;
+  color: #ffffff;
+  box-shadow: 0 10px 18px rgba(47, 99, 255, 0.28);
+}
+
+:host .sidebar-link-icon {
+  width: 18px;
+  height: 18px;
+}
+
+:host .logout-icon::before {
+  width: 11px;
+  height: 12px;
+  left: 1px;
+  top: 3px;
+  border: 1.5px solid currentcolor;
+  border-right: 0;
+  border-radius: 3px 0 0 3px;
+}
+
+:host .logout-icon::after {
+  width: 10px;
+  height: 7px;
+  left: 7px;
+  top: 5px;
+  border-top: 1.5px solid currentcolor;
+  border-right: 1.5px solid currentcolor;
+  transform: rotate(45deg);
+}
+
+:host .sidebar-course-card {
+  display: none;
+}
+
+:host main.page {
+  min-height: calc(100dvh - var(--portal-nav-height));
+  padding: 0 !important;
+  background: #f8fafc;
+}
+
+:host .page-with-sidebar {
+  margin-left: var(--portal-sidebar-width) !important;
+  width: calc(100% - var(--portal-sidebar-width)) !important;
+  max-width: calc(100% - var(--portal-sidebar-width)) !important;
+}
+
+:host .portal-footer {
+  display: none !important;
+}
+
+@media (max-width: 980px) {
+  :host .academy-search {
+    width: min(430px, 42vw);
+  }
+
+  :host .profile-copy {
+    display: none;
+  }
+
+  :host .profile-trigger {
+    min-width: 62px;
+  }
+}
+
+@media (max-width: 760px) {
+  :host .academy-nav {
+    flex-wrap: wrap;
+    padding: 10px 12px;
+  }
+
+  :host .academy-search {
+    order: 5;
+    width: 100%;
+  }
+
+  :host .top-actions {
+    min-height: 44px;
+  }
+
+  :host .nav-icon,
+  :host .profile-trigger,
+  :host .language-trigger {
+    min-height: 44px;
+  }
+}

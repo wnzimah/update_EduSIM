@@ -1,4 +1,5 @@
-target
-.idea
-.git
-*.iml
+target/
+.mvn/
+*.log
+.env
+.env.local
