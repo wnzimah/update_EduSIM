@@ -1839,8 +1839,45 @@ export class LecturerQuestionBankComponent implements OnInit {
     return `Q${displayNumber}`;
   }
 
+  bankCourseTitle(): string {
+    return this.currentCourseTitle() || "Database Management";
+  }
+
+  topicOptions(): string[] {
+    const values = new Set<string>();
+    for (const item of this.questionBank) {
+      const topic = String(item?.topicTag ?? "").trim();
+      const module = String(item?.moduleTag ?? "").trim();
+      if (topic) {
+        values.add(topic);
+      }
+      if (module) {
+        values.add(module);
+      }
+    }
+    return Array.from(values).sort((a, b) => a.localeCompare(b));
+  }
+
   questionBankDisplayPrompt(item: any): string {
     return String(item?.prompt ?? "").replace(/^\s*Q\s*\d+\s*[:.)-]\s*/i, "");
+  }
+
+  difficultyLabel(item: any): string {
+    const value = String(item?.difficultyLevel ?? "MEDIUM").toUpperCase();
+    if (value === "EASY") {
+      return "Beginner";
+    }
+    if (value === "HARD") {
+      return "Advanced";
+    }
+    return "Intermediate";
+  }
+
+  copyQuestion(item: any): void {
+    this.openEditQuestion(item);
+    this.editingQuestionId = null;
+    this.questionForm.prompt = `${this.questionForm.prompt} (Copy)`;
+    this.statusMessage = "Question copied into a new draft. Save it to add the copy.";
   }
 
   taggedQuestionCount(): number {

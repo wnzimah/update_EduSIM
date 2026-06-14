@@ -24,6 +24,7 @@ services:
       mysql:
         condition: service_healthy
     environment:
+      SPRING_DATASOURCE_URL: "jdbc:mysql://mysql:3306/${EDUSIM_DB_NAME:-edusim}?sslMode=${EDUSIM_DB_SSL_MODE:-DISABLED}&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kuala_Lumpur"
       EDUSIM_DB_HOST: mysql
       EDUSIM_DB_PORT: 3306
       EDUSIM_DB_NAME: ${EDUSIM_DB_NAME:-edusim}

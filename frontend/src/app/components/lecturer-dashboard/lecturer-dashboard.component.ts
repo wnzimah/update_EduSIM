@@ -241,6 +241,50 @@ export class LecturerDashboardComponent implements OnInit {
       .sort((a, b) => String(a.title ?? "").localeCompare(String(b.title ?? "")));
   }
 
+  visibleCourses(): any[] {
+    return this.filteredCourses().slice(0, 3);
+  }
+
+  recentSubmissionRows(): any[] {
+    return this.filteredRecentActivity().slice(0, 5);
+  }
+
+  studentInitials(name: string): string {
+    const parts = String(name ?? "Student")
+      .trim()
+      .split(/\s+/)
+      .filter(Boolean);
+    if (parts.length === 0) {
+      return "ST";
+    }
+    return parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("");
+  }
+
+  downloadSubmissionRecord(item: any): void {
+    const rows = [
+      ["Student ID", "Student Name", "Course", "Quiz", "Score (%)", "Status", "Submitted At"],
+      [
+        item?.studentId ?? "",
+        item?.studentName ?? "",
+        item?.courseTitle ?? "",
+        item?.quizTitle ?? "",
+        item?.score ?? "",
+        item?.passed ? "Graded" : "Review",
+        item?.submittedAt ?? ""
+      ]
+    ];
+    const csv = rows
+      .map((row) => row.map((cell) => this.csvCell(cell)).join(","))
+      .join("\n");
+    const blob = new Blob([csv], { type: "text/csv;charset=utf-8" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `edusim-submission-${item?.attemptId ?? Date.now()}.csv`;
+    link.click();
+    URL.revokeObjectURL(url);
+  }
+
   courseImage(course: any, index: number): string {
     const imageUrl = String(course?.imageUrl ?? "").trim();
     if (imageUrl) {
@@ -287,6 +331,11 @@ export class LecturerDashboardComponent implements OnInit {
     return activity.filter((item: any) =>
       lecturerCourseTitles.has(String(item?.courseTitle ?? "").trim().toLowerCase())
     );
+  }
+
+  private csvCell(value: unknown): string {
+    const text = String(value ?? "");
+    return `"${text.replace(/"/g, "\"\"")}"`;
   }
 
   private buildTimelineEntries(): TimelineEntry[] {

@@ -6,44 +6,15 @@
   } @else if (dashboard) {
     <section class="panel lecturer-layout">
       <section class="main-panel">
-        <section class="lecturer-hero">
-          <div class="hero-overlay">
-            <p class="hero-kicker">EduSIM Lecturer Portal</p>
-            <h2>Guide Learning and Assessment from One Place</h2>
-            <p>Manage course content, publish quizzes, and monitor student outcomes with a clear workflow.</p>
-          </div>
-        </section>
-
-        <section class="welcome-band">
-          <div>
-            <p class="welcome-tag">Welcome back</p>
-            <h1>{{ dashboard.lecturer.name }}</h1>
-          </div>
-        </section>
-
-        <section class="grid cards-3">
-          <article class="panel card">
-            <h2>{{ dashboard.stats.courses }}</h2>
-            <p>Courses Managed</p>
-          </article>
-          <article class="panel card">
-            <h2>{{ dashboard.stats.videos }}</h2>
-            <p>Total Videos</p>
-          </article>
-          <article class="panel card">
-            <h2>{{ dashboard.stats.quizzes }}</h2>
-            <p>Total Quizzes</p>
-          </article>
-          <article class="panel card">
-            <h2>{{ dashboard.stats.students }}</h2>
-            <p>Enrolled Students</p>
-          </article>
-        </section>
-
         <section class="panel block course-overview-block">
           <div class="overview-head">
             <h2>Course Overview</h2>
-            <span>{{ filteredCourses().length }} course</span>
+            <div class="overview-head-actions">
+              <span>{{ filteredCourses().length }} courses</span>
+              <select aria-label="Course filter">
+                <option>All Courses</option>
+              </select>
+            </div>
           </div>
 
           <div class="overview-search">
@@ -58,11 +29,13 @@
             <p class="muted">No managed courses found.</p>
           } @else {
             <div class="overview-grid">
-              @for (course of filteredCourses(); track course.courseId; let i = $index) {
+              @for (course of visibleCourses(); track course.courseId; let i = $index) {
                 <article class="overview-card">
-                  <img [src]="courseImage(course, i)" [alt]="course.title">
+                  <div class="overview-image-wrap">
+                    <img [src]="courseImage(course, i)" [alt]="course.title">
+                    <button type="button" class="course-menu-btn" aria-label="Course options">...</button>
+                  </div>
                   <div class="overview-body">
-                    <p class="overview-meta">Managed Course</p>
                     <h3>{{ course.title }}</h3>
                     <p class="overview-desc">{{ course.description || "Course description is not set yet." }}</p>
                     <div class="overview-stats">
@@ -81,7 +54,7 @@
                           </svg>
                         </span>
                         <span>Open Course</span>
-                        <span class="action-arrow" aria-hidden="true">↗</span>
+                        <span class="action-arrow" aria-hidden="true">-></span>
                       </a>
                       <a
                         class="action-link"
@@ -94,7 +67,7 @@
                           </svg>
                         </span>
                         <span>Add/Edit Quiz</span>
-                        <span class="action-arrow" aria-hidden="true">↗</span>
+                        <span class="action-arrow" aria-hidden="true">-></span>
                       </a>
                       <a
                         class="action-link"
@@ -111,19 +84,23 @@
                           </svg>
                         </span>
                         <span>Student Attempts</span>
-                        <span class="action-arrow" aria-hidden="true">↗</span>
+                        <span class="action-arrow" aria-hidden="true">-></span>
                       </a>
                     </div>
                   </div>
                 </article>
               }
             </div>
+            <div class="view-all-courses">
+              <a routerLink="/lecturer/manage">View all courses <span aria-hidden="true">-></span></a>
+            </div>
           }
         </section>
 
-        <section class="panel block">
+        <section class="panel block recent-submission-block">
           <div class="heading">
             <h2>Recent Submission</h2>
+            <a routerLink="/lecturer/student-attempts">View All <span aria-hidden="true">-></span></a>
           </div>
           @if (filteredRecentActivity().length === 0) {
             <p class="muted">No submission yet.</p>
@@ -135,23 +112,42 @@
                   <th>Quiz</th>
                   <th>Course</th>
                   <th>Score</th>
+                  <th>Submitted</th>
                   <th>Status</th>
-                  <th>Date</th>
+                  <th>Action</th>
                 </tr>
               </thead>
               <tbody>
-                @for (item of filteredRecentActivity(); track item.attemptId) {
+                @for (item of recentSubmissionRows(); track item.attemptId) {
                   <tr>
-                    <td>{{ item.studentName }}</td>
+                    <td>
+                      <div class="student-cell">
+                        <span class="student-avatar">{{ studentInitials(item.studentName) }}</span>
+                        <span>
+                          <strong>{{ item.studentName }}</strong>
+                          <small>{{ item.studentId || "Student" }}</small>
+                        </span>
+                      </div>
+                    </td>
                     <td>{{ item.quizTitle }}</td>
                     <td>{{ item.courseTitle }}</td>
-                    <td>{{ item.score }}%</td>
+                    <td class="score-cell">{{ item.score }}%</td>
+                    <td>
+                      {{ item.submittedAt | date: "MMM d, y" }}
+                      <br>
+                      <small>{{ item.submittedAt | date: "h:mm a" }}</small>
+                    </td>
                     <td>
                       <span class="badge" [class.fail]="!item.passed">
-                        {{ item.passed ? "PASS" : "FAIL" }}
+                        {{ item.passed ? "Graded" : "Review" }}
                       </span>
                     </td>
-                    <td>{{ item.submittedAt | date: "medium" }}</td>
+                    <td>
+                      <div class="row-actions">
+                        <a [routerLink]="['/lecturer/student-attempts']" [queryParams]="{ quizId: item.quizId }" aria-label="View submission"></a>
+                        <button type="button" aria-label="Download submission" (click)="downloadSubmissionRecord(item)"></button>
+                      </div>
+                    </td>
                   </tr>
                 }
               </tbody>
@@ -162,71 +158,16 @@
 
       <aside class="side-panel">
         <section class="calendar-card">
-          <div class="month-head">
-            <h3>{{ monthLabel }}</h3>
-            <div class="month-nav">
-              <button type="button" (click)="previousMonth()">&#8249;</button>
-              <button type="button" (click)="nextMonth()">&#8250;</button>
-            </div>
-          </div>
-
-          <div class="calendar-grid">
-            @for (dayLabel of weekDays; track dayLabel) {
-              <span class="weekday">{{ dayLabel }}</span>
-            }
-            @for (week of monthGrid; track $index) {
-              @for (day of week; track $index) {
-                <button
-                  type="button"
-                  class="day-cell"
-                  [class.today]="isToday(day)"
-                  [class.selected]="isSelectedDay(day)"
-                  [class.has-entry]="entriesForDay(day).length > 0"
-                  [disabled]="!day"
-                  (click)="selectCalendarDay(day)">
-                  <span class="day-number">{{ day ?? "" }}</span>
-                  @if (entriesForDay(day).length > 0) {
-                    <div class="day-entries">
-                      @for (entry of entriesForDay(day); track entry.id) {
-                        <span class="day-entry" [class.event]="entry.type === 'EVENT'" [class.marking]="entry.type === 'MARKING'">
-                          {{ timelineTypeLabel(entry.type) }}
-                        </span>
-                      }
-                    </div>
-                  }
-                </button>
+          <div class="calendar-summary-head">
+            <div>
+              <h3>{{ selectedDateLabel() }}</h3>
+              @if (selectedDateEntries().length === 0) {
+                <p>No event for this date.</p>
+              } @else {
+                <p>{{ selectedDateEntries().length }} event(s) for this date.</p>
               }
-            }
-          </div>
-
-          <div class="selected-day-panel">
-            <div class="selected-day-head">
-              <div>
-                <p>Selected date</p>
-                <h4>{{ selectedDateLabel() }}</h4>
-              </div>
-              <button type="button" class="mini-add-btn" (click)="openEventFormForSelectedDate()">+ Event</button>
             </div>
-
-            @if (selectedDateEntries().length === 0) {
-              <p class="muted selected-empty">No event for this date.</p>
-            } @else {
-              <ul class="selected-event-list">
-                @for (item of selectedDateEntries(); track item.id) {
-                  <li [class.manual]="item.type === 'EVENT'" [class.marking]="item.type === 'MARKING'">
-                    <div>
-                      <span>{{ timelineTypeLabel(item.type) }}</span>
-                      <strong>{{ item.title }}</strong>
-                      <p>{{ item.subtitle }}</p>
-                      <small>{{ item.occurredAt | date: "shortTime" }}</small>
-                    </div>
-                    @if (item.type === "EVENT") {
-                      <button type="button" class="icon-btn" title="Remove event" (click)="deleteCalendarEvent(item.id)">x</button>
-                    }
-                  </li>
-                }
-              </ul>
-            }
+            <button type="button" class="mini-add-btn" (click)="openEventFormForSelectedDate()">+ Event</button>
           </div>
 
           <div class="calendar-actions">

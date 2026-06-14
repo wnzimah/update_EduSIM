@@ -552,6 +552,8 @@
 }
 
 .login-form {
+  width: min(390px, 100%);
+  margin: 0 auto;
   display: grid;
   gap: 12px;
 }

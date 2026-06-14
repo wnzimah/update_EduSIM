@@ -56,6 +56,11 @@ export class AppComponent {
         this.showNotifications = false;
         this.showLanguageMenu = false;
         this.showHelpMenu = false;
+        if (this.isLoginPage() || this.isTrackerPage()) {
+          this.isSidebarOpen = false;
+        } else if (this.session()) {
+          this.isSidebarOpen = true;
+        }
       }
     });
   }
@@ -147,11 +152,16 @@ export class AppComponent {
   }
 
   showSidebar(): boolean {
-    return !this.isLoginPage() && !this.isTrackerPage() && this.isSidebarOpen;
+    return !this.isLoginPage() && !this.isTrackerPage() && !!this.session() && this.isSidebarOpen;
   }
 
   isCurrentRoute(...paths: string[]): boolean {
     return paths.some((path) => this.router.url.startsWith(path));
+  }
+
+  isExactRoute(path: string): boolean {
+    const current = this.router.url.split("?")[0].split("#")[0];
+    return current === path;
   }
 
   @HostListener("document:click")
@@ -161,6 +171,7 @@ export class AppComponent {
 
   navigateHome(): void {
     this.closeMenus();
+    this.isSidebarOpen = false;
     this.authService.logout();
     this.router.navigateByUrl("/login");
   }
@@ -171,7 +182,7 @@ export class AppComponent {
       this.router.navigateByUrl("/lecturer/student-attempts");
       return;
     }
-    this.router.navigateByUrl("/student/dashboard");
+    this.router.navigateByUrl("/student/history");
   }
 
   toggleNotifications(event: Event): void {
@@ -279,6 +290,7 @@ export class AppComponent {
 
   logout(): void {
     this.closeMenus();
+    this.isSidebarOpen = false;
     this.authService.logout();
     this.router.navigateByUrl("/login");
   }

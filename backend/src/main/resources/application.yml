@@ -3,9 +3,9 @@ server:
 
 spring:
   datasource:
-    url: jdbc:mysql://${EDUSIM_DB_HOST:localhost}:${EDUSIM_DB_PORT:3306}/${EDUSIM_DB_NAME:edusim}?sslMode=${EDUSIM_DB_SSL_MODE:DISABLED}&serverTimezone=Asia/Kuala_Lumpur
+    url: jdbc:mysql://${EDUSIM_DB_HOST:localhost}:${EDUSIM_DB_PORT:3306}/${EDUSIM_DB_NAME:edusim}?sslMode=${EDUSIM_DB_SSL_MODE:DISABLED}&allowPublicKeyRetrieval=true&serverTimezone=Asia/Kuala_Lumpur
     username: ${EDUSIM_DB_USER:root}
-    password: ${EDUSIM_DB_PASSWORD:}
+    password: ${EDUSIM_DB_PASSWORD:root}
     driver-class-name: com.mysql.cj.jdbc.Driver
 
   jpa:

@@ -25,16 +25,22 @@ EduSIM is a role-based LMS demo with:
 
 Seed data is created automatically on first backend run.
 
-## Run Instructions
+## Local Run Instructions
 
-1. Start MySQL.
-   Optional with Docker:
+1. Start Docker Desktop, then start the local MySQL container:
 
 ```bash
 docker compose up -d mysql
 ```
 
-2. Run setup SQL from `database/mysql-setup.sql`.
+2. Confirm MySQL is running:
+
+```bash
+docker ps
+```
+
+You should see `edusim-mysql` with port `3306`.
+
 3. Start backend:
 
 ```bash
@@ -42,7 +48,7 @@ cd backend
 mvn spring-boot:run
 ```
 
-4. Start frontend:
+4. Start frontend in another terminal:
 
 ```bash
 cd frontend
@@ -52,13 +58,19 @@ npm start
 
 5. Open `http://localhost:4200`.
 
+If you use a local Windows MySQL service instead of Docker, make sure it is running on port `3306` and set the matching credentials with environment variables such as `EDUSIM_DB_USER` and `EDUSIM_DB_PASSWORD`.
+
 ## Default Backend DB Config
 
 Configured in `backend/src/main/resources/application.yml`:
 
-- DB URL: `jdbc:mysql://127.0.0.1:${EDUSIM_DB_PORT:3307}/edusim`
-- Username: `${EDUSIM_DB_USER:edusim}`
-- Password: `${EDUSIM_DB_PASSWORD:1234}`
+- DB host: `${EDUSIM_DB_HOST:localhost}`
+- DB port: `${EDUSIM_DB_PORT:3306}`
+- DB name: `${EDUSIM_DB_NAME:edusim}`
+- Username: `${EDUSIM_DB_USER:root}`
+- Password: `${EDUSIM_DB_PASSWORD:root}`
+
+The JDBC URL includes `allowPublicKeyRetrieval=true` for MySQL 8 Docker authentication.
 
 ## Production Deployment (DigitalOcean Droplet + Docker)
 
@@ -111,6 +123,8 @@ Edit `.env` and change all secrets/passwords before first run.
 ```bash
 docker compose -f docker-compose.prod.yml --env-file .env up -d --build
 ```
+
+Production `docker-compose.prod.yml` passes `SPRING_DATASOURCE_URL` directly to the backend, so the backend connects to the internal MySQL container at `mysql:3306` with `allowPublicKeyRetrieval=true`.
 
 ### 5. Access Live App
 

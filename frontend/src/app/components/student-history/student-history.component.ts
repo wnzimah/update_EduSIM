@@ -125,6 +125,10 @@ export class StudentHistoryComponent implements OnInit {
     return this.defaultStudentName;
   }
 
+  studentFirstName(): string {
+    return this.studentName().trim().split(/\s+/)[0] || this.defaultStudentName;
+  }
+
   passRateLabel(): string {
     const releasedAttempts = this.attempts.filter((attempt) => attempt.resultReleased !== false);
     if (releasedAttempts.length === 0) {

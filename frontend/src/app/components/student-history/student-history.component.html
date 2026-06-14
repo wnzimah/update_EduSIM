@@ -1,65 +1,76 @@
-<div class="container history-shell">
+<div class="container history-shell attempt-dashboard">
   @if (loading) {
     <ng-container></ng-container>
   } @else if (errorMessage) {
-    <section class="history-state-card error">
+    <section class="attempt-state-card error">
       <p>{{ errorMessage }}</p>
     </section>
   } @else {
-    <section class="history-page">
-      <section class="history-study-strip">
-        <div class="history-study-title">
-          <span class="history-book-icon" aria-hidden="true"></span>
-          <h1>Study Hub</h1>
-        </div>
-        <aside class="history-milestone-head">
-          <h2>Milestones</h2>
-          <a routerLink="/student/dashboard/grades">Show all</a>
-        </aside>
-      </section>
+    <section class="attempt-welcome-card">
+      <div>
+        <p class="attempt-kicker">Student Attempts</p>
+        <h1>Good Morning, {{ studentFirstName() }}!</h1>
+        <p>Track your quiz attempts, review mistakes, and keep improving every day.</p>
+      </div>
+      <div class="attempt-hero-art" aria-hidden="true">
+        <span class="art-board"></span>
+        <span class="art-leaf left"></span>
+        <span class="art-leaf right"></span>
+      </div>
+    </section>
 
-      <header class="history-hero">
+    <section class="attempt-stat-grid" aria-label="Attempt summary">
+      <article class="attempt-stat-card purple">
+        <span class="stat-icon"></span>
         <div>
-          <h1>Attempt History &amp; Review</h1>
-          <p>Review your attempts, feedback, and get smart learning recommendations.</p>
-        </div>
-      </header>
-
-      <section class="history-summary-card">
-        <div class="student-mini-profile">
-          <span class="student-avatar">{{ studentInitial() }}</span>
-          <div>
-            <strong>{{ studentName() }}</strong>
-            <small>{{ studentIdLabel() }}</small>
-          </div>
-        </div>
-
-        <div class="history-metric">
-          <span>Attempts</span>
+          <small>Attempts</small>
           <strong>{{ attempts.length }}</strong>
+          <p>Total attempts made</p>
         </div>
-        <div class="history-metric">
-          <span>Passed</span>
+      </article>
+      <article class="attempt-stat-card green">
+        <span class="stat-icon"></span>
+        <div>
+          <small>Passed</small>
           <strong>{{ passedAttemptsCount() }}</strong>
+          <p>Quizzes passed</p>
         </div>
-        <div class="history-metric alert">
-          <span>Pass Rate</span>
+      </article>
+      <article class="attempt-stat-card red">
+        <span class="stat-icon"></span>
+        <div>
+          <small>Pass Rate</small>
           <strong>{{ passRatePercent() }}%</strong>
+          <p>Overall performance</p>
         </div>
-        <div class="history-metric">
-          <span>Average Score</span>
+      </article>
+      <article class="attempt-stat-card violet">
+        <span class="stat-icon"></span>
+        <div>
+          <small>Average Score</small>
           <strong>{{ averageScorePercent() }}%</strong>
+          <p>Average score</p>
         </div>
-        <button class="summary-icon-btn" type="button" aria-label="Open summary">&#9635;</button>
-      </section>
+      </article>
+    </section>
 
-      <section class="history-filter-bar">
-        <div class="history-filter-tabs">
+    <section class="attempt-profile-card">
+      <span class="attempt-avatar">{{ studentInitial() }}</span>
+      <div>
+        <strong>{{ studentName() }}</strong>
+        <small>{{ studentIdLabel() }}</small>
+      </div>
+      <a routerLink="/student/profile" aria-label="Open profile">Open</a>
+    </section>
+
+    <section class="attempt-board-card">
+      <header class="attempt-board-toolbar">
+        <div class="attempt-tabs">
           <button type="button" class="active">All Attempts</button>
           <button type="button">{{ passRatePercent() }}% Pass Rate</button>
           <button type="button">Overall Attempts</button>
         </div>
-        <label class="course-filter">
+        <label>
           <span>View by class</span>
           <select [value]="courseFilter" (change)="onCourseFilterChange($any($event.target).value)">
             <option value="ALL">Overall attempts</option>
@@ -68,172 +79,38 @@
             }
           </select>
         </label>
-      </section>
+      </header>
 
       @if (attempts.length === 0) {
-        <section class="history-state-card">
-          <p>No quiz attempt yet.</p>
-        </section>
-      } @else {
-        <section class="history-dashboard-grid">
-          <main class="history-dashboard-main">
-            @if (latestAttempt(); as latest) {
-              <section class="latest-attempt-card">
-                <span class="section-tab">Latest Attempt</span>
-                <div class="latest-attempt-content">
-                  <span class="attempt-icon">&#9745;</span>
-                  <div class="attempt-main-copy">
-                    <h2>{{ latest.quizTitle }}</h2>
-                    <p>Course: {{ latest.courseTitle }}</p>
-                    <p>Submitted: {{ latest.submittedAt | date: "medium" }}</p>
-
-                    <div class="attempt-facts">
-                      <article>
-                        <span>&#9635;</span>
-                        <small>Attempt</small>
-                        <strong>#{{ latest.attemptNumber }}</strong>
-                      </article>
-                      <article>
-                        <span>&#9684;</span>
-                        <small>Time Taken</small>
-                        <strong>{{ timeTakenLabel(latest) }}</strong>
-                      </article>
-                      <article>
-                        <span>&#9633;</span>
-                        <small>Total Questions</small>
-                        <strong>{{ latest.questionCount || "-" }}</strong>
-                      </article>
-                    </div>
-                  </div>
-
-                  <aside class="result-card" [ngClass]="resultPillClass(latest)">
-                    <div class="result-head">
-                      <span>Result</span>
-                      <strong>{{ resultStatusLabel(latest) }}</strong>
-                    </div>
-                    <small>Your Score</small>
-                    <b>{{ scoreMarksLabel(latest) }}</b>
-                    <hr>
-                    <small>Pass Mark</small>
-                    <p>{{ passMarkLabel(latest) }}</p>
-                  </aside>
-                </div>
-
-                <div class="next-step-row">
-                  <div>
-                    <small>Next Step</small>
-                    <p>Review your answers, feedback and get learning recommendations.</p>
-                  </div>
-                  <a class="primary-review-btn" [routerLink]="['/student/attempts', latest.attemptId, 'feedback']">
-                    Continue Review Flow <span>&rarr;</span>
-                  </a>
-                </div>
-              </section>
-            }
-
-            <section class="review-flow-card">
-              <h2>Review Flow</h2>
-              <p>Complete all steps to improve your understanding.</p>
-              <div class="review-flow-steps">
-                <a class="flow-step active" [routerLink]="latestAttempt() ? ['/student/attempts', latestAttempt()?.attemptId, 'feedback'] : '/student/history'">
-                  <span>1</span>
-                  <strong>Review Answers</strong>
-                  <small>Check your answers and correct ones</small>
-                </a>
-                <a class="flow-step" [routerLink]="latestAttempt() ? ['/student/attempts', latestAttempt()?.attemptId, 'feedback'] : '/student/history'">
-                  <span>2</span>
-                  <strong>Feedback / Result</strong>
-                  <small>View detailed feedback and results</small>
-                </a>
-                <a class="flow-step" [routerLink]="latestAttempt() ? ['/student/attempts', latestAttempt()?.attemptId, 'recommendation'] : '/student/history'">
-                  <span>3</span>
-                  <strong>Learning Recommendation</strong>
-                  <small>Get personalized suggestions</small>
-                </a>
-                <a class="flow-step" [routerLink]="latestAttempt() ? ['/student/attempts', latestAttempt()?.attemptId, 'improvement'] : '/student/history'">
-                  <span>&#10003;</span>
-                  <strong>Reflection</strong>
-                  <small>Rate your confidence and understanding</small>
-                </a>
-              </div>
-            </section>
-          </main>
-
-          <aside class="recommendation-panel">
-            <header>
-              <span>&#10022;</span>
-              <div>
-                <h2>Learning Recommendation</h2>
-                <p>Based on your performance, we recommend the following to help you improve.</p>
-              </div>
-            </header>
-
-            <div class="recommendation-list">
-              @for (item of recommendationCards(); track item.type) {
-                <a class="recommendation-item" [ngClass]="item.type" [routerLink]="item.route">
-                  <span class="recommendation-icon"></span>
-                  <div>
-                    <small>
-                      @if (item.type === "topic") {
-                        Review Topic
-                      } @else if (item.type === "material") {
-                        Study Material
-                      } @else {
-                        Practice Quiz
-                      }
-                    </small>
-                    <strong>{{ item.title }}</strong>
-                    <p>{{ item.subtitle }}</p>
-                  </div>
-                  <b>&rsaquo;</b>
-                </a>
-              }
-            </div>
-
-            <a class="outline-review-btn" [routerLink]="latestAttempt() ? ['/student/attempts', latestAttempt()?.attemptId, 'recommendation'] : '/student/history'">
-              View All Recommendations <span>&rarr;</span>
-            </a>
-          </aside>
-        </section>
-
-        <section class="past-attempts-card">
-          <h2>Past Attempts</h2>
-          <div class="attempt-table-wrap">
-            <table>
-              <thead>
-                <tr>
-                  <th>Quiz Title</th>
-                  <th>Attempt</th>
-                  <th>Submitted</th>
-                  <th>Score</th>
-                  <th>Result</th>
-                  <th>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                @for (attempt of attempts; track attempt.attemptId) {
-                  <tr>
-                    <td>
-                      <strong>{{ attempt.quizTitle }}</strong>
-                      <span>{{ attempt.courseTitle }}</span>
-                    </td>
-                    <td>#{{ attempt.attemptNumber }}</td>
-                    <td>{{ attempt.submittedAt | date: "medium" }}</td>
-                    <td>{{ scoreMarksLabel(attempt) }}</td>
-                    <td>
-                      <span class="result-pill" [ngClass]="resultPillClass(attempt)">
-                        {{ resultStatusLabel(attempt) }}
-                      </span>
-                    </td>
-                    <td>
-                      <a class="view-detail-btn" [routerLink]="['/student/attempts', attempt.attemptId, 'feedback']">View Details</a>
-                    </td>
-                  </tr>
-                }
-              </tbody>
-            </table>
+        <div class="attempt-empty-state">
+          <span class="empty-sparkle one" aria-hidden="true"></span>
+          <span class="empty-sparkle two" aria-hidden="true"></span>
+          <div class="empty-illustration" aria-hidden="true">
+            <span class="empty-clipboard"></span>
+            <span class="empty-search"></span>
           </div>
-        </section>
+          <h2>No quiz attempt yet</h2>
+          <p>Start attempting quizzes to see your progress here.</p>
+          <a routerLink="/student/my-courses">Browse Quizzes</a>
+        </div>
+      } @else {
+        <div class="attempt-list">
+          @for (attempt of attempts; track attempt.attemptId) {
+            <article class="attempt-row">
+              <div>
+                <strong>{{ attempt.quizTitle }}</strong>
+                <small>{{ attempt.courseTitle }}</small>
+              </div>
+              <span>Attempt #{{ attempt.attemptNumber }}</span>
+              <span>{{ attempt.submittedAt | date: "medium" }}</span>
+              <b>{{ scoreMarksLabel(attempt) }}</b>
+              <span class="result-pill" [ngClass]="resultPillClass(attempt)">
+                {{ resultStatusLabel(attempt) }}
+              </span>
+              <a [routerLink]="['/student/attempts', attempt.attemptId, 'feedback']">Review</a>
+            </article>
+          }
+        </div>
       }
     </section>
   }

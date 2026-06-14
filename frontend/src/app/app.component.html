@@ -28,20 +28,6 @@
         <span class="sidebar-toggle-icon" aria-hidden="true"></span>
       </button>
 
-      <button class="explore-btn" type="button" (click)="openQuickSearch()">
-        <span class="grid-mark" aria-hidden="true"></span>
-        Browse
-        <span aria-hidden="true">⌄</span>
-      </button>
-
-      <div class="academy-search" role="search">
-        <svg viewBox="0 0 24 24" aria-hidden="true">
-          <path d="M10.5 4a6.5 6.5 0 0 1 5.16 10.45l4.45 4.44-1.42 1.42-4.44-4.45A6.5 6.5 0 1 1 10.5 4Zm0 2a4.5 4.5 0 1 0 0 9 4.5 4.5 0 0 0 0-9Z" />
-        </svg>
-        <input type="search" placeholder="Search courses, quizzes and study materials" aria-label="Search" />
-        <button type="button">{{ isLecturer() ? "Lecturer" : "Learner" }} ⌄</button>
-      </div>
-
       <div class="academy-links">
         @if (isLecturer()) {
           <a routerLink="/lecturer/dashboard" routerLinkActive="active-link">Dashboard</a>
@@ -51,7 +37,7 @@
         }
         @if (isStudent()) {
           <a routerLink="/student/my-courses" routerLinkActive="active-link">Learning Hub</a>
-          <a routerLink="/student/dashboard" routerLinkActive="active-link">Overview</a>
+          <a routerLink="/student/history" routerLinkActive="active-link">Attempts</a>
         }
       </div>
 
@@ -67,19 +53,6 @@
             </svg>
             <span>Homepage</span>
           </button>
-
-          <div class="zoom-controls" aria-label="Page zoom controls">
-            <button class="nav-icon zoom-trigger" type="button" aria-label="Zoom out" title="Zoom out" (click)="zoomOut()">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M10.5 4a6.5 6.5 0 0 1 5.08 10.56l4.43 4.43-1.42 1.42-4.43-4.43A6.5 6.5 0 1 1 10.5 4Zm-3.5 5.5v2h7v-2H7Z" />
-              </svg>
-            </button>
-            <button class="nav-icon zoom-trigger" type="button" aria-label="Zoom in" title="Zoom in" (click)="zoomIn()">
-              <svg viewBox="0 0 24 24" aria-hidden="true">
-                <path d="M10.5 4a6.5 6.5 0 0 1 5.08 10.56l4.43 4.43-1.42 1.42-4.43-4.43A6.5 6.5 0 1 1 10.5 4Zm-1 3.5v2H7v2h2.5V14h2v-2.5H14v-2h-2.5v-2h-2Z" />
-              </svg>
-            </button>
-          </div>
 
           <button class="nav-icon language-trigger" type="button" aria-label="Language" (click)="toggleLanguageMenu($event)">
             <span class="globe-icon" aria-hidden="true"></span>
@@ -203,9 +176,9 @@
 
                 @if (isStudent()) {
                   <section class="drawer-section">
-                    <h4>Dashboard</h4>
+                    <h4>Learning</h4>
                     <a routerLink="/student/my-courses" (click)="closeMenus()">Learning Hub</a>
-                    <a routerLink="/student/dashboard" (click)="closeMenus()">Overview</a>
+                    <a routerLink="/student/history" (click)="closeMenus()">Attempts</a>
                   </section>
                   <section class="drawer-section">
                     <h4>Profile</h4>
@@ -306,31 +279,19 @@
 
     @if (isStudent()) {
       <nav class="sidebar-links">
-        <a routerLink="/student/dashboard" routerLinkActive="active-link">
-          <span class="sidebar-link-icon dashboard-icon" aria-hidden="true"></span>
-          <span>Dashboard</span>
-        </a>
-        <a routerLink="/student/my-courses" routerLinkActive="active-link">
+        <a routerLink="/student/my-courses" [class.active-link]="isExactRoute('/student/my-courses') || isCurrentRoute('/student/courses/')">
           <span class="sidebar-link-icon courses-icon" aria-hidden="true"></span>
           <span>My Courses</span>
         </a>
-        <a routerLink="/student/history" routerLinkActive="active-link">
+        <a routerLink="/student/history">
           <span class="sidebar-link-icon quiz-icon" aria-hidden="true"></span>
           <span>Quizzes</span>
         </a>
-        <a routerLink="/student/my-courses" routerLinkActive="active-link">
-          <span class="sidebar-link-icon content-icon" aria-hidden="true"></span>
-          <span>Materials</span>
-        </a>
-        <a routerLink="/student/history" routerLinkActive="active-link">
+        <a routerLink="/student/history" [class.active-link]="isExactRoute('/student/history') || isCurrentRoute('/student/attempts/')">
           <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
           <span>Attempts</span>
         </a>
-        <a routerLink="/student/dashboard" routerLinkActive="active-link">
-          <span class="sidebar-link-icon messages-icon" aria-hidden="true"></span>
-          <span>Messages</span>
-        </a>
-        <a routerLink="/student/profile" routerLinkActive="active-link">
+        <a routerLink="/student/profile" [class.active-link]="isExactRoute('/student/profile')">
           <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
           <span>Profile</span>
         </a>

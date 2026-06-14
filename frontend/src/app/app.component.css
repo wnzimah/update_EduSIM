@@ -1754,25 +1754,6 @@ main.page {
   background: currentcolor;
 }
 
-.messages-icon::before {
-  width: 13px;
-  height: 10px;
-  left: 2px;
-  top: 3px;
-  border: 1.5px solid currentcolor;
-  border-radius: 3px;
-}
-
-.messages-icon::after {
-  width: 6px;
-  height: 6px;
-  left: 5px;
-  bottom: 1px;
-  border-left: 1.5px solid currentcolor;
-  border-bottom: 1.5px solid currentcolor;
-  transform: rotate(-45deg);
-}
-
 @media (max-width: 820px) {
   :host {
     --portal-sidebar-width: 100%;

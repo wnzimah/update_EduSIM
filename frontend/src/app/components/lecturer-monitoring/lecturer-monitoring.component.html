@@ -16,7 +16,7 @@
       @if (scopedCourseId) {
         <button class="attempts-light-btn" type="button" (click)="clearCourseScope()">Back to Quiz List</button>
       } @else {
-        <a class="attempts-light-btn" routerLink="/lecturer/question-bank" [queryParams]="{ mode: 'results' }">Back to Quiz List</a>
+        <a class="attempts-light-btn" routerLink="/lecturer/quiz-overview">Back to Quiz List</a>
       }
       <button class="attempts-light-btn" type="button" [disabled]="loading || filteredResults().length === 0" (click)="downloadScoreReport()">
         Export

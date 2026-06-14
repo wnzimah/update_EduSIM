@@ -2,8 +2,8 @@
   <p class="toast" [class.toast-ok]="!errorMessage" [class.toast-error]="!!errorMessage">{{ activeToastMessage }}</p>
 }
 
-<div class="container quiz-page" [class.modern-settings-page]="isSettingsMode()" [class.modern-builder-page]="isQuestionsMode()">
-  @if (!isSettingsMode() && !isQuestionsMode()) {
+<div class="container quiz-page" [class.modern-settings-page]="isSettingsMode()" [class.modern-builder-page]="isQuestionsMode()" [class.question-bank-page]="isBankMode()">
+  @if (!isSettingsMode() && !isQuestionsMode() && !isBankMode()) {
     <section class="style-hero lecturer-course-topbar panel">
       <button class="lecturer-course-brand" type="button" routerLink="/lecturer/dashboard">
         <span>EduSIM</span>
@@ -50,19 +50,48 @@
   }
 
   @if (isBankMode() && !showCreateModal) {
-    <section class="published-block question-bank-filters-card">
-      <header class="studio-section-head">
+    <header class="bank-page-head">
+      <nav aria-label="Breadcrumb">
+        <a routerLink="/lecturer/dashboard">Home</a>
+        <span aria-hidden="true">&gt;</span>
+        <a routerLink="/lecturer/question-bank">Question Bank</a>
+        <span aria-hidden="true">&gt;</span>
+        <strong>{{ bankCourseTitle() }}</strong>
+      </nav>
+      <div class="bank-page-title-row">
         <div>
-          <p class="section-eyebrow">Question library</p>
-          <h2>Find Questions</h2>
-          <span>Use topic, type, difficulty, date, or keyword to narrow the list.</span>
+          <h1>{{ bankCourseTitle() }}</h1>
         </div>
-        <strong class="section-count-pill">{{ questionBank.length }} question(s)</strong>
+        <label class="bank-course-select">
+          <span>Course</span>
+          <select [ngModel]="selectedCourseId ?? ''" (ngModelChange)="onCourseChange($event)" name="bankCourseId">
+            <option value="">Select course</option>
+            @for (course of courses; track course.courseId) {
+              <option [value]="course.courseId">{{ course.title }}</option>
+            }
+          </select>
+        </label>
+      </div>
+    </header>
+
+    <section class="question-bank-filters-card">
+      <header class="bank-card-head">
+        <span class="bank-card-icon search" aria-hidden="true"></span>
+        <div>
+          <h2>Find Questions</h2>
+          <p>Use topic, type, difficulty, date, or keyword to narrow the list.</p>
+        </div>
+        <strong>{{ filteredQuestionBank().length }} question(s)</strong>
       </header>
       <div class="filter-grid">
         <div class="field-block">
           <label>Topic / Module</label>
-          <input [(ngModel)]="questionFilters.topicTag" name="topicFilter" placeholder="Data Integration">
+          <select [(ngModel)]="questionFilters.topicTag" name="topicFilter">
+            <option value="">All topics</option>
+            @for (topic of topicOptions(); track topic) {
+              <option [value]="topic">{{ topic }}</option>
+            }
+          </select>
         </div>
         <div class="field-block">
           <label>Difficulty</label>
@@ -96,8 +125,11 @@
         </div>
       </div>
       <div class="filter-actions">
-        <button class="btn btn-action" type="button" (click)="applyQuestionFilters()">Apply Filter</button>
-        <button class="btn btn-outline" type="button" (click)="resetQuestionFilters()">Reset</button>
+        <button class="btn btn-action bank-filter-btn" type="button" (click)="applyQuestionFilters()">
+          <span aria-hidden="true"></span>
+          Apply Filter
+        </button>
+        <button class="btn btn-outline bank-reset-btn" type="button" (click)="resetQuestionFilters()">Reset</button>
       </div>
     </section>
   }
@@ -835,6 +867,7 @@
                 <span class="modern-card-icon blue">BI</span>
                 <div>
                   <h2>Basic Information</h2>
+                  <small>Quiz details and core rules</small>
                 </div>
               </header>
 
@@ -971,10 +1004,13 @@
           </main>
 
           <aside class="modern-summary-card">
-            <h2>Quiz Summary</h2>
+            <header class="modern-summary-head">
+              <span class="modern-card-icon blue">QS</span>
+              <h2>Quiz Summary</h2>
+            </header>
             <div class="summary-row">
               <span class="summary-icon blue">Q</span>
-              <div><strong>Questions</strong><small>{{ selectedQuestionIds.length }} questions added</small></div>
+              <div><strong>Questions</strong><small>{{ selectedQuestions().length + draftQuestions.length }} questions added</small></div>
             </div>
             <div class="summary-row">
               <span class="summary-icon orange">M</span>
@@ -1318,7 +1354,8 @@
 
       <section class="quiz-transfer-panel">
         <header class="quiz-transfer-head">
-          <h3>EduSIM Quiz Import/Export</h3>
+          <span class="quiz-transfer-icon" aria-hidden="true">D</span>
+          <h3>EduSIM Quiz Import / Export</h3>
         </header>
 
         <nav class="quiz-transfer-tabs" aria-label="Quiz import export tabs">
@@ -1335,7 +1372,7 @@
               </label>
               <label class="transfer-check">
                 <input type="checkbox" [(ngModel)]="quizImportDeleteExistingQuestions" name="deleteExistingQuizQuestions">
-                Delete Existing Questions
+                Delete existing questions before import
               </label>
               <button class="btn btn-action" type="button" [disabled]="quizImporting || !quizImportFile" (click)="importQuizBackup()">
                 {{ quizImporting ? "Importing..." : "Import" }}
@@ -1439,12 +1476,12 @@
                 </td>
                 <td class="table-actions premium-actions">
                   <button class="mini-link-btn" type="button" (click)="togglePublish(quiz.quizId, !quiz.published)">
-                    <span class="mini-action-icon">{{ quiz.published ? "Off" : "On" }}</span>
-                    <span>{{ quiz.published ? "Unpublish" : "Publish" }}</span>
+                    <span class="mini-action-icon" aria-hidden="true">{{ quiz.published ? "⏻" : "✓" }}</span>
+                    <span>{{ quiz.published ? "Off / Unpublish" : "Publish" }}</span>
                   </button>
                   @if (canReleaseQuizResult(quiz)) {
-                    <button class="mini-link-btn" type="button" (click)="releaseQuizResult(quiz)">
-                      <span class="mini-action-icon">Rel</span>
+                  <button class="mini-link-btn" type="button" (click)="releaseQuizResult(quiz)">
+                      <span class="mini-action-icon" aria-hidden="true">↗</span>
                       <span>Release Result</span>
                     </button>
                   }
@@ -1458,18 +1495,22 @@
                     <span>Preview</span>
                   </button>
                   <button class="mini-link-btn" type="button" (click)="duplicateQuiz(quiz.quizId)">
-                    <span class="mini-action-icon">Copy</span>
-                    <span>Duplicate</span>
+                    <span class="mini-action-icon" aria-hidden="true">⧉</span>
+                    <span>Copy / Duplicate</span>
                   </button>
                   <button class="mini-link-btn" type="button" (click)="exportQuizBackup(quiz.quizId)">
-                    <span class="mini-action-icon">DL</span>
-                    <span>Export</span>
+                    <span class="mini-action-icon" aria-hidden="true">↓</span>
+                    <span>Export (DL)</span>
+                  </button>
+                  <button class="mini-link-btn scorm" type="button" (click)="exportQuizBackup(quiz.quizId)">
+                    <span class="mini-action-icon" aria-hidden="true">SC</span>
+                    <span>Export (SCORM)</span>
                   </button>
                   <a
                     class="mini-link-btn"
                     routerLink="/lecturer/student-attempts"
                     [queryParams]="{ courseId: selectedCourseId ?? quiz.courseId, courseTitle: currentCourseTitle() || quiz.courseTitle, quizId: quiz.quizId }">
-                    <span class="mini-action-icon">View</span>
+                    <span class="mini-action-icon" aria-hidden="true">↗</span>
                     <span>Attempts</span>
                   </a>
                   <button class="mini-link-btn danger" type="button" title="Delete quiz" aria-label="Delete quiz" (click)="deleteQuiz(quiz.quizId, quiz.title)">
@@ -1494,88 +1535,21 @@
   }
 
   @if (isBankMode() && !showCreateModal) {
-    <section class="main-editor question-bank-main">
+    <section class="question-bank-main">
       <header class="bank-workspace-intro">
+        <span class="bank-card-icon stack" aria-hidden="true"></span>
         <div>
-          <p class="section-eyebrow">Organise bank</p>
           <h2>Question Bank Workspace</h2>
-          <span>Select questions for a quiz, create a new item, or generate drafts from documents.</span>
+          <p>Select questions for a quiz, create a new item, or generate drafts from documents.</p>
         </div>
-        <button type="button" class="btn btn-action" (click)="openCreateQuestionQuick()">Create New Question</button>
-      </header>
-
-      <div class="library-tools question-bank-tools">
-        <div class="tool-field">
-          <label>Select a category</label>
-          <select [(ngModel)]="questionBankView.category" name="questionBankCategory" (ngModelChange)="resetQuestionBankPage()">
-            @for (category of categoryOptions(); track category.value) {
-              <option [value]="category.value">{{ category.label }}</option>
-            }
-          </select>
-        </div>
-        <div class="tool-field">
-          <label>Filter by tags</label>
-          <input [(ngModel)]="questionBankView.tagFilter" name="questionBankTag" placeholder="e.g. ETL" (ngModelChange)="resetQuestionBankPage()">
-        </div>
-        <div class="tool-field">
-          <label>Show question text in list</label>
-          <select [(ngModel)]="questionBankView.showQuestionTextMode" name="questionTextMode">
-            @for (mode of questionTextModes; track mode.value) {
-              <option [value]="mode.value">{{ mode.label }}</option>
-            }
-          </select>
-        </div>
-      </div>
-
-      <div class="search-options-block">
-        <p>Include in search</p>
-        <label class="check-row">
-          <input type="checkbox" [(ngModel)]="questionBankView.includeSubcategories" name="includeSubcategories" (ngModelChange)="resetQuestionBankPage()">
-          Also show questions from subcategories
-        </label>
-        <label class="check-row">
-          <input type="checkbox" [(ngModel)]="questionBankView.includeOldQuestions" name="includeOldQuestions" (ngModelChange)="resetQuestionBankPage()">
-          Also show old questions
-        </label>
-      </div>
-
-      <section class="import-question-panel">
-        <div>
-          <p class="import-kicker">Document import</p>
-          <h3>Generate questions from Word or PDF</h3>
-          <p>Upload class notes or a module document. EduSIM will extract readable text and create draft questions in this question bank.</p>
-        </div>
-        <div class="import-question-grid">
-          <label>
-            <span>File</span>
-            <input #importQuestionFileInput type="file" accept=".docx,.pdf,.txt,.md" (change)="onImportQuestionFileChange($event)">
-          </label>
-        </div>
-        <button type="button" class="btn btn-action" [disabled]="importingQuestions || !importQuestionFile" (click)="importQuestionsFromFile()">
-          {{ importingQuestions ? "Generating..." : "Generate from document" }}
-        </button>
-        <p class="import-help-text">Tip: PDF must contain selectable/readable text. Scanned image PDFs need OCR before EduSIM can generate questions.</p>
-        @if (importStatusMessage) {
-          <p class="import-feedback import-success">{{ importStatusMessage }}</p>
-        }
-        @if (importErrorMessage) {
-          <p class="import-feedback import-error">{{ importErrorMessage }}</p>
-        }
-      </section>
-
-      <div class="library-tools bank-search-line">
-        <input type="text" name="librarySearch" placeholder="Search by question name or keyword..." [(ngModel)]="librarySearch" (ngModelChange)="resetQuestionBankPage()">
-        <span class="count">{{ selectedCountLabel() }}</span>
-        @if (selectedQuestionIds.length > 0) {
-          <button type="button" class="btn btn-danger bank-bulk-delete" (click)="deleteSelectedQuestions()">
-            {{ bulkDeleteButtonLabel() }}
+        <div class="bank-create-wrap">
+          <button type="button" class="btn btn-action bank-create-btn" (click)="openCreateQuestionQuick()">
+            <span aria-hidden="true">+</span>
+            Create New Question
           </button>
-        }
-        <button type="button" class="btn btn-outline" (click)="openCreateQuestionQuick()">Create manually</button>
-        <button type="button" class="btn btn-action" [disabled]="selectedQuestionIds.length === 0" (click)="useSelectedInQuizDraft()">
-          Use selected in quiz
-        </button>
-      </div>
+          <button type="button" class="bank-create-chevron" aria-label="More create options" (click)="openCreateQuestionQuick()">&#8964;</button>
+        </div>
+      </header>
 
       <div class="bank-table-wrap">
         <table class="bank-table">
@@ -1589,13 +1563,13 @@
               </th>
               <th>Question</th>
               <th class="center-col">Type</th>
-              <th>Actions</th>
+              <th class="center-col">Difficulty</th>
               <th class="center-col">Status</th>
-              <th>Created by</th>
-              <th class="center-col">Comments</th>
+              <th>Created By</th>
+              <th>Created On</th>
               <th class="center-col">Usage</th>
-              <th>Last used</th>
-              <th>Modified by</th>
+              <th>Last Used</th>
+              <th class="center-col">Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1610,16 +1584,7 @@
                 <td>
                   <div class="question-cell">
                     <p class="question-code">{{ questionBankDisplayCode(rowIndex) }}</p>
-                    @if (showQuestionPrompt()) {
-                      <p class="question-text">{{ questionBankDisplayPrompt(item) }}</p>
-                    }
-                    @if (showQuestionMeta()) {
-                      <div class="question-meta-chips">
-                        <span>{{ questionTypeLabel(item.questionType) }}</span>
-                        <span>{{ item.topicTag || "-" }}</span>
-                        <span>{{ item.points || 1 }} point(s)</span>
-                      </div>
-                    }
+                    <p class="question-text">{{ questionBankDisplayPrompt(item) }}</p>
                   </div>
                 </td>
                 <td class="center-col">
@@ -1633,18 +1598,10 @@
                     {{ questionTypeLabel(item.questionType) }}
                   </span>
                 </td>
-                <td>
-                  <div class="table-actions compact premium-actions">
-                    <button class="mini-link-btn" type="button" (click)="openEditQuestion(item)">
-                      <span>Edit</span>
-                    </button>
-                    <button class="mini-link-btn danger" type="button" (click)="deleteQuestion(item.questionBankId)">
-                      <span>Delete</span>
-                    </button>
-                    <button class="mini-link-btn" type="button" (click)="toggleQuestion(item.questionBankId, !isSelected(item.questionBankId))">
-                      <span>{{ isSelected(item.questionBankId) ? "Remove" : "Add" }}</span>
-                    </button>
-                  </div>
+                <td class="center-col">
+                  <span class="difficulty-pill" [class.easy]="difficultyLabel(item) === 'Beginner'" [class.medium]="difficultyLabel(item) === 'Intermediate'" [class.hard]="difficultyLabel(item) === 'Advanced'">
+                    {{ difficultyLabel(item) }}
+                  </span>
                 </td>
                 <td class="center-col">
                   <span
@@ -1658,16 +1615,22 @@
                 <td>
                   <div class="meta-cell">
                     <span>{{ item.createdBy || "Lecturer" }}</span>
-                    <small>{{ item.createdAt ? (item.createdAt | date : "medium") : "-" }}</small>
                   </div>
                 </td>
-                <td class="center-col">{{ item.commentCount ?? 0 }}</td>
-                <td class="center-col">{{ item.usageCount ?? 0 }}</td>
-                <td>{{ item.lastUsedAt ? (item.lastUsedAt | date : "mediumDate") : "Never" }}</td>
                 <td>
                   <div class="meta-cell">
-                    <span>{{ item.modifiedBy || (item.createdBy || "Lecturer") }}</span>
-                    <small>{{ item.updatedAt ? (item.updatedAt | date : "medium") : "-" }}</small>
+                    <span>{{ item.createdAt ? (item.createdAt | date : "MMM d, y") : "-" }}</span>
+                    <small>{{ item.createdAt ? (item.createdAt | date : "h:mm a") : "" }}</small>
+                  </div>
+                </td>
+                <td class="center-col">{{ item.usageCount ?? 0 }}</td>
+                <td>{{ item.lastUsedAt ? (item.lastUsedAt | date : "mediumDate") : "Never" }}</td>
+                <td class="center-col">
+                  <div class="bank-row-actions">
+                    <button type="button" class="bank-icon-btn view" title="View question" aria-label="View question" (click)="openEditQuestion(item)"></button>
+                    <button type="button" class="bank-icon-btn copy" title="Copy question" aria-label="Copy question" (click)="copyQuestion(item)"></button>
+                    <button type="button" class="bank-icon-btn edit" title="Edit question" aria-label="Edit question" (click)="openEditQuestion(item)"></button>
+                    <button type="button" class="bank-icon-btn delete" title="Delete question" aria-label="Delete question" (click)="deleteQuestion(item.questionBankId)"></button>
                   </div>
                 </td>
               </tr>
@@ -1685,6 +1648,10 @@
 
       <div class="question-bank-footer">
         <div class="question-bank-result-count">{{ questionBankShowingLabel() }}</div>
+        <div class="tagging-summary">
+          <span class="tagging-pill tagged">Tagged: {{ taggedQuestionCount() }}</span>
+          <span class="tagging-pill untagged">Untagged: {{ untaggedQuestionCount() }}</span>
+        </div>
         <div class="question-bank-pagination" aria-label="Question bank pagination">
           <button
             type="button"
@@ -1719,13 +1686,6 @@
             <option [ngValue]="size">{{ size }} / page</option>
           }
         </select>
-      </div>
-
-      <div class="question-bank-tagging-bar">
-        <div class="tagging-summary">
-          <span class="tagging-pill tagged">Tagged: {{ taggedQuestionCount() }}</span>
-          <span class="tagging-pill untagged">Untagged: {{ untaggedQuestionCount() }}</span>
-        </div>
         <button type="button" class="tagging-export-btn" (click)="exportTaggingReport()">
           <span aria-hidden="true">&#8681;</span>
           Export Tagging Report

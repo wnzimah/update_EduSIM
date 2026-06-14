@@ -118,7 +118,9 @@ export class LecturerMonitoringComponent implements OnInit {
   }
 
   clearCourseScope(): void {
-    this.router.navigate(["/lecturer/student-attempts"]);
+    this.router.navigate(["/lecturer/quiz-overview"], {
+      queryParams: this.scopedCourseId ? { courseId: this.scopedCourseId } : undefined
+    });
   }
 
   availableStudents(): string[] {
@@ -423,16 +425,17 @@ export class LecturerMonitoringComponent implements OnInit {
     }
 
     const rows: string[] = [];
-    rows.push("Report Type,Student Attempts");
+    rows.push("Report Type,Student Attempt Records");
     rows.push(`Course Scope,${this.csvCell(this.scopedCourseTitle || (this.scopedCourseId ? `Course ID ${this.scopedCourseId}` : "All Courses"))}`);
     rows.push(`Quiz Filter,${this.csvCell(this.quizFilterLabel())}`);
     rows.push(`Student Filter,${this.csvCell(this.studentFilterLabel())}`);
     rows.push(`Generated At,${this.csvCell(new Date().toISOString())}`);
     rows.push("");
-    rows.push("Student,Course,Quiz,Attempt,Score (%),Status,Time Taken (s),Submitted At,Result Released");
+    rows.push("Student ID,Student Name,Course,Quiz,Attempt,Score (%),Status,Time Taken (s),Submitted At,Result Released");
 
     for (const item of rowsToExport) {
       rows.push([
+        this.csvCell(item.studentId),
         this.csvCell(item.studentName),
         this.csvCell(item.courseTitle),
         this.csvCell(item.quizTitle),
@@ -452,7 +455,7 @@ export class LecturerMonitoringComponent implements OnInit {
     link.download = this.reportFileName();
     link.click();
     URL.revokeObjectURL(url);
-    this.statusMessage = "Score report downloaded.";
+    this.statusMessage = "Student record export downloaded.";
   }
 
   openResultDetail(attemptId: number): void {
@@ -565,7 +568,7 @@ export class LecturerMonitoringComponent implements OnInit {
     const stamp = new Date().toISOString().slice(0, 19).replace(/[:T]/g, "-");
     const scope = this.scopedCourseId ? `course-${this.scopedCourseId}` : "all-courses";
     const quiz = this.resultQuizId ? `quiz-${this.resultQuizId}` : "all-quiz";
-    return `edusim-score-report-${scope}-${quiz}-${stamp}.csv`;
+    return `edusim-student-records-${scope}-${quiz}-${stamp}.csv`;
   }
 
   private csvCell(value: unknown): string {

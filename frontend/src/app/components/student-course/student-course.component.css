@@ -1786,3 +1786,35 @@
   width: 0;
   height: 0;
 }
+
+/* Make the Course Navigator card continue all the way down. */
+.course-workspace {
+  align-items: stretch !important;
+}
+
+.outline-panel {
+  display: flex !important;
+  flex-direction: column;
+  height: calc(100dvh - 40px) !important;
+  min-height: calc(100dvh - 40px) !important;
+  max-height: none !important;
+}
+
+.assessment-dock-card {
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  min-height: 320px;
+}
+
+.assessment-dock-card .quiz-outline-list {
+  flex: 1 1 auto;
+  align-content: start;
+}
+
+@media (max-width: 1180px) {
+  .outline-panel {
+    height: calc(100dvh - 24px) !important;
+    min-height: calc(100dvh - 24px) !important;
+  }
+}

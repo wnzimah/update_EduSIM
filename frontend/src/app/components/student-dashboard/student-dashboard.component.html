@@ -1,197 +1,121 @@
-<div class="dashboard-shell">
+<div class="dashboard-shell student-overview-dashboard">
   @if (loading) {
     <ng-container></ng-container>
   } @else if (errorMessage) {
     <section class="dashboard-state error">{{ errorMessage }}</section>
   } @else if (dashboard) {
-    <section class="learning-board">
-      <section class="board-main">
-        <header class="board-header">
-          <div>
-            <p class="eyebrow">Welcome back</p>
-            <h1>{{ dashboard.student.name }}</h1>
-            <span>{{ completionHeadline() }}</span>
+    <section class="student-hero-panel">
+      <div>
+        <h1>Good Morning, {{ studentFirstName() }}!</h1>
+        <p>Track your quiz attempts, review mistakes, and keep improving every day.</p>
+      </div>
+      <div class="hero-illustration" aria-hidden="true">
+        <span class="hero-board"></span>
+        <span class="hero-orb"></span>
+        <span class="hero-leaf"></span>
+      </div>
+    </section>
+
+    <section class="student-stat-grid" aria-label="Quiz performance summary">
+      <article class="student-stat-card purple">
+        <span class="stat-icon clipboard-icon" aria-hidden="true"></span>
+        <div>
+          <small>Attempts</small>
+          <strong>{{ attemptCount() }}</strong>
+          <em>Total attempts made</em>
+        </div>
+      </article>
+      <article class="student-stat-card green">
+        <span class="stat-icon check-icon" aria-hidden="true"></span>
+        <div>
+          <small>Passed</small>
+          <strong>{{ passedCount() }}</strong>
+          <em>Quizzes passed</em>
+        </div>
+      </article>
+      <article class="student-stat-card red">
+        <span class="stat-icon ring-icon" aria-hidden="true"></span>
+        <div>
+          <small>Pass Rate</small>
+          <strong>{{ passRate() }}%</strong>
+          <em>Overall performance</em>
+        </div>
+      </article>
+      <article class="student-stat-card indigo">
+        <span class="stat-icon star-icon" aria-hidden="true"></span>
+        <div>
+          <small>Average Score</small>
+          <strong>{{ averageScore() }}%</strong>
+          <em>Average score</em>
+        </div>
+      </article>
+    </section>
+
+    <section class="student-profile-strip">
+      <span class="student-avatar">{{ studentInitial() }}</span>
+      <div>
+        <strong>{{ dashboard.student.name }}</strong>
+        <small>Student ID: {{ studentIdentifier() }}</small>
+      </div>
+      <a routerLink="/student/profile" aria-label="Open profile">
+        <span aria-hidden="true"></span>
+      </a>
+    </section>
+
+    <section class="attempt-overview-panel">
+      <header class="attempt-toolbar">
+        <div class="attempt-tabs" aria-label="Attempt filters">
+          <button class="active" type="button">
+            <span aria-hidden="true"></span>
+            All Attempts
+          </button>
+          <button type="button">
+            <span aria-hidden="true"></span>
+            {{ passRate() }}% Pass Rate
+          </button>
+          <button type="button">
+            <span aria-hidden="true"></span>
+            Overall Attempts
+          </button>
+        </div>
+        <label>
+          <span>View by class</span>
+          <select aria-label="View attempts by class">
+            <option>Overall attempts</option>
+            @for (course of dashboard.courses ?? []; track course.courseId) {
+              <option>{{ course.title }}</option>
+            }
+          </select>
+        </label>
+      </header>
+
+      @if (recentAttempts().length > 0) {
+        <div class="attempt-list">
+          @for (attempt of recentAttempts(); track attempt.attemptId ?? $index) {
+            <article class="attempt-row">
+              <span class="attempt-badge" [class.passed]="attempt.passed === true" [class.failed]="attempt.passed === false">
+                {{ attempt.passed === true ? "P" : (attempt.passed === false ? "R" : "A") }}
+              </span>
+              <div>
+                <strong>{{ attempt.quizTitle }}</strong>
+                <small>{{ attempt.courseTitle }} | {{ attempt.submittedAt | date: "mediumDate" }}</small>
+              </div>
+              <em>{{ attempt.resultReleased === false ? "Pending" : scoreText(attempt) }}</em>
+              <button type="button" (click)="openFeedback(attempt)">Review</button>
+            </article>
+          }
+        </div>
+      } @else {
+        <div class="attempt-empty-state">
+          <div class="empty-illustration" aria-hidden="true">
+            <span></span>
+            <i></i>
           </div>
-          <a class="header-profile" routerLink="/student/profile" aria-label="Open profile">
-            <span>{{ dashboard.student.name.charAt(0) }}</span>
-            <div>
-              <strong>{{ dashboard.student.name }}</strong>
-              <small>Learner</small>
-            </div>
-          </a>
-        </header>
-
-        <section class="overview-grid">
-          <article class="featured-course">
-            @if (primaryCourse(); as course) {
-              <div class="course-visual">
-                <img [src]="courseImage(course, 0)" [alt]="course.title" />
-                <span>{{ courseProgressLabel(course) }}</span>
-              </div>
-              <div class="featured-copy">
-                <span class="status-pill">{{ currentCourseStatus(course) }}</span>
-                <h2>{{ course.title }}</h2>
-                <p>{{ courseDescription(course) }}</p>
-                <div class="course-progress">
-                  <small>{{ courseProgressLabel(course) }} complete</small>
-                  <span>
-                    <i [style.width.%]="course.progress"></i>
-                  </span>
-                </div>
-                <div class="featured-actions">
-                  <a class="primary-action" [routerLink]="['/student/courses', course.courseId]">Continue course</a>
-                  <button class="ghost-action" type="button" (click)="goToPerformance(course)">View feedback</button>
-                </div>
-              </div>
-              <aside class="next-card">
-                <strong>Next lesson</strong>
-                <p>{{ nextLessonLabel(course) }}</p>
-                <span>{{ quizCountForCourse(course) }} quiz set(s)</span>
-                <span>{{ submissionCountForCourse(course) }} submission(s)</span>
-              </aside>
-            } @else {
-              <div class="empty-feature">
-                <h2>No enrolled course yet</h2>
-                <p>Courses assigned by your lecturer will appear here.</p>
-              </div>
-            }
-          </article>
-
-          <aside class="progress-card">
-            <div class="section-head compact">
-              <h2>Your progress</h2>
-              <a routerLink="/student/my-courses">View all</a>
-            </div>
-            <div class="progress-ring" [style.background]="progressRingBackground()">
-              <div>
-                <strong>{{ overallProgress() }}%</strong>
-                <span>Overall</span>
-              </div>
-            </div>
-            <div class="progress-stats">
-              <span><b>{{ completedCoursesCount() }}</b> course complete</span>
-              <span><b>{{ activitiesCompletedCount() }}</b> activities done</span>
-              <span><b>{{ activitiesDueCount() }}</b> due now</span>
-            </div>
-          </aside>
-        </section>
-
-        <section class="insight-grid">
-          <article class="feedback-panel">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Instant feedback</p>
-                <h2>Latest quiz result</h2>
-              </div>
-              <a routerLink="/student/history">Details</a>
-            </div>
-
-            @if (latestFeedback(); as feedback) {
-              <div class="feedback-score" [class.pending]="feedback.resultReleased === false">
-                <span>{{ feedbackScoreLabel(feedback) }}</span>
-                <strong>{{ feedbackStatusLabel(feedback) }}</strong>
-              </div>
-              <h3>{{ feedback.quizTitle }}</h3>
-              <p>{{ feedbackFeedbackText(feedback) }}</p>
-              <div class="feedback-meta">
-                <span>{{ feedback.courseTitle }}</span>
-                <span>{{ feedback.submittedAt | date: "mediumDate" }}</span>
-              </div>
-              <button class="primary-action small" type="button" (click)="openFeedback(feedback)">
-                View detailed feedback
-              </button>
-            } @else {
-              <div class="mini-empty">
-                <strong>No quiz feedback yet</strong>
-                <p>Complete a quiz to unlock instant score and detailed feedback.</p>
-              </div>
-            }
-          </article>
-
-          <article class="recommend-panel">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Learning recommendation</p>
-                <h2>Suggested next steps</h2>
-              </div>
-              <a routerLink="/student/history">Review</a>
-            </div>
-
-            <div class="recommend-list">
-              @for (item of recommendationsPreview(); track $index) {
-                <article class="recommend-item">
-                  <span>{{ item.badge }}</span>
-                  <div>
-                    <strong>{{ item.title }}</strong>
-                    <p>{{ item.reason }}</p>
-                    @if (item.link) {
-                      <a [href]="item.link" target="_blank" rel="noopener">{{ item.action }}</a>
-                    } @else if (item.courseId) {
-                      <a [routerLink]="['/student/courses', item.courseId]">{{ item.action }}</a>
-                    } @else {
-                      <a routerLink="/student/history">{{ item.action }}</a>
-                    }
-                  </div>
-                </article>
-              }
-            </div>
-          </article>
-        </section>
-
-        <section class="lower-grid">
-          <article class="course-panel">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Ongoing courses</p>
-                <h2>Continue learning</h2>
-              </div>
-              <a routerLink="/student/my-courses">View all</a>
-            </div>
-
-            <div class="course-card-grid">
-              @for (course of dashboardCourses(); track course.courseId; let index = $index) {
-                <article class="mini-course">
-                  <img [src]="courseImage(course, index)" [alt]="course.title" />
-                  <div>
-                    <strong>{{ course.title }}</strong>
-                    <small>{{ course.mandatoryCompleted || 0 }} / {{ course.mandatoryTotal || 0 }} lessons completed</small>
-                    <span class="mini-track"><i [style.width.%]="course.progress"></i></span>
-                    <a [routerLink]="['/student/courses', course.courseId]">Open course</a>
-                  </div>
-                </article>
-              }
-            </div>
-          </article>
-
-          <aside class="activity-panel">
-            <div class="section-head">
-              <div>
-                <p class="eyebrow">Learning path</p>
-                <h2>Today focus</h2>
-              </div>
-            </div>
-
-            <div class="streak-row">
-              @for (day of streakDays(); track day.label) {
-                <span [class.done]="day.done">{{ day.label }}</span>
-              }
-            </div>
-
-            <div class="timeline-list">
-              @for (entry of filteredTimelineEntries().slice(0, 4); track $index) {
-                <button type="button" class="timeline-item" [disabled]="entry.disabled" (click)="handleTimelineAction(entry)">
-                  <span [class]="entry.type"></span>
-                  <div>
-                    <strong>{{ entry.title }}</strong>
-                    <small>{{ entry.detail }}</small>
-                  </div>
-                  <em>{{ entry.actionLabel }}</em>
-                </button>
-              }
-            </div>
-          </aside>
-        </section>
-      </section>
+          <h2>No quiz attempt yet</h2>
+          <p>Start attempting quizzes to see your progress here.</p>
+          <a routerLink="/student/my-courses">Browse Quizzes</a>
+        </div>
+      }
     </section>
   }
 </div>

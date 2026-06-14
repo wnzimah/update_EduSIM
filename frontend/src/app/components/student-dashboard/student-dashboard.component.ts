@@ -199,6 +199,57 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     return rows[0] ?? null;
   }
 
+  studentFirstName(): string {
+    return String(this.dashboard?.student?.name ?? "Student").trim().split(/\s+/)[0] || "Student";
+  }
+
+  studentInitial(): string {
+    return this.studentFirstName().charAt(0).toUpperCase() || "S";
+  }
+
+  studentIdentifier(): string {
+    const id = this.dashboard?.student?.studentId ?? this.dashboard?.student?.id;
+    return id ? String(id) : "STU000002";
+  }
+
+  recentAttempts(): any[] {
+    return Array.isArray(this.dashboard?.latestResults) ? this.dashboard.latestResults : [];
+  }
+
+  attemptCount(): number {
+    return this.recentAttempts().length;
+  }
+
+  passedCount(): number {
+    return this.recentAttempts().filter((attempt: any) => attempt?.passed === true).length;
+  }
+
+  passRate(): number {
+    const attempts = this.recentAttempts().filter((attempt: any) => attempt?.resultReleased !== false);
+    if (attempts.length === 0) {
+      return 0;
+    }
+    return Math.round((attempts.filter((attempt: any) => attempt?.passed === true).length / attempts.length) * 100);
+  }
+
+  averageScore(): number {
+    const scores = this.recentAttempts()
+      .filter((attempt: any) => attempt?.resultReleased !== false && attempt?.score !== null && attempt?.score !== undefined)
+      .map((attempt: any) => Number(attempt.score))
+      .filter((score: number) => Number.isFinite(score));
+    if (scores.length === 0) {
+      return 0;
+    }
+    return Math.round(scores.reduce((sum: number, score: number) => sum + score, 0) / scores.length);
+  }
+
+  scoreText(attempt: any): string {
+    if (attempt?.score === null || attempt?.score === undefined) {
+      return "-";
+    }
+    return `${Math.round(Number(attempt.score))}%`;
+  }
+
   feedbackScoreLabel(feedback: any): string {
     if (feedback?.resultReleased === false) {
       return "-";
