@@ -14,9 +14,10 @@
   --edusim-muted: #64748b;
   --edusim-border: #dbe4f0;
   --edusim-panel: #ffffff;
-  --edusim-page: #fbfbff;
+  --edusim-page: #e8f0fa;
   --edusim-hero: linear-gradient(110deg, #ffffff 0%, #f8fbff 52%, #fff7e6 100%);
-  --edusim-primary-gradient: linear-gradient(135deg, #2563eb 0%, #174aa9 100%);
+  --edusim-primary-gradient: linear-gradient(135deg, #3678ff 0%, #2456e8 52%, #173aa9 100%);
+  --edusim-primary-gradient-hover: linear-gradient(135deg, #4b88ff 0%, #2f63f2 48%, #1d45b8 100%);
   --edusim-accent-gradient: linear-gradient(135deg, #f97316 0%, #f59e0b 100%);
   --bg: #08122d;
   --bg-soft: #0f1f46;
@@ -87,9 +88,9 @@ body {
   min-height: 100dvh;
   font-family: "Manrope", sans-serif;
   background:
-    radial-gradient(circle at 12% 18%, rgba(80, 152, 255, 0.22) 0, rgba(80, 152, 255, 0) 38%),
-    radial-gradient(circle at 88% 72%, rgba(126, 92, 255, 0.16) 0, rgba(126, 92, 255, 0) 40%),
-    linear-gradient(165deg, #06102a 0%, #0d1f4a 46%, #0b2f6e 100%);
+    radial-gradient(circle at 8% 12%, rgba(37, 99, 235, 0.12) 0, rgba(37, 99, 235, 0) 34%),
+    radial-gradient(circle at 92% 18%, rgba(20, 120, 232, 0.10) 0, rgba(20, 120, 232, 0) 34%),
+    linear-gradient(180deg, #e8f0fa 0%, #dfe8f4 100%);
   color: var(--text);
 }
 
@@ -328,6 +329,9 @@ tbody tr:hover {
 
 .page {
   padding: 24px 0 40px;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(37, 99, 235, 0.10), transparent 30%),
+    linear-gradient(180deg, #e8f0fa 0%, #dfe8f4 100%);
   animation: fade-up 0.35s ease both;
 }
 
@@ -359,7 +363,136 @@ tbody tr:hover {
 
 :where(.btn:hover, .drawer-logout:hover, .module-head button:hover, .flow-tab.active:hover) {
   border-color: var(--edusim-primary-dark) !important;
-  background: linear-gradient(135deg, var(--edusim-primary-dark), var(--edusim-primary)) !important;
+  background: var(--edusim-primary-gradient-hover) !important;
+}
+
+/* Premium compact action buttons across EduSIM. */
+:where(
+  .btn,
+  .btn-action,
+  .btn-secondary,
+  .course-action,
+  .start-btn,
+  .save-btn,
+  .submit-btn,
+  .add-btn,
+  .complete-btn,
+  .modern-btn,
+  .modern-save-btn,
+  .modern-edit-btn,
+  .modern-icon-btn,
+  .builder-side-actions button,
+  .lecturer-window-actions button,
+  .module-head button,
+  .simple-form-actions .btn,
+  .inline-draft-actions .btn,
+  .settings-flow-actions .btn,
+  .editor-footer .btn,
+  .moodle-right-actions .btn,
+  .quiz-transfer-row .btn-action,
+  .quiz-template-line .btn-outline,
+  button[type="submit"]
+) {
+  width: auto !important;
+  min-width: 112px !important;
+  max-width: min(240px, 100%) !important;
+  min-height: 42px !important;
+  padding: 10px 18px !important;
+  display: inline-flex !important;
+  align-items: center !important;
+  justify-content: center !important;
+  justify-self: start !important;
+  gap: 8px !important;
+  border: 1px solid rgba(33, 83, 217, 0.9) !important;
+  border-radius: 8px !important;
+  background: var(--edusim-primary-gradient) !important;
+  color: #ffffff !important;
+  font-family: inherit !important;
+  font-size: 14px !important;
+  font-weight: 900 !important;
+  line-height: 1.15 !important;
+  letter-spacing: 0 !important;
+  text-align: center !important;
+  white-space: normal !important;
+  box-shadow: 0 12px 24px rgba(31, 79, 194, 0.22) !important;
+}
+
+:where(
+  .btn:hover,
+  .btn-action:hover,
+  .btn-secondary:hover,
+  .course-action:hover,
+  .start-btn:hover,
+  .save-btn:hover,
+  .submit-btn:hover,
+  .add-btn:hover,
+  .complete-btn:hover,
+  .modern-btn:hover,
+  .modern-save-btn:hover,
+  .modern-edit-btn:hover,
+  .modern-icon-btn:hover,
+  .builder-side-actions button:hover,
+  .lecturer-window-actions button:hover,
+  .module-head button:hover,
+  .simple-form-actions .btn:hover,
+  .inline-draft-actions .btn:hover,
+  .settings-flow-actions .btn:hover,
+  .editor-footer .btn:hover,
+  .moodle-right-actions .btn:hover,
+  .quiz-transfer-row .btn-action:hover,
+  .quiz-template-line .btn-outline:hover,
+  button[type="submit"]:hover
+) {
+  border-color: #1d4ed8 !important;
+  background: var(--edusim-primary-gradient-hover) !important;
+  box-shadow: 0 16px 30px rgba(31, 79, 194, 0.28) !important;
+}
+
+:where(
+  .btn-outline,
+  .btn-secondary,
+  .modern-btn.ghost,
+  .modern-edit-btn,
+  .quiz-template-line .btn-outline
+) {
+  border-color: #b7c9f7 !important;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f7ff 100%) !important;
+  color: #2456e8 !important;
+  box-shadow: 0 10px 20px rgba(43, 92, 209, 0.12) !important;
+}
+
+:where(
+  .btn-outline:hover,
+  .btn-secondary:hover,
+  .modern-btn.ghost:hover,
+  .modern-edit-btn:hover,
+  .quiz-template-line .btn-outline:hover
+) {
+  border-color: #7fa2f4 !important;
+  background: linear-gradient(180deg, #f8fbff 0%, #e9f0ff 100%) !important;
+  color: #173aa9 !important;
+}
+
+@media (max-width: 560px) {
+  :where(
+    .btn,
+    .btn-action,
+    .btn-secondary,
+    .course-action,
+    .start-btn,
+    .save-btn,
+    .submit-btn,
+    .add-btn,
+    .complete-btn,
+    .modern-btn,
+    .modern-save-btn,
+    .modern-edit-btn,
+    .modern-icon-btn,
+    button[type="submit"]
+  ) {
+    width: 100% !important;
+    max-width: 100% !important;
+  }
 }
 
 :where(

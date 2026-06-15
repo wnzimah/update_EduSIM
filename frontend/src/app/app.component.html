@@ -1,5 +1,8 @@
 @if (!isLoginPage() && !isTrackerPage()) {
-  <header class="academy-shell">
+  <header
+    class="academy-shell"
+    [class.academy-shell-with-sidebar]="showSidebar()"
+    [class.academy-shell-sidebar-collapsed]="showSidebar() && !isSidebarOpen">
     <section class="updates-strip" aria-label="Learning pulse">
       <div class="updates-copy">
         <strong>EduSIM Learning Hub</strong>
@@ -18,22 +21,11 @@
         <img src="assets/edusim-brand-logo.png" alt="EduSIM Educational Self-Instructional Material System" />
       </button>
 
-      <button
-        class="sidebar-toggle"
-        type="button"
-        [attr.aria-label]="isSidebarOpen ? 'Close sidebar' : 'Open sidebar'"
-        [attr.aria-expanded]="isSidebarOpen"
-        [title]="isSidebarOpen ? 'Close sidebar' : 'Open sidebar'"
-        (click)="toggleSidebar($event)">
-        <span class="sidebar-toggle-icon" aria-hidden="true"></span>
-      </button>
-
       <div class="academy-links">
         @if (isLecturer()) {
-          <a routerLink="/lecturer/dashboard" routerLinkActive="active-link">Dashboard</a>
           <a routerLink="/lecturer/manage" routerLinkActive="active-link">My Courses</a>
-          <a routerLink="/lecturer/student-attempts" routerLinkActive="active-link">Student Attempts</a>
-          <a routerLink="/lecturer/reset-requests" routerLinkActive="active-link">Reset Requests</a>
+          <a routerLink="/lecturer/student-attempts" routerLinkActive="active-link">Students</a>
+          <a routerLink="/lecturer/quiz-performance" routerLinkActive="active-link">Reports</a>
         }
         @if (isStudent()) {
           <a routerLink="/student/my-courses" routerLinkActive="active-link">Learning Hub</a>
@@ -43,6 +35,130 @@
 
       @if (session(); as user) {
         <div class="top-actions">
+          <div class="menu-wrap main-menu-wrap" (click)="$event.stopPropagation()">
+            <button
+              class="nav-icon only-icon main-menu-trigger"
+              type="button"
+              aria-label="Open main menu"
+              [attr.aria-expanded]="showMainMenu"
+              title="Menu"
+              (click)="toggleMainMenu($event)">
+              <span class="main-menu-icon" aria-hidden="true"></span>
+            </button>
+
+            @if (showMainMenu) {
+              <aside class="menu-dropdown main-menu-drawer">
+                <header class="main-menu-head">
+                  <span class="main-menu-brand-icon" aria-hidden="true"></span>
+                  <div>
+                    <h3>EDUSIM</h3>
+                    <p>{{ isLecturer() ? "Lecturer Hub" : "Learner Hub" }}</p>
+                  </div>
+                </header>
+
+                @if (isLecturer()) {
+                  <section class="main-menu-section" aria-label="Lecturer menu">
+                    <h4>Menu</h4>
+                    <a routerLink="/lecturer/dashboard" [class.active-link]="isLecturerMenuActive('dashboard')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon dashboard-icon" aria-hidden="true"></span>
+                      <span>Dashboard</span>
+                    </a>
+                    <a routerLink="/lecturer/manage" [class.active-link]="isLecturerMenuActive('courses')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon courses-icon" aria-hidden="true"></span>
+                      <span>My Courses</span>
+                    </a>
+                    <a routerLink="/lecturer/quiz-overview" [class.active-link]="isLecturerMenuActive('quizzes')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon quiz-icon" aria-hidden="true"></span>
+                      <span>Quizzes</span>
+                    </a>
+                    <a routerLink="/lecturer/student-attempts" [class.active-link]="isLecturerMenuActive('students')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
+                      <span>Students</span>
+                    </a>
+                    <a routerLink="/lecturer/question-bank" [class.active-link]="isLecturerMenuActive('questionBank')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon database-icon" aria-hidden="true"></span>
+                      <span>Question Bank</span>
+                    </a>
+                    <a routerLink="/lecturer/quiz-performance" [class.active-link]="isLecturerMenuActive('reports')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
+                      <span>Reports</span>
+                    </a>
+                    <a routerLink="/lecturer/reset-requests" [class.active-link]="isLecturerMenuActive('messages')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon messages-icon" aria-hidden="true"></span>
+                      <span>Messages</span>
+                      <small class="main-menu-badge">3</small>
+                    </a>
+                    <a routerLink="/lecturer/quiz-settings" [class.active-link]="isLecturerMenuActive('settings')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon settings-icon" aria-hidden="true"></span>
+                      <span>Settings</span>
+                    </a>
+                  </section>
+                  <section class="main-menu-section main-menu-actions" aria-label="Quick actions">
+                    <h4>Quick Actions</h4>
+                    <button type="button" (click)="openHelpTarget('questions')">
+                      <span class="quick-action-icon plus-icon" aria-hidden="true"></span>
+                      <span>Create New Quiz</span>
+                    </button>
+                    <button type="button" (click)="openHelpTarget('questions')">
+                      <span class="quick-action-icon document-icon" aria-hidden="true"></span>
+                      <span>Question Bank</span>
+                    </button>
+                  </section>
+                }
+
+                @if (isStudent()) {
+                  <section class="main-menu-section" aria-label="Learner menu">
+                    <h4>Menu</h4>
+                    <a routerLink="/student/dashboard" [class.active-link]="isStudentMenuActive('dashboard')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon dashboard-icon" aria-hidden="true"></span>
+                      <span>Dashboard</span>
+                    </a>
+                    <a routerLink="/student/my-courses" [class.active-link]="isStudentMenuActive('courses')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon courses-icon" aria-hidden="true"></span>
+                      <span>My Courses</span>
+                    </a>
+                    <a routerLink="/student/my-courses" [class.active-link]="isStudentMenuActive('quizzes')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon quiz-icon" aria-hidden="true"></span>
+                      <span>Quizzes</span>
+                    </a>
+                    <a routerLink="/student/history" [class.active-link]="isStudentMenuActive('attempts')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
+                      <span>Attempts</span>
+                    </a>
+                    <a routerLink="/student/profile" [class.active-link]="isStudentMenuActive('profile')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
+                      <span>Profile</span>
+                    </a>
+                    <a routerLink="/student/history" [class.active-link]="isStudentMenuActive('messages')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon messages-icon" aria-hidden="true"></span>
+                      <span>Messages</span>
+                      <small class="main-menu-badge">3</small>
+                    </a>
+                    <a routerLink="/student/profile" [class.active-link]="isStudentMenuActive('settings')" (click)="closeMenus()">
+                      <span class="sidebar-link-icon settings-icon" aria-hidden="true"></span>
+                      <span>Settings</span>
+                    </a>
+                  </section>
+                  <section class="main-menu-section main-menu-actions" aria-label="Quick actions">
+                    <h4>Quick Actions</h4>
+                    <button type="button" (click)="openHelpTarget('courses')">
+                      <span class="quick-action-icon plus-icon" aria-hidden="true"></span>
+                      <span>Open Courses</span>
+                    </button>
+                    <button type="button" (click)="openHelpTarget('history')">
+                      <span class="quick-action-icon document-icon" aria-hidden="true"></span>
+                      <span>View Attempts</span>
+                    </button>
+                    <button type="button" (click)="openHelpTarget('profile')">
+                      <span class="quick-action-icon settings-icon" aria-hidden="true"></span>
+                      <span>Update Profile</span>
+                    </button>
+                  </section>
+                }
+              </aside>
+            }
+          </div>
+
           <button
             class="nav-icon home-trigger"
             type="button"
@@ -54,54 +170,23 @@
             <span>Homepage</span>
           </button>
 
-          <button class="nav-icon language-trigger" type="button" aria-label="Language" (click)="toggleLanguageMenu($event)">
-            <span class="globe-icon" aria-hidden="true"></span>
-            <strong>{{ currentLanguage }}</strong>
-          </button>
-
-          <div class="menu-wrap utility-wrap" (click)="$event.stopPropagation()">
+          <div class="zoom-controls" role="group" [attr.aria-label]="'Page zoom ' + zoomLabel()">
             <button
-              class="nav-icon only-icon"
+              class="nav-icon only-icon zoom-trigger"
               type="button"
-              aria-label="Help"
-              [attr.aria-expanded]="showHelpMenu"
-              (click)="toggleHelpMenu($event)">?</button>
-
-            @if (showHelpMenu) {
-              <aside class="menu-dropdown utility-menu help-menu">
-                <header>
-                  <strong>Help</strong>
-                  <span>{{ isLecturer() ? "Lecturer tools" : "Learner tools" }}</span>
-                </header>
-                <button type="button" (click)="openHelpTarget('home')">
-                  Go to home
-                  <small>Dashboard</small>
-                </button>
-                <button type="button" (click)="openHelpTarget('courses')">
-                  {{ isLecturer() ? "Manage courses" : "My courses" }}
-                  <small>{{ isLecturer() ? "Content setup" : "Study hub" }}</small>
-                </button>
-                @if (isLecturer()) {
-                  <button type="button" (click)="openHelpTarget('questions')">
-                    Question bank
-                    <small>Create and reuse questions</small>
-                  </button>
-                  <button type="button" (click)="openHelpTarget('monitoring')">
-                    Student attempts
-                    <small>Attempts and scores</small>
-                  </button>
-                } @else {
-                  <button type="button" (click)="openHelpTarget('history')">
-                    Learning history
-                    <small>Results and feedback</small>
-                  </button>
-                  <button type="button" (click)="openHelpTarget('profile')">
-                    Profile
-                    <small>Update account</small>
-                  </button>
-                }
-              </aside>
-            }
+              aria-label="Zoom out page"
+              [title]="'Zoom out page (' + zoomLabel() + ')'"
+              (click)="zoomOut()">
+              <span class="zoom-icon zoom-out-icon" aria-hidden="true"></span>
+            </button>
+            <button
+              class="nav-icon only-icon zoom-trigger"
+              type="button"
+              aria-label="Zoom in page"
+              [title]="'Zoom in page (' + zoomLabel() + ')'"
+              (click)="zoomIn()">
+              <span class="zoom-icon zoom-in-icon" aria-hidden="true"></span>
+            </button>
           </div>
           <div class="menu-wrap notification-wrap" (click)="$event.stopPropagation()">
             <button
@@ -211,124 +296,88 @@
   </header>
 
   @if (showSidebar()) {
-  <aside
-    class="portal-sidebar"
-    [class.portal-sidebar-lecturer]="isLecturer()"
-    [class.portal-sidebar-student]="isStudent()"
-    aria-label="Main sidebar navigation">
-    <div class="sidebar-head">
-      <button class="sidebar-logo" type="button" (click)="navigateHome()" aria-label="Go to EduSIM home">
-        <img src="assets/edusim-brand-logo.png" alt="EduSIM" />
-      </button>
-      <button
-        class="sidebar-close-btn"
-        type="button"
-        aria-label="Close sidebar"
-        title="Close sidebar"
-        (click)="toggleSidebar($event)">
-        <span aria-hidden="true"></span>
-      </button>
-    </div>
-
-    @if (isLecturer()) {
-      <nav class="sidebar-links">
-        <a routerLink="/lecturer/dashboard" routerLinkActive="active-link">
-          <span class="sidebar-link-icon dashboard-icon" aria-hidden="true"></span>
-          <span>Dashboard</span>
-        </a>
-        <a routerLink="/lecturer/manage" routerLinkActive="active-link">
-          <span class="sidebar-link-icon courses-icon" aria-hidden="true"></span>
-          <span>My Courses</span>
-        </a>
-        <a routerLink="/lecturer/student-attempts" routerLinkActive="active-link">
-          <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
-          <span>Students</span>
-        </a>
-        <div class="sidebar-group" [class.active-group]="isCurrentRoute('/lecturer/quiz-overview', '/lecturer/quiz-builder', '/lecturer/question-bank', '/lecturer/quiz-settings', '/lecturer/quiz-results')">
-          <a class="sidebar-group-label" routerLink="/lecturer/quiz-overview" routerLinkActive="active-link">
-            <span class="sidebar-link-icon quiz-icon" aria-hidden="true"></span>
-            <span>Assessments</span>
-          </a>
-          <div class="sidebar-sub-links">
-            <a routerLink="/lecturer/question-bank" routerLinkActive="active-link">Question Bank</a>
-            <a routerLink="/lecturer/quiz-overview" routerLinkActive="active-link">Quizzes</a>
-            <a routerLink="/lecturer/student-attempts" routerLinkActive="active-link">Quiz Attempts</a>
-            <a routerLink="/lecturer/quiz-results" routerLinkActive="active-link">Results</a>
-          </div>
-        </div>
-        <a routerLink="/lecturer/manage" routerLinkActive="active-link">
-          <span class="sidebar-link-icon content-icon" aria-hidden="true"></span>
-          <span>Content</span>
-        </a>
-        <a routerLink="/lecturer/quiz-results" routerLinkActive="active-link">
-          <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
-          <span>Reports</span>
-        </a>
-        <a routerLink="/lecturer/quiz-settings" routerLinkActive="active-link">
-          <span class="sidebar-link-icon settings-icon" aria-hidden="true"></span>
-          <span>Settings</span>
-        </a>
-      </nav>
-      <aside class="sidebar-course-card">
-        <span class="sidebar-card-visual" aria-hidden="true"></span>
-        <strong>Keep teaching, keep improving!</strong>
-        <p>Review quizzes, feedback settings, and student performance.</p>
-        <button type="button" (click)="openHelpTarget('monitoring')">Go to Results</button>
-      </aside>
-    }
-
-    @if (isStudent()) {
-      <nav class="sidebar-links">
-        <a routerLink="/student/my-courses" [class.active-link]="isExactRoute('/student/my-courses') || isCurrentRoute('/student/courses/')">
-          <span class="sidebar-link-icon courses-icon" aria-hidden="true"></span>
-          <span>My Courses</span>
-        </a>
-        <a routerLink="/student/history">
-          <span class="sidebar-link-icon quiz-icon" aria-hidden="true"></span>
-          <span>Quizzes</span>
-        </a>
-        <a routerLink="/student/history" [class.active-link]="isExactRoute('/student/history') || isCurrentRoute('/student/attempts/')">
-          <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
-          <span>Attempts</span>
-        </a>
-        <a routerLink="/student/profile" [class.active-link]="isExactRoute('/student/profile')">
-          <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
-          <span>Profile</span>
-        </a>
-        <button class="sidebar-logout-link" type="button" (click)="logout()">
-          <span class="sidebar-link-icon logout-icon" aria-hidden="true"></span>
-          <span>Logout</span>
+    <aside
+      class="portal-sidebar"
+      [class.portal-sidebar-collapsed]="!isSidebarOpen"
+      [class.portal-sidebar-lecturer]="isLecturer()"
+      [class.portal-sidebar-student]="isStudent()"
+      aria-label="Main sidebar navigation">
+      <div class="sidebar-head">
+        <button
+          class="sidebar-logo"
+          type="button"
+          [attr.aria-label]="isSidebarOpen ? 'Go to EduSIM home' : 'Expand sidebar'"
+          (click)="handleSidebarLogoClick($event)">
+          <span class="sidebar-logo-icon" aria-hidden="true"></span>
+          <span class="sidebar-logo-copy">
+            <strong>EDUSIM</strong>
+            <small>{{ isLecturer() ? "Lecturer Hub" : "Learner Hub" }}</small>
+          </span>
         </button>
-      </nav>
-      <aside class="sidebar-course-card">
-        <span class="sidebar-card-visual" aria-hidden="true"></span>
-        <strong>Keep learning, keep improving!</strong>
-        <p>Review your quizzes and get personalized recommendations.</p>
-        <button type="button" (click)="openHelpTarget('history')">Go to My Progress</button>
-      </aside>
-    }
-  </aside>
-  }
+        <button
+          class="sidebar-close-btn"
+          type="button"
+          [attr.aria-label]="isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'"
+          [title]="isSidebarOpen ? 'Collapse sidebar' : 'Expand sidebar'"
+          (click)="toggleSidebar($event)">
+          <span aria-hidden="true"></span>
+        </button>
+      </div>
 
-  @if (!showSidebar()) {
-    <button
-      class="sidebar-open-btn"
-      type="button"
-      aria-label="Open sidebar"
-      title="Open sidebar"
-      (click)="toggleSidebar($event)">
-      <span aria-hidden="true"></span>
-      <strong>Menu</strong>
-    </button>
+      @if (isLecturer()) {
+        <nav class="sidebar-links">
+          <span class="sidebar-nav-title">Quiz Workspace</span>
+          <a routerLink="/lecturer/quiz-overview" [class.active-link]="isCurrentRoute('/lecturer/quiz-overview', '/lecturer/quizzes/')">
+            <span class="sidebar-link-icon quiz-icon" aria-hidden="true"></span>
+            <span class="sidebar-link-text">Quizzes</span>
+          </a>
+          <a routerLink="/lecturer/quiz-settings" [class.active-link]="isCurrentRoute('/lecturer/quiz-settings')">
+            <span class="sidebar-link-icon settings-icon" aria-hidden="true"></span>
+            <span class="sidebar-link-text">Create Quiz</span>
+          </a>
+          <a routerLink="/lecturer/question-bank" [class.active-link]="isCurrentRoute('/lecturer/question-bank')">
+            <span class="sidebar-link-icon database-icon" aria-hidden="true"></span>
+            <span class="sidebar-link-text">Question Bank</span>
+          </a>
+
+          <span class="sidebar-nav-title">Monitoring</span>
+          <a routerLink="/lecturer/reset-requests" [class.active-link]="isLecturerMenuActive('messages')">
+            <span class="sidebar-link-icon messages-icon" aria-hidden="true"></span>
+            <span class="sidebar-link-text">Messages</span>
+          </a>
+        </nav>
+      }
+
+      @if (isStudent()) {
+        <nav class="sidebar-links">
+          <a routerLink="/student/dashboard" [class.active-link]="isStudentMenuActive('dashboard')">
+            <span class="sidebar-link-icon dashboard-icon" aria-hidden="true"></span>
+            <span class="sidebar-link-text">Dashboard</span>
+          </a>
+          <a routerLink="/student/my-courses" [class.active-link]="isStudentMenuActive('courses')">
+            <span class="sidebar-link-icon courses-icon" aria-hidden="true"></span>
+            <span class="sidebar-link-text">My Courses</span>
+          </a>
+          <a routerLink="/student/history" [class.active-link]="isStudentMenuActive('attempts')">
+            <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
+            <span class="sidebar-link-text">Attempt History</span>
+          </a>
+          <a routerLink="/student/profile" [class.active-link]="isStudentMenuActive('profile')">
+            <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
+            <span class="sidebar-link-text">Profile</span>
+          </a>
+        </nav>
+      }
+    </aside>
   }
 }
 
-<main class="page" [class.page-login]="isLoginPage()" [class.page-tracker]="isTrackerPage()" [class.page-with-sidebar]="showSidebar()">
+<main class="page" [class.page-login]="isLoginPage()" [class.page-tracker]="isTrackerPage()" [class.page-with-sidebar]="showSidebar()" [class.page-sidebar-collapsed]="showSidebar() && !isSidebarOpen">
   <router-outlet />
 </main>
 
 @if (!isLoginPage() && !isTrackerPage()) {
   <footer class="portal-footer" [class.portal-footer-with-sidebar]="showSidebar()">
-    <p>&copy; {{ currentYear }} EduSIM Learning Hub</p>
+    <p>&copy; EduSIM 2026</p>
   </footer>
 }

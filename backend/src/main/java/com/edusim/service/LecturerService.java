@@ -2257,7 +2257,11 @@ public class LecturerService {
         if (normalizedPrompt.startsWith("true or false") || Objects.equals(normalizedAnswer, "true") || Objects.equals(normalizedAnswer, "false")) {
             return QuestionType.TRUE_FALSE;
         }
-        if (!choiceOptions(prompt).isEmpty()) {
+        Map<String, String> choices = choiceOptions(prompt);
+        if (!choices.isEmpty() && hasMultipleChoiceAnswers(seed.answer(), choices)) {
+            return QuestionType.MULTI_SELECT;
+        }
+        if (!choices.isEmpty()) {
             return QuestionType.MCQ;
         }
         return QuestionType.SHORT_ANSWER;
@@ -2347,10 +2351,12 @@ public class LecturerService {
         List<String> options = choices.isEmpty()
             ? answerOptions(seed.answer())
             : new ArrayList<>(choices.values());
-        String correct = correctChoiceAnswer(seed.answer(), choices, options);
+        List<String> correctAnswers = correctChoiceAnswers(seed.answer(), choices, options);
+        String correct = correctAnswers.isEmpty() ? correctChoiceAnswer(seed.answer(), choices, options) : correctAnswers.get(0);
+        List<String> effectiveCorrectAnswers = correctAnswers.isEmpty() ? List.of(correct) : correctAnswers;
         item.setPrompt(prompt);
         item.setOptionsJson(writeSafe(options));
-        item.setCorrectAnswerJson(writeSafe(multiSelect ? List.of(correct) : correct));
+        item.setCorrectAnswerJson(writeSafe(multiSelect ? effectiveCorrectAnswers : correct));
     }
 
     private String booleanAnswer(String value) {
@@ -2421,6 +2427,65 @@ public class LecturerService {
         }
         options.add(0, trimmed);
         return trimmed;
+    }
+
+    private boolean hasMultipleChoiceAnswers(String answer, Map<String, String> choices) {
+        return correctChoiceAnswers(answer, choices, new ArrayList<>(choices.values())).size() > 1;
+    }
+
+    private List<String> correctChoiceAnswers(String answer, Map<String, String> choices, List<String> options) {
+        List<String> answers = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        for (String token : importedChoiceAnswerTokens(answer)) {
+            String key = token.replaceAll("[^A-Za-z]", "").toUpperCase();
+            if (choices.containsKey(key) && seen.add(normalize(choices.get(key)))) {
+                answers.add(choices.get(key));
+                continue;
+            }
+            for (String option : options) {
+                if (normalize(option).equals(normalize(token)) && seen.add(normalize(option))) {
+                    answers.add(option);
+                    break;
+                }
+            }
+        }
+        return answers;
+    }
+
+    private List<String> importedChoiceAnswerTokens(String answer) {
+        if (answer == null || answer.isBlank()) {
+            return List.of();
+        }
+        List<String> tokens = Pattern.compile("\\s*(?:,|;|\\||/|\\band\\b|\\&)\\s*", Pattern.CASE_INSENSITIVE)
+            .splitAsStream(answer)
+            .map(String::trim)
+            .map(value -> value.replaceAll("(?i)^(answer|ans|jawapan)\\s*:?\\s*", "").trim())
+            .filter(value -> !value.isBlank())
+            .toList();
+        if (tokens.size() > 1) {
+            return tokens;
+        }
+
+        String lettersOnly = answer.replaceAll("[^A-Za-z]", "").toUpperCase();
+        if (lettersOnly.length() >= 2 && lettersOnly.length() <= 4) {
+            List<String> compactKeys = new ArrayList<>();
+            for (int i = 0; i < lettersOnly.length(); i++) {
+                String key = String.valueOf(lettersOnly.charAt(i));
+                if (List.of("A", "B", "C", "D").contains(key)) {
+                    compactKeys.add(key);
+                }
+            }
+            if (compactKeys.size() == lettersOnly.length()) {
+                return compactKeys;
+            }
+        }
+
+        Matcher keyMatcher = Pattern.compile("\\b([A-D])\\b", Pattern.CASE_INSENSITIVE).matcher(answer);
+        List<String> keyed = new ArrayList<>();
+        while (keyMatcher.find()) {
+            keyed.add(keyMatcher.group(1).toUpperCase());
+        }
+        return keyed.size() > 1 ? keyed : tokens;
     }
 
     private List<QuestionBankItem> generateImportedQuestions(

@@ -3,6 +3,19 @@
 }
 
 <div class="container quiz-page" [class.modern-settings-page]="isSettingsMode()" [class.modern-builder-page]="isQuestionsMode()" [class.question-bank-page]="isBankMode()">
+  <input
+    #importQuestionFileInput
+    class="pdf-generator-input"
+    type="file"
+    accept=".pdf"
+    (change)="onImportQuestionFileChange($event)">
+
+  @if ((isQuestionsMode() || isBankMode()) && (importStatusMessage || importErrorMessage)) {
+    <div class="pdf-import-feedback" [class.error]="!!importErrorMessage">
+      {{ importErrorMessage || importStatusMessage }}
+    </div>
+  }
+
   @if (!isSettingsMode() && !isQuestionsMode() && !isBankMode()) {
     <section class="style-hero lecturer-course-topbar panel">
       <button class="lecturer-course-brand" type="button" routerLink="/lecturer/dashboard">
@@ -60,6 +73,7 @@
       </nav>
       <div class="bank-page-title-row">
         <div>
+          <p class="bank-page-kicker">Question Bank</p>
           <h1>{{ bankCourseTitle() }}</h1>
         </div>
         <label class="bank-course-select">
@@ -140,7 +154,7 @@
         <button class="modern-menu-btn" type="button" aria-label="Menu">&#9776;</button>
         <div>
           <p>Question Builder</p>
-          <h1>{{ quizForm.title.trim() || "Data Management and Integration Quiz" }}</h1>
+          <h1>{{ quizForm.title.trim() || "Untitled quiz" }}</h1>
         </div>
         <div class="modern-builder-actions">
           <button class="modern-btn ghost" type="button" (click)="createQuizAndDisplay()">Preview Quiz</button>
@@ -164,7 +178,7 @@
             </button>
             <button type="button" (click)="goToBuilderStep(3)">
               <span>3</span>
-              <div><strong>Review &amp; Publish</strong><small>Final check before publish</small></div>
+              <div><strong>Add Question</strong><small>Add and manage questions</small></div>
             </button>
           </nav>
 
@@ -175,6 +189,9 @@
                 <p>Add questions manually or import from your question bank.</p>
               </div>
               <div>
+                <button class="modern-btn ghost pdf-generate-btn" type="button" [disabled]="importingQuestions || !selectedCourseId" (click)="openPdfQuestionGenerator()">
+                  {{ importingQuestions ? "Generating..." : "Generate Question from PDF" }}
+                </button>
                 <button class="modern-btn ghost" type="button" (click)="openQuestionLibrary()">Import Question Bank</button>
                 <button class="modern-btn primary" type="button" (click)="openModernWidgetList()">Add Question</button>
               </div>
@@ -327,7 +344,27 @@
                       </span>
                     </div>
                     <h3>{{ questionBankDisplayPrompt(item) || item.prompt }}</h3>
-                    <p>{{ questionTypeCountLabel(item) }}</p>
+                    <div class="modern-question-meta-row">
+                      <span>{{ questionTypeCountLabel(item) }}</span>
+                      <span>Topic: {{ item.topicTag || item.moduleTag || "-" }}</span>
+                      <span>Difficulty: {{ difficultyLabel(item) }}</span>
+                    </div>
+                    @if (questionAnswerDetails(item).length > 0) {
+                      <div class="modern-answer-preview">
+                        <strong>Answer details</strong>
+                        <div class="modern-answer-grid">
+                          @for (answer of questionAnswerDetails(item); track answer.label) {
+                            <div class="modern-answer-row" [class.correct]="answer.correct">
+                              <span class="modern-answer-label">{{ answer.label }}</span>
+                              <span class="modern-answer-text">{{ answer.text }}</span>
+                              @if (answer.correct) {
+                                <span class="modern-answer-correct">Correct</span>
+                              }
+                            </div>
+                          }
+                        </div>
+                      </div>
+                    }
                   </div>
                   <div class="modern-question-actions">
                     <button type="button" class="modern-icon-btn" (click)="openEditQuestion(item)">Copy</button>
@@ -462,7 +499,7 @@
                 name="description"
                 rows="2"
                 [(ngModel)]="quizForm.description"
-                placeholder="This quiz covers key topics from the lesson.">
+                placeholder="Enter instructions for students.">
               </textarea>
             </div>
 
@@ -828,7 +865,7 @@
           <p>Set up your quiz details, access rules and feedback for students.</p>
         </div>
         <div class="modern-head-actions">
-          <button class="modern-btn ghost" type="button" [disabled]="savingQuiz" (click)="saveSettingsDraft()">Save Draft</button>
+          <button class="modern-btn ghost" type="button" [disabled]="savingQuiz" (click)="saveSettingsDraft()">Save</button>
           <button class="modern-btn ghost" type="button" [disabled]="savingQuiz" (click)="createQuizAndDisplay()">Preview</button>
           <button class="modern-btn primary" type="button" [disabled]="savingQuiz" (click)="publishQuizFromSettings()">
             {{ savingQuiz ? "Publishing..." : "Publish Quiz" }}
@@ -838,25 +875,43 @@
 
       <section class="modern-settings-card">
         <nav class="modern-stepper" aria-label="Quiz setup steps">
-          <button type="button" class="active" (click)="scrollToSettingsSection('general')">
+          <button
+            type="button"
+            [class.active]="isSettingsSectionOpen('general')"
+            [class.complete]="settingsSectionStatus('general') === 'complete'"
+            [class.error]="settingsSectionStatus('general') === 'error'"
+            (click)="scrollToSettingsSection('general')">
             <span>1</span>
             <strong>Quiz Details</strong>
             <small>Basic information</small>
           </button>
-          <button type="button" (click)="scrollToSettingsSection('timing')">
+          <button
+            type="button"
+            [class.active]="isSettingsSectionOpen('timing')"
+            [class.complete]="settingsSectionStatus('timing') === 'complete'"
+            [class.error]="settingsSectionStatus('timing') === 'error'"
+            (click)="scrollToSettingsSection('timing')">
             <span>2</span>
             <strong>Access &amp; Timing</strong>
             <small>When and how students take it</small>
           </button>
-          <button type="button" (click)="scrollToSettingsSection('grade')">
+          <button
+            type="button"
+            [class.active]="isSettingsSectionOpen('grade')"
+            [class.complete]="settingsSectionStatus('grade') === 'complete'"
+            [class.error]="settingsSectionStatus('grade') === 'error'"
+            (click)="scrollToSettingsSection('grade')">
             <span>3</span>
             <strong>Feedback &amp; Review</strong>
             <small>Results and feedback settings</small>
           </button>
-          <button type="button" (click)="createQuizAndDisplay()">
+          <button
+            type="button"
+            [class.complete]="reviewPublishStepComplete()"
+            (click)="createQuizAndDisplay()">
             <span>4</span>
-            <strong>Review &amp; Publish</strong>
-            <small>Final checks before publish</small>
+            <strong>Add Question</strong>
+            <small>Add and manage questions</small>
           </button>
         </nav>
 
@@ -873,7 +928,7 @@
 
               <label class="modern-field full">
                 <span>Quiz Name *</span>
-                <input id="quizTitleSettings" name="modernQuizTitleSettings" [(ngModel)]="quizForm.title" placeholder="Data Management and Integration Quiz">
+                <input id="quizTitleSettings" name="modernQuizTitleSettings" [(ngModel)]="quizForm.title" placeholder="Enter quiz name">
                 <small>{{ quizForm.title.length || 0 }}/100</small>
               </label>
 
@@ -924,7 +979,7 @@
                   rows="4"
                   [(ngModel)]="quizForm.description"
                   name="modernQuizDescriptionSettings"
-                  placeholder="This quiz covers key topics from the lesson.">
+                  placeholder="Enter instructions for students.">
                 </textarea>
                 <small>{{ quizForm.description.length || 0 }}/500</small>
               </label>
@@ -951,6 +1006,7 @@
                   <label class="modern-field">
                     <span>Question Display</span>
                     <select [(ngModel)]="quizForm.questionDisplayMode" name="modernQuestionDisplayModeSettings">
+                      <option value="">Select question display</option>
                       <option value="ONE_BY_ONE">One by one</option>
                       <option value="ALL_AT_ONCE">All at once</option>
                     </select>
@@ -973,6 +1029,10 @@
                 </div>
               </summary>
               <div class="modern-accordion-body">
+                <div class="modern-settings-subtitle">
+                  <strong>Review timing</strong>
+                  <small>Choose when students can open their quiz review after submission.</small>
+                </div>
                 <div class="modern-release-grid">
                   <label [class.active]="quizForm.reviewTiming === 'IMMEDIATE_AFTER_SUBMISSION'">
                     <input type="radio" name="modernReviewTimingSettings" [checked]="quizForm.reviewTiming === 'IMMEDIATE_AFTER_SUBMISSION'" (change)="setReviewTiming('IMMEDIATE_AFTER_SUBMISSION')">
@@ -990,6 +1050,10 @@
                     <input type="radio" name="modernReviewTimingSettings" [checked]="quizForm.reviewTiming === 'HIDDEN'" (change)="setReviewTiming('HIDDEN')">
                     Hidden
                   </label>
+                </div>
+                <div class="modern-settings-subtitle">
+                  <strong>Feedback visibility</strong>
+                  <small>Select which feedback details students can see during review.</small>
                 </div>
                 <div class="modern-check-grid compact">
                   <label><input type="checkbox" [(ngModel)]="quizForm.showSelectedAnswer" name="modernShowSelectedAnswerSettings"> Show Student Selected Answer</label>
@@ -1018,11 +1082,11 @@
             </div>
             <div class="summary-row">
               <span class="summary-icon green">P</span>
-              <div><strong>Pass Mark</strong><small>{{ quizForm.passingMark }}%</small></div>
+              <div><strong>Pass Mark</strong><small>{{ quizForm.passingMark === "" ? "-" : (quizForm.passingMark + "%") }}</small></div>
             </div>
             <div class="summary-row">
               <span class="summary-icon purple">A</span>
-              <div><strong>Attempts</strong><small>{{ quizForm.maxAttempts }} attempts</small></div>
+              <div><strong>Attempts</strong><small>{{ quizForm.maxAttempts === "" ? "-" : (quizForm.maxAttempts + " attempts") }}</small></div>
             </div>
             <div class="summary-row">
               <span class="summary-icon orange">T</span>
@@ -1032,6 +1096,7 @@
               <span class="summary-icon red">R</span>
               <div><strong>Release</strong><small>{{ quizReleaseSummary() }}</small></div>
             </div>
+            <button class="modern-save-btn" type="button" [disabled]="savingQuiz" (click)="saveSettingsDraft()">Save</button>
             <button class="modern-edit-btn" type="button" (click)="scrollToSettingsSection('general')">Edit All Settings</button>
           </aside>
         </div>
@@ -1123,7 +1188,7 @@
                     name="quizDescriptionSettings"
                     rows="4"
                     [(ngModel)]="quizForm.description"
-                    placeholder="This quiz covers key topics from the lesson.">
+                    placeholder="Enter instructions for students.">
                   </textarea>
                 </div>
               </div>
@@ -1177,6 +1242,7 @@
                 <div class="field-block compact">
                   <label>Question display mode</label>
                   <select [(ngModel)]="quizForm.questionDisplayMode" name="questionDisplayModeSettings">
+                    <option value="">Select question display</option>
                     <option value="ONE_BY_ONE">One by one</option>
                     <option value="ALL_AT_ONCE">All at once</option>
                   </select>
@@ -1349,63 +1415,39 @@
           <h2>Quiz List & Publish</h2>
           <span>Manage draft, published, preview, export, and monitoring actions in one table.</span>
         </div>
-        <strong class="section-count-pill">{{ quizzes.length }} quiz(s)</strong>
+        <strong class="section-count-pill">{{ quizCountLabel() }}</strong>
       </header>
 
       <section class="quiz-transfer-panel">
         <header class="quiz-transfer-head">
           <span class="quiz-transfer-icon" aria-hidden="true">D</span>
-          <h3>EduSIM Quiz Import / Export</h3>
+          <h3>EduSIM Quiz Export</h3>
         </header>
 
         <nav class="quiz-transfer-tabs" aria-label="Quiz import export tabs">
-          <button type="button" [class.active]="quizTransferTab === 'import'" (click)="setQuizTransferTab('import')">Import Quiz</button>
-          <button type="button" [class.active]="quizTransferTab === 'export'" (click)="setQuizTransferTab('export')">Quiz Export Options</button>
+          <button type="button" class="active">Quiz Export Options</button>
         </nav>
 
-        @if (quizTransferTab === "import") {
-          <div class="quiz-transfer-body">
-            <div class="quiz-transfer-row">
-              <label class="transfer-file-field">
-                <span>Import Quiz</span>
-                <input type="file" accept=".csv,.xls,.xlsx" (change)="onQuizImportFileChange($event)">
-              </label>
-              <label class="transfer-check">
-                <input type="checkbox" [(ngModel)]="quizImportDeleteExistingQuestions" name="deleteExistingQuizQuestions">
-                Delete existing questions before import
-              </label>
-              <button class="btn btn-action" type="button" [disabled]="quizImporting || !quizImportFile" (click)="importQuizBackup()">
-                {{ quizImporting ? "Importing..." : "Import" }}
-              </button>
-            </div>
-
-            <div class="quiz-template-line">
-              <strong>Import/Export Standard Template Files</strong>
-              <button class="btn btn-outline" type="button" (click)="downloadQuizTemplate()">Download Template</button>
-            </div>
+        <div class="quiz-transfer-body export-body">
+          <div class="quiz-export-copy">
+            <h3>Export Quizzes For Backup Or Migration</h3>
+            <p>Easily download your quizzes into an Excel-compatible CSV file to keep a secure backup or move them to another EduSIM course.</p>
           </div>
-        } @else {
-          <div class="quiz-transfer-body export-body">
-            <div class="quiz-export-copy">
-              <h3>Export Quizzes For Backup Or Migration</h3>
-              <p>Easily download your quizzes into an Excel-compatible CSV file to keep a secure backup or move them to another EduSIM course.</p>
-            </div>
-            <div class="quiz-export-actions">
-              <label>
-                <span>Export scope</span>
-                <select [(ngModel)]="quizExportSelection" name="quizExportSelection">
-                  <option value="ALL">All quizzes in selected course</option>
-                  @for (quiz of quizzes; track quiz.quizId) {
-                    <option [value]="quiz.quizId">{{ quiz.title }}</option>
-                  }
-                </select>
-              </label>
-              <button class="btn btn-action" type="button" [disabled]="quizExporting || quizzes.length === 0" (click)="exportQuizBackup()">
-                {{ quizExporting ? "Exporting..." : "Download Export" }}
-              </button>
-            </div>
+          <div class="quiz-export-actions">
+            <label>
+              <span>Export scope</span>
+              <select [(ngModel)]="quizExportSelection" name="quizExportSelection">
+                <option value="ALL">All quizzes in selected course</option>
+                @for (quiz of quizzes; track quiz.quizId) {
+                  <option [value]="quiz.quizId">{{ quiz.title }}</option>
+                }
+              </select>
+            </label>
+            <button class="btn btn-action" type="button" [disabled]="quizExporting || quizzes.length === 0" (click)="exportQuizBackup()">
+              {{ quizExporting ? "Exporting..." : "Download Export" }}
+            </button>
           </div>
-        }
+        </div>
 
         @if (quizTransferStatusMessage) {
           <p class="import-feedback import-success">{{ quizTransferStatusMessage }}</p>
@@ -1485,6 +1527,15 @@
                       <span>Release Result</span>
                     </button>
                   }
+                  <button class="mini-link-btn" type="button" title="Edit quiz" aria-label="Edit quiz" (click)="editQuiz(quiz)">
+                    <span class="mini-action-icon" aria-hidden="true">
+                      <svg class="mini-icon-svg" viewBox="0 0 24 24" focusable="false">
+                      <path d="M4 20h4L19 9l-4-4L4 16v4Z"></path>
+                      <path d="m13 7 4 4"></path>
+                      </svg>
+                    </span>
+                    <span>Edit</span>
+                  </button>
                   <button class="mini-link-btn" type="button" title="Preview" aria-label="Preview" (click)="openQuizPreview(quiz.quizId)">
                     <span class="mini-action-icon" aria-hidden="true">
                       <svg class="mini-icon-svg" viewBox="0 0 24 24" focusable="false">
@@ -1542,14 +1593,37 @@
           <h2>Question Bank Workspace</h2>
           <p>Select questions for a quiz, create a new item, or generate drafts from documents.</p>
         </div>
-        <div class="bank-create-wrap">
-          <button type="button" class="btn btn-action bank-create-btn" (click)="openCreateQuestionQuick()">
-            <span aria-hidden="true">+</span>
-            Create New Question
+        <div class="bank-workspace-actions">
+          <button type="button" class="btn pdf-bank-generate-btn" [disabled]="importingQuestions || !selectedCourseId" (click)="openPdfQuestionGenerator()">
+            {{ importingQuestions ? "Generating..." : "Generate Question from PDF" }}
           </button>
-          <button type="button" class="bank-create-chevron" aria-label="More create options" (click)="openCreateQuestionQuick()">&#8964;</button>
+          <div class="bank-create-wrap">
+            <button type="button" class="btn btn-action bank-create-btn" (click)="openCreateQuestionQuick()">
+              <span aria-hidden="true">+</span>
+              Create New Question
+            </button>
+            <button type="button" class="bank-create-chevron" aria-label="More create options" (click)="openCreateQuestionQuick()">&#8964;</button>
+          </div>
         </div>
       </header>
+
+      @if (selectedQuestionIds.length > 0) {
+        <div class="bank-selection-toolbar">
+          <div>
+            <strong>{{ selectedCountLabel() }}</strong>
+            <span>Choose an action for the selected question(s).</span>
+          </div>
+          <div class="bank-selection-actions">
+            <button type="button" class="bank-clear-selection" (click)="clearSelectedQuestions()">
+              Clear selection
+            </button>
+            <button type="button" class="bank-bulk-delete" (click)="deleteSelectedQuestions()">
+              <span aria-hidden="true">&#128465;</span>
+              {{ bulkDeleteButtonLabel() }}
+            </button>
+          </div>
+        </div>
+      }
 
       <div class="bank-table-wrap">
         <table class="bank-table">

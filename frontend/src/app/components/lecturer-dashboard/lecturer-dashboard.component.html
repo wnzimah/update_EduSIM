@@ -4,8 +4,79 @@
   } @else if (errorMessage && !dashboard) {
     <p class="error">{{ errorMessage }}</p>
   } @else if (dashboard) {
+    <header class="lecturer-dashboard-head">
+      <div class="lecturer-title-wrap">
+        <div>
+          <p>Welcome back,</p>
+          <h1>{{ lecturerName() }} <span aria-hidden="true">&#128075;</span></h1>
+          <small>Here's what's happening in your lecturer hub today.</small>
+        </div>
+      </div>
+
+    </header>
+
     <section class="panel lecturer-layout">
       <section class="main-panel">
+        <section
+          class="lecturer-hero"
+          aria-label="Lecturer dashboard overview"
+          [style.background-image]="lecturerHeroBackground()">
+          <div class="hero-overlay">
+            <p class="hero-kicker">{{ activeHeroSlide().kicker }}</p>
+            <h2>{{ activeHeroSlide().title }}</h2>
+            <p>{{ activeHeroSlide().body }}</p>
+            <div class="hero-dots" aria-label="Lecturer dashboard slides">
+              @for (slide of heroSlides; track slide.title; let index = $index) {
+                <button
+                  type="button"
+                  [class.active]="index === activeHeroSlideIndex"
+                  [attr.aria-label]="'Show slide ' + (index + 1)"
+                  (click)="setHeroSlide(index)">
+                </button>
+              }
+            </div>
+          </div>
+          <div class="hero-controls">
+            <button type="button" aria-label="Previous lecturer dashboard slide" (click)="previousHeroSlide()">&lsaquo;</button>
+            <button type="button" aria-label="Next lecturer dashboard slide" (click)="nextHeroSlide()">&rsaquo;</button>
+          </div>
+        </section>
+
+        <section class="lecturer-stat-grid" aria-label="Lecturer dashboard statistics">
+          <article class="lecturer-stat-card courses">
+            <span aria-hidden="true"></span>
+            <div>
+              <strong>{{ statValue("courses") }}</strong>
+              <p>Courses Managed</p>
+              <a routerLink="/lecturer/manage">View all courses <i aria-hidden="true">&rarr;</i></a>
+            </div>
+          </article>
+          <article class="lecturer-stat-card videos">
+            <span aria-hidden="true"></span>
+            <div>
+              <strong>{{ statValue("videos") }}</strong>
+              <p>Total Videos</p>
+              <a routerLink="/lecturer/manage">View all videos <i aria-hidden="true">&rarr;</i></a>
+            </div>
+          </article>
+          <article class="lecturer-stat-card quizzes">
+            <span aria-hidden="true"></span>
+            <div>
+              <strong>{{ statValue("quizzes") }}</strong>
+              <p>Total Quizzes</p>
+              <a routerLink="/lecturer/quiz-settings">View all quizzes <i aria-hidden="true">&rarr;</i></a>
+            </div>
+          </article>
+          <article class="lecturer-stat-card students">
+            <span aria-hidden="true"></span>
+            <div>
+              <strong>{{ statValue("students") }}</strong>
+              <p>Enrolled Students</p>
+              <a routerLink="/lecturer/student-attempts">View students <i aria-hidden="true">&rarr;</i></a>
+            </div>
+          </article>
+        </section>
+
         <section class="panel block course-overview-block">
           <div class="overview-head">
             <h2>Course Overview</h2>
@@ -158,8 +229,49 @@
 
       <aside class="side-panel">
         <section class="calendar-card">
+          <div class="month-head">
+            <h3>{{ monthLabel }}</h3>
+            <div class="month-nav" aria-label="Calendar month navigation">
+              <button type="button" aria-label="Previous month" (click)="previousMonth()">&lsaquo;</button>
+              <button type="button" aria-label="Next month" (click)="nextMonth()">&rsaquo;</button>
+            </div>
+          </div>
+
+          <div class="calendar-grid" aria-label="Lecturer calendar">
+            @for (dayName of weekDays; track dayName) {
+              <span class="weekday">{{ dayName }}</span>
+            }
+            @for (week of monthGrid; track $index) {
+              @for (day of week; track $index) {
+                <button
+                  type="button"
+                  class="day-cell"
+                  [class.today]="isToday(day)"
+                  [class.selected]="isSelectedDay(day)"
+                  [class.has-entry]="entriesForDay(day).length > 0"
+                  [disabled]="!day"
+                  (click)="selectCalendarDay(day)">
+                  <span class="day-number">{{ day || "" }}</span>
+                  @if (entriesForDay(day).length > 0) {
+                    <span class="day-entries">
+                      @for (entry of entriesForDay(day); track entry.id) {
+                        <span
+                          class="day-entry"
+                          [class.event]="entry.type === 'EVENT'"
+                          [class.marking]="entry.type === 'MARKING'">
+                          {{ entry.title }}
+                        </span>
+                      }
+                    </span>
+                  }
+                </button>
+              }
+            }
+          </div>
+
           <div class="calendar-summary-head">
             <div>
+              <p>Selected Date</p>
               <h3>{{ selectedDateLabel() }}</h3>
               @if (selectedDateEntries().length === 0) {
                 <p>No event for this date.</p>

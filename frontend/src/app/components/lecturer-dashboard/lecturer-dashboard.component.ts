@@ -23,6 +23,13 @@ type TimelineEntry = {
   score?: number;
 };
 
+type HeroSlide = {
+  kicker: string;
+  title: string;
+  body: string;
+  image: string;
+};
+
 @Component({
   selector: "app-lecturer-dashboard",
   standalone: true,
@@ -40,6 +47,33 @@ export class LecturerDashboardComponent implements OnInit {
   errorMessage = "";
   statusMessage = "";
   courseSearch = "";
+  activeHeroSlideIndex = 0;
+  readonly heroSlides: HeroSlide[] = [
+    {
+      kicker: "EduSIM Lecturer Portal",
+      title: "Guide Learning and Assessment from One Place",
+      body: "Manage course content, publish quizzes, and monitor student outcomes with a clear workflow.",
+      image: "https://images.unsplash.com/photo-1521587760476-6c12a4b040da?auto=format&fit=crop&w=1800&q=80"
+    },
+    {
+      kicker: "Course Library",
+      title: "Organise Videos, Notes, and Materials Clearly",
+      body: "Keep every course resource easy to find so students can continue learning without friction.",
+      image: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?auto=format&fit=crop&w=1800&q=80"
+    },
+    {
+      kicker: "Assessment Workflow",
+      title: "Build Quizzes and Review Attempts Faster",
+      body: "Create question banks, inspect submissions, and give useful feedback from the lecturer hub.",
+      image: "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=1800&q=80"
+    },
+    {
+      kicker: "Progress Insight",
+      title: "Track Student Outcomes with Confidence",
+      body: "Spot patterns early and support learners before the next assessment opens.",
+      image: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?auto=format&fit=crop&w=1800&q=80"
+    }
+  ];
   readonly weekDays = ["Mon", "Tue", "Wed", "Thu", "Fri", "Sat", "Sun"];
   monthLabel = "";
   monthGrid: Array<Array<number | null>> = [];
@@ -85,6 +119,26 @@ export class LecturerDashboardComponent implements OnInit {
   nextMonth(): void {
     this.viewingDate = new Date(this.viewingDate.getFullYear(), this.viewingDate.getMonth() + 1, 1);
     this.buildCalendar();
+  }
+
+  activeHeroSlide(): HeroSlide {
+    return this.heroSlides[this.activeHeroSlideIndex];
+  }
+
+  lecturerHeroBackground(): string {
+    return `linear-gradient(95deg, rgba(8, 28, 84, 0.96) 0%, rgba(18, 54, 122, 0.86) 45%, rgba(25, 52, 99, 0.38) 100%), url("${this.activeHeroSlide().image}")`;
+  }
+
+  previousHeroSlide(): void {
+    this.activeHeroSlideIndex = (this.activeHeroSlideIndex - 1 + this.heroSlides.length) % this.heroSlides.length;
+  }
+
+  nextHeroSlide(): void {
+    this.activeHeroSlideIndex = (this.activeHeroSlideIndex + 1) % this.heroSlides.length;
+  }
+
+  setHeroSlide(index: number): void {
+    this.activeHeroSlideIndex = index;
   }
 
   selectCalendarDay(day: number | null): void {
@@ -158,6 +212,33 @@ export class LecturerDashboardComponent implements OnInit {
     return this.buildTimelineEntries()
       .filter((entry) => this.toDateKey(entry.occurredAt) === this.selectedDateKey)
       .sort((a, b) => this.safeTimestamp(a.occurredAt) - this.safeTimestamp(b.occurredAt));
+  }
+
+  lecturerName(): string {
+    return String(this.dashboard?.lecturer?.name ?? "Lecturer").trim() || "Lecturer";
+  }
+
+  lecturerInitials(): string {
+    const parts = this.lecturerName()
+      .split(/\s+/)
+      .filter(Boolean);
+    return parts.slice(0, 2).map((part) => part[0]?.toUpperCase()).join("") || "L";
+  }
+
+  statValue(key: "courses" | "videos" | "quizzes" | "students"): number {
+    const value = Number(this.dashboard?.stats?.[key] ?? 0);
+    if (Number.isFinite(value)) {
+      return value;
+    }
+    return 0;
+  }
+
+  notificationCount(): number {
+    return this.filteredRecentActivity().length;
+  }
+
+  openAppSidebar(): void {
+    document.querySelector<HTMLButtonElement>(".sidebar-open-btn")?.click();
   }
 
   timelineTypeLabel(type: TimelineEntryType): string {

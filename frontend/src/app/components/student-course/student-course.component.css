@@ -1,6 +1,8 @@
 .course-player-page {
   min-height: calc(100dvh - 190px);
-  background: #f6f7f8;
+  background:
+    radial-gradient(circle at 8% 8%, rgba(37, 99, 235, 0.10), transparent 30%),
+    linear-gradient(180deg, #e8f0fa 0%, #dfe8f4 100%);
   color: #101820;
 }
 
@@ -1816,5 +1818,249 @@
   .outline-panel {
     height: calc(100dvh - 24px) !important;
     min-height: calc(100dvh - 24px) !important;
+  }
+}
+
+/* Compact course view to match the smaller learning window reference. */
+.course-player-page {
+  min-height: calc(100dvh - 128px) !important;
+}
+
+.course-topbar {
+  min-height: 78px !important;
+  grid-template-columns: 128px minmax(0, 1fr) auto !important;
+}
+
+.course-brand {
+  height: 58px !important;
+}
+
+.course-brand span {
+  font-size: 13px !important;
+}
+
+.course-brand strong {
+  font-size: 15px !important;
+}
+
+.course-title-block {
+  padding: 0 22px !important;
+}
+
+.course-title-block p {
+  margin-bottom: 4px !important;
+  font-size: 10px !important;
+}
+
+.course-topbar h1 {
+  font-size: clamp(24px, 2vw, 32px) !important;
+}
+
+.course-window-actions {
+  height: 78px !important;
+}
+
+.mini-action {
+  min-width: 70px !important;
+  padding: 0 14px !important;
+  font-size: 12px !important;
+}
+
+.course-window-actions button:not(.mini-action) {
+  width: 64px !important;
+  font-size: 44px !important;
+}
+
+.course-overview-strip {
+  margin: 16px clamp(16px, 1.8vw, 28px) 0 !important;
+  border-radius: 18px !important;
+  padding: 10px !important;
+  gap: 10px !important;
+}
+
+.course-overview-strip article {
+  min-height: 70px !important;
+  border-radius: 12px !important;
+  padding: 12px !important;
+}
+
+.course-overview-strip span {
+  font-size: 24px !important;
+}
+
+.course-overview-strip p {
+  margin-top: 6px !important;
+  font-size: 10px !important;
+}
+
+.course-workspace {
+  grid-template-columns: minmax(0, 900px) minmax(300px, 350px) !important;
+  gap: 16px !important;
+  padding: 16px clamp(16px, 1.8vw, 28px) 32px !important;
+}
+
+.lesson-stage {
+  max-width: 900px !important;
+}
+
+.lesson-toolbar {
+  min-height: 58px !important;
+  border-radius: 18px 18px 0 0 !important;
+  padding: 0 18px !important;
+  gap: 12px !important;
+}
+
+.lesson-toolbar button {
+  font-size: 24px !important;
+}
+
+.lesson-toolbar h2 {
+  font-size: 18px !important;
+}
+
+.toolbar-icons {
+  gap: 10px !important;
+}
+
+.toolbar-icons span {
+  min-width: 30px !important;
+  height: 30px !important;
+  border-radius: 8px !important;
+  font-size: 11px !important;
+}
+
+.lesson-hero {
+  min-height: 330px !important;
+  border-radius: 0 0 22px 22px !important;
+}
+
+.lesson-hero iframe,
+.inline-video-player,
+.video-cover {
+  min-height: 330px !important;
+  height: min(42dvh, 420px) !important;
+}
+
+.lesson-overlay {
+  padding: 18px 22px !important;
+}
+
+.lesson-overlay p {
+  font-size: 16px !important;
+}
+
+.lesson-details,
+.coach-panel,
+.comments-panel {
+  margin-top: 12px !important;
+  border-radius: 16px !important;
+  padding: 18px 22px !important;
+}
+
+.lesson-details h3,
+.comment-head h3 {
+  font-size: 23px !important;
+}
+
+.lesson-details p {
+  font-size: 14px !important;
+}
+
+.outline-panel {
+  top: 148px !important;
+  height: calc(100dvh - 32px) !important;
+  min-height: calc(100dvh - 32px) !important;
+  border-radius: 20px !important;
+  padding: 16px !important;
+}
+
+.path-dock-head {
+  margin-bottom: 14px !important;
+}
+
+.path-dock-head h2 {
+  font-size: 21px !important;
+}
+
+.path-dock-head span {
+  min-width: 52px !important;
+  height: 52px !important;
+  border-radius: 14px !important;
+  font-size: 16px !important;
+}
+
+.outline-search {
+  margin: 0 0 14px !important;
+}
+
+.outline-search input {
+  min-height: 38px !important;
+  font-size: 14px !important;
+}
+
+.module-card.open,
+.dock-card {
+  border-radius: 18px !important;
+  margin-top: 12px !important;
+}
+
+.module-head {
+  padding: 16px 16px 10px !important;
+}
+
+.module-head h2 {
+  font-size: 15px !important;
+  line-height: 1.45 !important;
+}
+
+.module-head p,
+.dock-toggle small {
+  font-size: 12px !important;
+}
+
+.module-progress {
+  margin: 0 16px 8px !important;
+}
+
+.lesson-tree {
+  padding: 8px 12px 14px !important;
+  gap: 8px !important;
+}
+
+.lesson-row {
+  min-height: 44px !important;
+  border-radius: 12px !important;
+  padding: 8px !important;
+  font-size: 13px !important;
+}
+
+.dock-toggle {
+  padding: 14px !important;
+}
+
+.dock-toggle strong {
+  font-size: 15px !important;
+}
+
+.dock-toggle b {
+  width: 30px !important;
+  height: 30px !important;
+  border-radius: 8px !important;
+  font-size: 20px !important;
+}
+
+@media (min-width: 1181px) {
+  .course-workspace {
+    grid-template-columns: minmax(0, 900px) minmax(300px, 350px) !important;
+  }
+}
+
+@media (max-width: 1180px) {
+  .course-workspace {
+    grid-template-columns: 1fr !important;
+  }
+
+  .outline-panel {
+    position: static !important;
   }
 }

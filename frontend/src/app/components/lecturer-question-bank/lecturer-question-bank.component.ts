@@ -13,8 +13,13 @@ type QuestionTextMode = "TEXT_ONLY" | "TEXT_WITH_META" | "HIDDEN";
 type EditorTool = "BOLD" | "ITALIC" | "HEADING" | "QUOTE" | "LINK" | "IMAGE" | "BULLET_LIST" | "NUMBER_LIST";
 type SettingsSection = "general" | "timing" | "grade";
 type ImportRole = "LECTURER" | "ADMINISTRATOR";
-type ReviewTiming = "IMMEDIATE_AFTER_SUBMISSION" | "AFTER_DUE_DATE" | "MANUAL_RELEASE" | "HIDDEN";
+type ReviewTiming = "" | "IMMEDIATE_AFTER_SUBMISSION" | "AFTER_DUE_DATE" | "MANUAL_RELEASE" | "HIDDEN";
 type SettingsHelpKey = "passingMark" | "maxAttempts" | "timeLimit" | "showCorrectAnswer" | "shuffleQuestions" | "debugLogs" | "minimumImportRole";
+
+type QuizValidationResult = {
+  message: string;
+  section: SettingsSection;
+};
 
 type QuestionTypeOption = {
   value: QuestionType;
@@ -77,10 +82,6 @@ export class LecturerQuestionBankComponent implements OnInit {
   importQuestionFile: File | null = null;
   importStatusMessage = "";
   importErrorMessage = "";
-  quizTransferTab: "import" | "export" = "import";
-  quizImportFile: File | null = null;
-  quizImportDeleteExistingQuestions = false;
-  quizImporting = false;
   quizExporting = false;
   quizExportSelection = "ALL";
   quizTransferStatusMessage = "";
@@ -236,45 +237,9 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   questionForm = this.defaultQuestionForm();
 
-  quizForm = {
-    title: "",
-    description: "This quiz covers key topics from the lesson.",
-    gradeOut: 20,
-    openDate: this.defaultOpenDate(),
-    openTime: "08:00",
-    closeDate: this.defaultDueDate(),
-    closeTime: "23:59",
-    resultReleaseDate: this.defaultDueDate(),
-    resultReleaseTime: "23:59",
-    timeLimitHours: 0,
-    timeLimitPartMinutes: 3,
-    timeLimitMinutes: 3,
-    maxAttempts: 3,
-    passingMark: 20,
-    published: true,
-    unlockAfterVideos: true,
-    shuffleQuestions: true,
-    shuffleAnswers: true,
-    questionDisplayMode: "ONE_BY_ONE",
-    reviewTiming: "IMMEDIATE_AFTER_SUBMISSION" as ReviewTiming,
-    showResultImmediately: true,
-    showScoreAfterSubmission: true,
-    showSelectedAnswer: true,
-    showCorrectAnswer: true,
-    showExplanation: true,
-    showRelatedConcept: true,
-    showLearningRecommendation: true,
-    showConfidence: true,
-    showScoreBreakdown: true,
-    showStudentAnswerReview: true,
-    enableDebugLogs: true,
-    minimumImportRole: "ADMINISTRATOR" as ImportRole,
-    autoSelectCount: 10
-  };
+  quizForm: any = this.defaultQuizForm();
 
   ngOnInit(): void {
-    this.restoreQuickControlsFromStorage();
-
     this.route.data.subscribe((data) => {
       const mode = String(data["mode"] ?? "").trim().toLowerCase();
       if (mode === "bank") {
@@ -333,9 +298,6 @@ export class LecturerQuestionBankComponent implements OnInit {
           if (!this.questionForm.topicTag.trim()) {
             this.questionForm.topicTag = selectedCourse.title;
           }
-          if (!this.quizForm.title) {
-            this.quizForm.title = `${selectedCourse.title} Quiz`;
-          }
         }
         const fromQuizBuilderFlow = this.isBankMode() && this.requestedSource === "quiz";
         if (!this.isBankMode() || fromQuizBuilderFlow) {
@@ -366,7 +328,7 @@ export class LecturerQuestionBankComponent implements OnInit {
         const validIds = new Set(normalized.map((item) => item.questionBankId));
         this.selectedQuestionIds = this.selectedQuestionIds
           .map((id) => this.asQuestionBankId(id))
-          .filter((id): id is number => id !== null && validIds.has(id));
+          .filter((id: number | null): id is number => id !== null && validIds.has(id));
       },
       error: (error) => this.errorMessage = this.extractApiMessage(error, "Failed to load question bank")
     });
@@ -595,6 +557,11 @@ export class LecturerQuestionBankComponent implements OnInit {
     return this.currentCourse()?.title ?? "";
   }
 
+  quizCountLabel(): string {
+    const count = this.quizzes.length;
+    return `${count} ${count === 1 ? "quiz" : "quizzes"}`;
+  }
+
   useSelectedInQuizDraft(): void {
     if (this.selectedQuestionIds.length === 0) {
       this.errorMessage = "Please select at least one question first.";
@@ -614,6 +581,73 @@ export class LecturerQuestionBankComponent implements OnInit {
     this.router.navigate(["/lecturer/quizzes", quizId, "preview"], {
       queryParams: {
         courseId: this.selectedCourseId ?? null
+      }
+    });
+  }
+
+  editQuiz(quiz: any): void {
+    this.clearMessages();
+
+    const quizId = Number(quiz?.quizId ?? 0);
+    if (!Number.isFinite(quizId) || quizId <= 0) {
+      this.errorMessage = "Unable to open quiz editor.";
+      return;
+    }
+
+    const courseId = Number(quiz?.courseId ?? this.selectedCourseId ?? 0);
+    if (Number.isFinite(courseId) && courseId > 0) {
+      this.selectedCourseId = courseId;
+    }
+
+    const feedbackSettings = quiz?.feedbackSettings && typeof quiz.feedbackSettings === "object"
+      ? quiz.feedbackSettings
+      : {};
+    const reviewTiming = this.normalizeReviewTiming(
+      quiz?.reviewTiming ?? feedbackSettings.reviewTiming ?? (quiz?.showResultImmediately ? "IMMEDIATE_AFTER_SUBMISSION" : "AFTER_DUE_DATE")
+    );
+
+    this.quizForm = {
+      ...this.defaultQuizForm(),
+      title: String(quiz?.title ?? ""),
+      description: String(quiz?.description ?? ""),
+      openDate: this.datePartFromDateTime(quiz?.openAt),
+      openTime: this.timePartFromDateTime(quiz?.openAt),
+      closeDate: this.datePartFromDateTime(quiz?.closeAt),
+      closeTime: this.timePartFromDateTime(quiz?.closeAt),
+      resultReleaseDate: this.datePartFromDateTime(quiz?.resultReleaseAt),
+      resultReleaseTime: this.timePartFromDateTime(quiz?.resultReleaseAt),
+      timeLimitMinutes: this.toNonNegativeInt(quiz?.timeLimitMinutes) || "",
+      maxAttempts: this.toNonNegativeInt(quiz?.maxAttempts) || "",
+      passingMark: this.toNonNegativeInt(quiz?.passingMark),
+      published: Boolean(quiz?.published),
+      shuffleQuestions: Boolean(quiz?.shuffleQuestions),
+      shuffleAnswers: Boolean(quiz?.shuffleAnswers),
+      questionDisplayMode: String(quiz?.questionDisplayMode ?? ""),
+      reviewTiming,
+      showResultImmediately: Boolean(quiz?.showResultImmediately),
+      showScoreAfterSubmission: Boolean(feedbackSettings.showScoreAfterSubmission),
+      showSelectedAnswer: Boolean(feedbackSettings.showSelectedAnswer),
+      showCorrectAnswer: Boolean(feedbackSettings.showCorrectAnswer),
+      showExplanation: Boolean(feedbackSettings.showExplanation),
+      showRelatedConcept: Boolean(feedbackSettings.showRelatedConcept),
+      showLearningRecommendation: Boolean(feedbackSettings.showLearningRecommendation),
+      showConfidence: Boolean(feedbackSettings.showConfidence),
+      showScoreBreakdown: Boolean(feedbackSettings.showScoreBreakdown),
+      showStudentAnswerReview: Boolean(feedbackSettings.showStudentAnswerReview)
+    };
+    this.syncTimeLimitPartsFromMinutes();
+
+    if (!this.persistQuizDraftToStorage()) {
+      this.errorMessage = "Unable to prepare quiz editor.";
+      return;
+    }
+
+    this.router.navigate(["/lecturer/quiz-builder"], {
+      queryParams: {
+        courseId: (this.selectedCourseId ?? courseId) || null,
+        courseTitle: this.currentCourseTitle() || quiz?.courseTitle || null,
+        quizId,
+        mode: "edit"
       }
     });
   }
@@ -815,6 +849,21 @@ export class LecturerQuestionBankComponent implements OnInit {
     this.importQuestionFile = input.files?.[0] ?? null;
     this.importStatusMessage = "";
     this.importErrorMessage = "";
+    if (this.importQuestionFile) {
+      this.importQuestionsFromFile();
+    }
+  }
+
+  openPdfQuestionGenerator(): void {
+    this.clearMessages();
+    this.importStatusMessage = "";
+    this.importErrorMessage = "";
+    if (!this.selectedCourseId) {
+      this.importErrorMessage = "Please select a course before generating questions from PDF.";
+      this.errorMessage = this.importErrorMessage;
+      return;
+    }
+    this.importQuestionFileInput?.nativeElement.click();
   }
 
   importQuestionsFromFile(): void {
@@ -840,10 +889,38 @@ export class LecturerQuestionBankComponent implements OnInit {
     this.importingQuestions = true;
     this.lecturerService.importQuestionBank(formData).subscribe({
       next: (response) => {
-        this.importStatusMessage = response?.message ?? "Questions imported successfully.";
+        const generatedQuestions = Array.isArray(response?.questions)
+          ? response.questions
+            .map((item: any) => this.normalizeQuestionBankItem(item))
+            .filter((item: any) => this.asQuestionBankId(item?.questionBankId) !== null)
+          : [];
+        const generatedIds = generatedQuestions
+          .map((item: any) => this.asQuestionBankId(item.questionBankId))
+          .filter((id: number | null): id is number => id !== null);
+        const generatedCount = Number(response?.generatedCount ?? generatedIds.length);
+        const typeSummary = this.importedQuestionTypeSummary(generatedQuestions);
+        this.importStatusMessage = response?.message
+          ? `${response.message}${typeSummary ? " " + typeSummary : ""}`
+          : `${generatedCount || generatedIds.length} question(s) generated from PDF.${typeSummary ? " " + typeSummary : ""}`;
         this.statusMessage = this.importStatusMessage;
         this.importingQuestions = false;
         this.importQuestionFile = null;
+        this.questionFilters = {
+          topicTag: "",
+          difficultyLevel: "",
+          questionType: "",
+          createdFrom: "",
+          createdTo: "",
+          search: ""
+        };
+        if (generatedQuestions.length > 0) {
+          const existing = new Map(this.questionBank.map((item) => [this.asQuestionBankId(item.questionBankId), item]));
+          generatedQuestions.forEach((item: any) => existing.set(this.asQuestionBankId(item.questionBankId), item));
+          this.questionBank = Array.from(existing.values());
+        }
+        if (this.isQuestionsMode() && generatedIds.length > 0) {
+          this.selectedQuestionIds = Array.from(new Set([...this.selectedQuestionIds, ...generatedIds]));
+        }
         if (this.importQuestionFileInput?.nativeElement) {
           this.importQuestionFileInput.nativeElement.value = "";
         }
@@ -854,70 +931,6 @@ export class LecturerQuestionBankComponent implements OnInit {
         this.errorMessage = this.importErrorMessage;
         this.importingQuestions = false;
       }
-    });
-  }
-
-  setQuizTransferTab(tab: "import" | "export"): void {
-    this.quizTransferTab = tab;
-    this.quizTransferStatusMessage = "";
-    this.quizTransferErrorMessage = "";
-  }
-
-  onQuizImportFileChange(event: Event): void {
-    const input = event.target as HTMLInputElement;
-    this.quizImportFile = input.files?.[0] ?? null;
-    this.quizTransferStatusMessage = "";
-    this.quizTransferErrorMessage = "";
-  }
-
-  importQuizBackup(): void {
-    this.clearMessages();
-    this.quizTransferStatusMessage = "";
-    this.quizTransferErrorMessage = "";
-    if (!this.selectedCourseId) {
-      this.quizTransferErrorMessage = "Please select a course before importing a quiz.";
-      return;
-    }
-    if (!this.quizImportFile) {
-      this.quizTransferErrorMessage = "Please choose a CSV, XLS, or XLSX quiz file.";
-      return;
-    }
-
-    const formData = new FormData();
-    formData.append("courseId", String(this.selectedCourseId));
-    formData.append("file", this.quizImportFile);
-    formData.append("deleteExistingQuestions", String(this.quizImportDeleteExistingQuestions));
-
-    this.quizImporting = true;
-    this.lecturerService.importQuizBackup(formData).subscribe({
-      next: (response) => {
-        const count = Number(response?.questionCount ?? 0);
-        this.quizTransferStatusMessage = response?.message
-          ? `${response.message} ${count ? count + " question(s) imported." : ""}`.trim()
-          : "Quiz imported successfully.";
-        this.statusMessage = this.quizTransferStatusMessage;
-        this.quizImporting = false;
-        this.quizImportFile = null;
-        this.refreshQuizList();
-      },
-      error: (error) => {
-        this.quizTransferErrorMessage = this.extractApiMessage(error, "Failed to import quiz backup.");
-        this.errorMessage = this.quizTransferErrorMessage;
-        this.quizImporting = false;
-      }
-    });
-  }
-
-  downloadQuizTemplate(): void {
-    this.clearMessages();
-    this.quizTransferStatusMessage = "";
-    this.quizTransferErrorMessage = "";
-    this.lecturerService.downloadQuizImportTemplate().subscribe({
-      next: (blob) => {
-        this.downloadBlob(blob, "edusim-quiz-import-template.csv");
-        this.quizTransferStatusMessage = "Template downloaded.";
-      },
-      error: (error) => this.quizTransferErrorMessage = this.extractApiMessage(error, "Failed to download template.")
     });
   }
 
@@ -971,7 +984,7 @@ export class LecturerQuestionBankComponent implements OnInit {
     const ids = Array.from(new Set(
       this.selectedQuestionIds
         .map((id) => this.asQuestionBankId(id))
-        .filter((id): id is number => id !== null)
+        .filter((id: number | null): id is number => id !== null)
     ));
     if (ids.length === 0) {
       this.errorMessage = "Please select at least one question to delete.";
@@ -990,13 +1003,9 @@ export class LecturerQuestionBankComponent implements OnInit {
   createQuiz(closeAfterSave = false, displayAfterSave = false): void {
     this.clearMessages();
 
-    if (!this.selectedCourseId) {
-      this.errorMessage = "Please select a course first.";
-      return;
-    }
-
-    if (!this.quizForm.title.trim()) {
-      this.errorMessage = "Quiz name is required.";
+    const validation = this.validateQuizSettings();
+    if (validation) {
+      this.showQuizValidationMessage(validation);
       return;
     }
 
@@ -1010,7 +1019,7 @@ export class LecturerQuestionBankComponent implements OnInit {
     const questionBankIds = Array.from(new Set(
       this.selectedQuestionIds
         .map((id) => this.asQuestionBankId(id))
-        .filter((id): id is number => id !== null)
+        .filter((id: number | null): id is number => id !== null)
     ));
     if (questionBankIds.length === 0) {
       this.errorMessage = "Please select at least one question before creating quiz.";
@@ -1101,14 +1110,9 @@ export class LecturerQuestionBankComponent implements OnInit {
   saveSettingsAndReturn(): void {
     this.clearMessages();
 
-    if (!this.selectedCourseId) {
-      this.errorMessage = "Please select a course first.";
-      return;
-    }
-
-    if (!this.quizForm.title.trim()) {
-      this.errorMessage = "Quiz name is required.";
-      this.openSettingsSection("general");
+    const validation = this.validateQuizSettings();
+    if (validation) {
+      this.showQuizValidationMessage(validation);
       return;
     }
 
@@ -1140,14 +1144,9 @@ export class LecturerQuestionBankComponent implements OnInit {
   saveSettingsDraft(): void {
     this.clearMessages();
 
-    if (!this.selectedCourseId) {
-      this.errorMessage = "Please select a course first.";
-      return;
-    }
-
-    if (!this.quizForm.title.trim()) {
-      this.errorMessage = "Quiz name is required.";
-      this.openSettingsSection("general");
+    const validation = this.validateQuizSettings();
+    if (validation) {
+      this.showQuizValidationMessage(validation);
       return;
     }
 
@@ -1169,6 +1168,11 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   saveBuilderDraft(): void {
     this.clearMessages();
+    const validation = this.validateQuizSettings();
+    if (validation) {
+      this.showQuizValidationMessage(validation);
+      return;
+    }
     if (!this.persistQuizDraftToStorage()) {
       this.errorMessage = "Unable to save quiz draft in this browser. Please try again.";
       return;
@@ -1311,41 +1315,7 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   cancelDraft(): void {
     this.selectedQuestionIds = [];
-    this.quizForm = {
-      title: "",
-      description: "This quiz covers key topics from the lesson.",
-      gradeOut: 20,
-      openDate: this.defaultOpenDate(),
-      openTime: "08:00",
-      closeDate: this.defaultDueDate(),
-      closeTime: "23:59",
-      resultReleaseDate: this.defaultDueDate(),
-      resultReleaseTime: "23:59",
-      timeLimitHours: 0,
-      timeLimitPartMinutes: 3,
-      timeLimitMinutes: 3,
-      maxAttempts: 3,
-      passingMark: 20,
-      published: true,
-      unlockAfterVideos: true,
-      shuffleQuestions: true,
-      shuffleAnswers: true,
-      questionDisplayMode: "ONE_BY_ONE",
-      reviewTiming: "IMMEDIATE_AFTER_SUBMISSION" as ReviewTiming,
-      showResultImmediately: true,
-      showScoreAfterSubmission: true,
-      showSelectedAnswer: true,
-      showCorrectAnswer: true,
-      showExplanation: true,
-      showRelatedConcept: true,
-      showLearningRecommendation: true,
-      showConfidence: true,
-      showScoreBreakdown: true,
-      showStudentAnswerReview: true,
-      enableDebugLogs: true,
-      minimumImportRole: "ADMINISTRATOR" as ImportRole,
-      autoSelectCount: 10
-    };
+    this.quizForm = this.defaultQuizForm();
     this.statusMessage = "Draft cleared.";
     this.errorMessage = "";
   }
@@ -1359,13 +1329,9 @@ export class LecturerQuestionBankComponent implements OnInit {
   createQuizAndDisplay(): void {
     this.clearMessages();
 
-    if (!this.selectedCourseId) {
-      this.errorMessage = "Please select a course first.";
-      return;
-    }
-
-    if (!this.quizForm.title.trim()) {
-      this.errorMessage = "Quiz name is required.";
+    const validation = this.validateQuizSettings();
+    if (validation) {
+      this.showQuizValidationMessage(validation);
       return;
     }
 
@@ -1400,6 +1366,9 @@ export class LecturerQuestionBankComponent implements OnInit {
   }
 
   quizDurationLabel(): string {
+    if (this.isBlank(this.quizForm.timeLimitMinutes)) {
+      return "-";
+    }
     const minutes = this.toNonNegativeInt(this.quizForm.timeLimitMinutes);
     if (minutes < 60) {
       return `${minutes} min`;
@@ -1414,6 +1383,9 @@ export class LecturerQuestionBankComponent implements OnInit {
   }
 
   quizMarkSummary(): string {
+    if (this.isBlank(this.quizForm.gradeOut)) {
+      return "-";
+    }
     const marks = Number(this.quizForm.gradeOut ?? 0);
     return `${marks} point${marks === 1 ? "" : "s"}`;
   }
@@ -1457,6 +1429,9 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   reviewTimingLabel(quiz: any): string {
     const timing = String(quiz?.reviewTiming ?? (quiz?.showResultImmediately ? "IMMEDIATE_AFTER_SUBMISSION" : "AFTER_DUE_DATE"));
+    if (!timing) {
+      return "Not set";
+    }
     const labels: Record<string, string> = {
       IMMEDIATE_AFTER_SUBMISSION: "Immediate",
       AFTER_DUE_DATE: "After due date",
@@ -1471,18 +1446,22 @@ export class LecturerQuestionBankComponent implements OnInit {
   }
 
   onTimeLimitPartChange(): void {
-    const hours = this.toNonNegativeInt(this.quizForm.timeLimitHours);
-    let minutes = Math.min(59, this.toNonNegativeInt(this.quizForm.timeLimitPartMinutes));
-
-    let total = (hours * 60) + minutes;
-    if (total < 1) {
-      minutes = hours > 0 ? 0 : 1;
-      total = 1;
+    const hoursBlank = this.isBlank(this.quizForm.timeLimitHours);
+    const minutesBlank = this.isBlank(this.quizForm.timeLimitPartMinutes);
+    if (hoursBlank && minutesBlank) {
+      this.quizForm.timeLimitHours = "";
+      this.quizForm.timeLimitPartMinutes = "";
+      this.quizForm.timeLimitMinutes = "";
+      return;
     }
 
-    this.quizForm.timeLimitHours = hours;
-    this.quizForm.timeLimitPartMinutes = minutes;
-    this.quizForm.timeLimitMinutes = total;
+    const hours = hoursBlank ? 0 : this.toNonNegativeInt(this.quizForm.timeLimitHours);
+    const minutes = minutesBlank ? 0 : Math.min(59, this.toNonNegativeInt(this.quizForm.timeLimitPartMinutes));
+    const total = (hours * 60) + minutes;
+
+    this.quizForm.timeLimitHours = hoursBlank ? "" : hours;
+    this.quizForm.timeLimitPartMinutes = minutesBlank ? "" : minutes;
+    this.quizForm.timeLimitMinutes = total > 0 ? total : "";
   }
 
   onTimeLimitMinutesChange(): void {
@@ -1543,6 +1522,13 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   settingsSectionStatusLabel(section: SettingsSection): string {
     return this.settingsSectionStatus(section) === "error" ? "!" : "OK";
+  }
+
+  reviewPublishStepComplete(): boolean {
+    const settingsComplete = (["general", "timing", "grade"] as SettingsSection[])
+      .every((section) => this.settingsSectionStatus(section) === "complete");
+    const questionCount = this.selectedQuestions().length + this.draftQuestions.length;
+    return settingsComplete && questionCount > 0;
   }
 
   openSettingsSection(section: SettingsSection): void {
@@ -1944,7 +1930,7 @@ export class LecturerQuestionBankComponent implements OnInit {
   isAllVisibleSelected(): boolean {
     const visibleIds = this.filteredQuestionBank()
       .map((item) => this.asQuestionBankId(item.questionBankId))
-      .filter((id): id is number => id !== null);
+      .filter((id: number | null): id is number => id !== null);
     if (visibleIds.length === 0) {
       return false;
     }
@@ -1954,7 +1940,7 @@ export class LecturerQuestionBankComponent implements OnInit {
   toggleVisibleSelection(checked: boolean): void {
     const visibleIds = this.filteredQuestionBank()
       .map((item) => this.asQuestionBankId(item.questionBankId))
-      .filter((id): id is number => id !== null);
+      .filter((id: number | null): id is number => id !== null);
     if (checked) {
       const merged = new Set([...this.selectedQuestionIds, ...visibleIds]);
       this.selectedQuestionIds = Array.from(merged);
@@ -1987,6 +1973,22 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   questionTypeLabel(type: QuestionType | string): string {
     return this.questionTypes.find((item) => item.value === type)?.label ?? type;
+  }
+
+  importedQuestionTypeSummary(questions: any[]): string {
+    const counts = new Map<string, number>();
+    for (const question of questions) {
+      const type = String(question?.questionType ?? "");
+      if (type) {
+        counts.set(type, (counts.get(type) ?? 0) + 1);
+      }
+    }
+    if (counts.size === 0) {
+      return "";
+    }
+    return Array.from(counts.entries())
+      .map(([type, count]) => `${this.questionTypeLabel(type)}: ${count}`)
+      .join(", ");
   }
 
   setQuestionType(type: QuestionType): void {
@@ -2053,6 +2055,53 @@ export class LecturerQuestionBankComponent implements OnInit {
     return String.fromCharCode(65 + index);
   }
 
+  questionAnswerDetails(item: any): Array<{ label: string; text: string; correct: boolean }> {
+    const type = String(item?.questionType ?? "").toUpperCase();
+
+    if (type === "MATCHING") {
+      const options = item?.options;
+      const left = Array.isArray(options?.left) ? options.left : [];
+      const right = Array.isArray(options?.right) ? options.right : [];
+      const correctMap = item?.correctAnswer && typeof item.correctAnswer === "object" && !Array.isArray(item.correctAnswer)
+        ? item.correctAnswer
+        : {};
+      return left
+        .map((prompt: unknown, index: number) => {
+          const promptText = String(prompt ?? "").trim();
+          const answerText = String(correctMap[promptText] ?? right[index] ?? "").trim();
+          return {
+            label: `${index + 1}`,
+            text: answerText ? `${promptText} -> ${answerText}` : promptText,
+            correct: Boolean(promptText && answerText)
+          };
+        })
+        .filter((row: { label: string; text: string; correct: boolean }) => row.text);
+    }
+
+    if (type === "SHORT_ANSWER") {
+      const answer = this.correctAnswerValues(item)[0] ?? "";
+      return answer ? [{ label: "Ans", text: answer, correct: true }] : [];
+    }
+
+    const options = type === "TRUE_FALSE"
+      ? ["True", "False"]
+      : Array.isArray(item?.options)
+        ? item.options.map((option: unknown) => typeof option === "object" && option !== null ? String((option as any).text ?? "") : String(option ?? ""))
+        : [];
+    const correctSet = new Set(this.correctAnswerValues(item).map((answer) => this.normalizeAnswer(answer)));
+
+    return options
+      .map((option: string, index: number) => {
+        const text = String(option ?? "").trim();
+        return {
+          label: this.optionLabel(index),
+          text,
+          correct: correctSet.has(this.normalizeAnswer(text))
+        };
+      })
+      .filter((row: { label: string; text: string; correct: boolean }) => row.text);
+  }
+
   questionOptionPreview(item: any): string[] {
     const type = String(item?.questionType ?? "").toUpperCase();
     const options = item?.options;
@@ -2072,6 +2121,22 @@ export class LecturerQuestionBankComponent implements OnInit {
       return answer ? [answer] : [];
     }
     return [];
+  }
+
+  private correctAnswerValues(item: any): string[] {
+    const answer = item?.correctAnswer;
+    if (Array.isArray(answer)) {
+      return answer.map((value) => String(value ?? "").trim()).filter(Boolean);
+    }
+    if (answer && typeof answer === "object") {
+      return Object.values(answer).map((value) => String(value ?? "").trim()).filter(Boolean);
+    }
+    const text = String(answer ?? "").trim();
+    return text ? [text] : [];
+  }
+
+  private normalizeAnswer(value: string): string {
+    return String(value ?? "").trim().toLowerCase();
   }
 
   matchingOptionChoices(): string[] {
@@ -2175,6 +2240,26 @@ export class LecturerQuestionBankComponent implements OnInit {
     return `${dateValue}T${timeValue}:00`;
   }
 
+  private datePartFromDateTime(value: unknown): string {
+    const match = String(value ?? "").match(/^(\d{4}-\d{2}-\d{2})[T\s]/);
+    return match?.[1] ?? "";
+  }
+
+  private timePartFromDateTime(value: unknown): string {
+    const match = String(value ?? "").match(/^[\d-]+[T\s](\d{2}:\d{2})/);
+    return match?.[1] ?? "";
+  }
+
+  private normalizeReviewTiming(value: unknown): ReviewTiming {
+    const timing = String(value ?? "").trim().toUpperCase();
+    return timing === "IMMEDIATE_AFTER_SUBMISSION" ||
+      timing === "AFTER_DUE_DATE" ||
+      timing === "MANUAL_RELEASE" ||
+      timing === "HIDDEN"
+      ? timing
+      : "";
+  }
+
   currentCourse(): any | null {
     return this.courses.find((course) => course.courseId === this.selectedCourseId) ?? null;
   }
@@ -2185,7 +2270,7 @@ export class LecturerQuestionBankComponent implements OnInit {
     const questionIds = Array.from(new Set(
       this.selectedQuestionIds
         .map((id) => this.asQuestionBankId(id))
-        .filter((id): id is number => id !== null)
+        .filter((id: number | null): id is number => id !== null)
     ));
     const payload = {
       courseId: this.selectedCourseId,
@@ -2326,6 +2411,12 @@ export class LecturerQuestionBankComponent implements OnInit {
   }
 
   private syncTimeLimitPartsFromMinutes(): void {
+    if (this.isBlank(this.quizForm.timeLimitMinutes)) {
+      this.quizForm.timeLimitMinutes = "";
+      this.quizForm.timeLimitHours = "";
+      this.quizForm.timeLimitPartMinutes = "";
+      return;
+    }
     const totalMinutes = Math.max(1, this.toNonNegativeInt(this.quizForm.timeLimitMinutes));
     this.quizForm.timeLimitMinutes = totalMinutes;
     this.quizForm.timeLimitHours = Math.floor(totalMinutes / 60);
@@ -2338,6 +2429,129 @@ export class LecturerQuestionBankComponent implements OnInit {
       return 0;
     }
     return num;
+  }
+
+  private isBlank(value: unknown): boolean {
+    return value === null || value === undefined || String(value).trim() === "";
+  }
+
+  private validateQuizSettings(): QuizValidationResult | null {
+    if (!this.selectedCourseId) {
+      return { message: "Please select a course first.", section: "general" };
+    }
+    if (this.isBlank(this.quizForm.title)) {
+      return { message: "Quiz name is required.", section: "general" };
+    }
+    if (this.isBlank(this.quizForm.description)) {
+      return { message: "Description / instructions is required.", section: "general" };
+    }
+    if (this.isBlank(this.quizForm.gradeOut) || Number(this.quizForm.gradeOut) <= 0) {
+      return { message: "Grade out of is required.", section: "general" };
+    }
+    if (this.isBlank(this.quizForm.passingMark) || Number(this.quizForm.passingMark) < 0 || Number(this.quizForm.passingMark) > 100) {
+      return { message: "Pass mark must be between 0 and 100.", section: "general" };
+    }
+    if (this.isBlank(this.quizForm.maxAttempts) || Number(this.quizForm.maxAttempts) < 1) {
+      return { message: "Allowed attempts must be at least 1.", section: "general" };
+    }
+    if (this.isBlank(this.quizForm.openDate) || this.isBlank(this.quizForm.openTime)) {
+      return { message: "Open date/time is required for quiz.", section: "timing" };
+    }
+    if (this.isBlank(this.quizForm.closeDate) || this.isBlank(this.quizForm.closeTime)) {
+      return { message: "Due date/time is required for quiz.", section: "timing" };
+    }
+    if (!this.combineDateTime(this.quizForm.closeDate, this.quizForm.closeTime)) {
+      return { message: "Due date/time is required for quiz.", section: "timing" };
+    }
+
+    const hours = this.isBlank(this.quizForm.timeLimitHours) ? 0 : this.toNonNegativeInt(this.quizForm.timeLimitHours);
+    const minutes = this.isBlank(this.quizForm.timeLimitPartMinutes) ? 0 : this.toNonNegativeInt(this.quizForm.timeLimitPartMinutes);
+    if (this.isBlank(this.quizForm.timeLimitHours) && this.isBlank(this.quizForm.timeLimitPartMinutes)) {
+      return { message: "Time limit is required.", section: "timing" };
+    }
+    if ((hours * 60) + minutes < 1) {
+      return { message: "Time limit must be at least 1 minute.", section: "timing" };
+    }
+    if (this.isBlank(this.quizForm.questionDisplayMode)) {
+      return { message: "Question display is required.", section: "timing" };
+    }
+    if (this.isBlank(this.quizForm.reviewTiming)) {
+      return { message: "Feedback release timing is required.", section: "grade" };
+    }
+    if (!this.hasAnyFeedbackVisibilitySelected()) {
+      return { message: "Please select at least one feedback visibility option.", section: "grade" };
+    }
+    return null;
+  }
+
+  private showQuizValidationMessage(validation: QuizValidationResult): void {
+    this.errorMessage = validation.message;
+    this.openSettingsSection(validation.section);
+    setTimeout(() => {
+      const elementId = validation.section === "general"
+        ? "quiz-general-section"
+        : validation.section === "timing"
+          ? "quiz-timing-section"
+          : "quiz-grade-section";
+      document.getElementById(elementId)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    }, 50);
+  }
+
+  private hasAnyFeedbackVisibilitySelected(): boolean {
+    return Boolean(
+      this.quizForm.showSelectedAnswer ||
+      this.quizForm.showCorrectAnswer ||
+      this.quizForm.showExplanation ||
+      this.quizForm.showLearningRecommendation ||
+      this.quizForm.showConfidence ||
+      this.quizForm.showScoreBreakdown
+    );
+  }
+
+  private quizSettingsValidationError(): string {
+    const validation = this.validateQuizSettings();
+    if (validation) {
+      return validation.message;
+    }
+    return "";
+  }
+
+  private defaultQuizForm(): any {
+    return {
+      title: "",
+      description: "",
+      gradeOut: "",
+      openDate: "",
+      openTime: "",
+      closeDate: "",
+      closeTime: "",
+      resultReleaseDate: "",
+      resultReleaseTime: "",
+      timeLimitHours: "",
+      timeLimitPartMinutes: "",
+      timeLimitMinutes: "",
+      maxAttempts: "",
+      passingMark: "",
+      published: false,
+      unlockAfterVideos: false,
+      shuffleQuestions: false,
+      shuffleAnswers: false,
+      questionDisplayMode: "",
+      reviewTiming: "" as ReviewTiming,
+      showResultImmediately: false,
+      showScoreAfterSubmission: false,
+      showSelectedAnswer: false,
+      showCorrectAnswer: false,
+      showExplanation: false,
+      showRelatedConcept: false,
+      showLearningRecommendation: false,
+      showConfidence: false,
+      showScoreBreakdown: false,
+      showStudentAnswerReview: false,
+      enableDebugLogs: false,
+      minimumImportRole: "ADMINISTRATOR" as ImportRole,
+      autoSelectCount: ""
+    };
   }
 
   private defaultQuestionForm() {

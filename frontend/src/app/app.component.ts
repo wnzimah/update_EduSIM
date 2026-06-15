@@ -15,6 +15,8 @@ type AppNotification = {
 };
 
 type LanguageCode = "EN" | "BM";
+type LecturerMenuKey = "dashboard" | "courses" | "quizzes" | "students" | "questionBank" | "reports" | "messages" | "settings";
+type StudentMenuKey = "dashboard" | "courses" | "quizzes" | "attempts" | "profile" | "messages" | "settings";
 
 @Component({
   selector: "app-root",
@@ -28,14 +30,18 @@ export class AppComponent {
   private readonly lecturerService = inject(LecturerService);
   private readonly studentService = inject(StudentService);
   private readonly router = inject(Router);
-  private readonly zoomStorageKey = "edusim.page.zoom";
+  private readonly zoomStorageKey = "edusim.page.zoom.v2";
   private readonly languageStorageKey = "edusim.language";
+  private routeHistory: string[] = [];
+  private isBackNavigation = false;
+  private hasOpenedAuthenticatedShell = false;
 
   readonly session = this.authService.session;
   readonly isStudent = computed(() => this.session()?.role === "STUDENT");
   readonly isLecturer = computed(() => this.session()?.role === "LECTURER");
   readonly currentYear = new Date().getFullYear();
   showUserMenu = false;
+  showMainMenu = false;
   showStudentDashboardMenu = false;
   showNotifications = false;
   showLanguageMenu = false;
@@ -44,7 +50,7 @@ export class AppComponent {
   notificationLoading = false;
   notificationError = "";
   notifications: AppNotification[] = [];
-  pageZoom = 100;
+  pageZoom = 90;
   currentLanguage: LanguageCode = "EN";
 
   constructor() {
@@ -52,14 +58,23 @@ export class AppComponent {
     this.loadPageZoom();
     this.router.events.subscribe((event) => {
       if (event instanceof NavigationEnd) {
+        const nextUrl = event.urlAfterRedirects;
+        if (this.isBackNavigation) {
+          this.isBackNavigation = false;
+        } else if (this.routeHistory.at(-1) !== nextUrl) {
+          this.routeHistory.push(nextUrl);
+        }
         this.applyPageZoom();
+        this.showMainMenu = false;
         this.showNotifications = false;
         this.showLanguageMenu = false;
         this.showHelpMenu = false;
         if (this.isLoginPage() || this.isTrackerPage()) {
           this.isSidebarOpen = false;
-        } else if (this.session()) {
+          this.hasOpenedAuthenticatedShell = false;
+        } else if (this.session() && !this.hasOpenedAuthenticatedShell) {
           this.isSidebarOpen = true;
+          this.hasOpenedAuthenticatedShell = true;
         }
       }
     });
@@ -83,20 +98,35 @@ export class AppComponent {
     if (this.router.url.startsWith("/lecturer/manage")) {
       return "Course Content";
     }
+    if (this.router.url.startsWith("/lecturer/quiz-overview")) {
+      return "Quizzes";
+    }
+    if (this.router.url.startsWith("/lecturer/quiz-settings")) {
+      return "Quiz Settings";
+    }
+    if (this.router.url.startsWith("/lecturer/quiz-builder")) {
+      return "Question Builder";
+    }
+    if (this.router.url.startsWith("/lecturer/quizzes/")) {
+      return "Quiz Preview";
+    }
+    if (this.router.url.startsWith("/lecturer/question-bank")) {
+      return "Question Bank";
+    }
     if (this.router.url.startsWith("/lecturer/student-attempts") || this.router.url.startsWith("/lecturer/monitoring")) {
       return "Student Attempts";
+    }
+    if (this.router.url.startsWith("/lecturer/quiz-performance") || this.router.url.startsWith("/lecturer/quiz-results")) {
+      return "Quiz Performance";
     }
     if (this.router.url.startsWith("/lecturer/reset-requests")) {
       return "Reset Requests";
     }
-    if (this.router.url.startsWith("/lecturer/question-bank")) {
-      return "Quiz Builder";
+    if (this.router.url.startsWith("/student/dashboard/grades")) {
+      return "Attempt History";
     }
     if (this.router.url.startsWith("/student/dashboard")) {
-      return "";
-    }
-    if (this.router.url.startsWith("/student/history")) {
-      return "Attempt History";
+      return "Student Dashboard";
     }
     if (this.router.url.startsWith("/student/courses/")) {
       return "Course Learning";
@@ -104,12 +134,25 @@ export class AppComponent {
     if (this.router.url.startsWith("/student/quiz/")) {
       return "Quiz Session";
     }
+    if (this.router.url.startsWith("/student/my-courses")) {
+      return "My Courses";
+    }
+    if (this.router.url.startsWith("/student/history")) {
+      return "Attempt History";
+    }
+    if (this.router.url.startsWith("/student/attempts/")) {
+      return "Attempt Review";
+    }
+    if (this.router.url.startsWith("/student/profile")) {
+      return "Profile";
+    }
     return "EduSIM Portal";
   }
 
   toggleUserMenu(event: Event): void {
     event.stopPropagation();
     this.showUserMenu = !this.showUserMenu;
+    this.showMainMenu = false;
     this.showStudentDashboardMenu = false;
     this.showNotifications = false;
     this.showLanguageMenu = false;
@@ -119,6 +162,7 @@ export class AppComponent {
   toggleStudentDashboardMenu(event: Event): void {
     event.stopPropagation();
     this.showStudentDashboardMenu = !this.showStudentDashboardMenu;
+    this.showMainMenu = false;
     this.showUserMenu = false;
     this.showNotifications = false;
     this.showLanguageMenu = false;
@@ -127,6 +171,7 @@ export class AppComponent {
 
   openStudentDashboardMenu(): void {
     this.showStudentDashboardMenu = true;
+    this.showMainMenu = false;
     this.showUserMenu = false;
     this.showNotifications = false;
     this.showLanguageMenu = false;
@@ -138,6 +183,7 @@ export class AppComponent {
   }
 
   closeMenus(): void {
+    this.showMainMenu = false;
     this.showUserMenu = false;
     this.showStudentDashboardMenu = false;
     this.showNotifications = false;
@@ -151,8 +197,49 @@ export class AppComponent {
     this.isSidebarOpen = !this.isSidebarOpen;
   }
 
+  toggleMainMenu(event: Event): void {
+    event.stopPropagation();
+    this.showMainMenu = !this.showMainMenu;
+    this.showUserMenu = false;
+    this.showStudentDashboardMenu = false;
+    this.showNotifications = false;
+    this.showLanguageMenu = false;
+    this.showHelpMenu = false;
+  }
+
+  handleSidebarLogoClick(event: Event): void {
+    event.stopPropagation();
+    if (!this.isSidebarOpen) {
+      this.isSidebarOpen = true;
+      return;
+    }
+    this.navigateHome();
+  }
+
   showSidebar(): boolean {
-    return !this.isLoginPage() && !this.isTrackerPage() && !!this.session() && this.isSidebarOpen;
+    return !this.isLoginPage() && !this.isTrackerPage() && !!this.session();
+  }
+
+  showBackButton(): boolean {
+    return !this.isLoginPage() && !this.isTrackerPage() && !!this.session();
+  }
+
+  goBack(event: Event): void {
+    event.stopPropagation();
+    this.closeMenus();
+    const fallback = this.isLecturer() ? "/lecturer/dashboard" : "/student/dashboard";
+    this.routeHistory.pop();
+    while (this.routeHistory.length > 0) {
+      const targetUrl = this.routeHistory.at(-1) ?? "";
+      if (!targetUrl.startsWith("/login") && !targetUrl.startsWith("/tracker")) {
+        this.isBackNavigation = true;
+        this.router.navigateByUrl(targetUrl);
+        return;
+      }
+      this.routeHistory.pop();
+    }
+    this.routeHistory = [fallback];
+    this.router.navigateByUrl(fallback);
   }
 
   isCurrentRoute(...paths: string[]): boolean {
@@ -162,6 +249,39 @@ export class AppComponent {
   isExactRoute(path: string): boolean {
     const current = this.router.url.split("?")[0].split("#")[0];
     return current === path;
+  }
+
+  isLecturerMenuActive(key: LecturerMenuKey): boolean {
+    const current = this.currentPath();
+    const checks: Record<LecturerMenuKey, boolean> = {
+      dashboard: current === "/lecturer/dashboard",
+      courses: current.startsWith("/lecturer/manage"),
+      quizzes: current.startsWith("/lecturer/quiz-overview") ||
+        current.startsWith("/lecturer/quiz-builder") ||
+        current.startsWith("/lecturer/quizzes/"),
+      students: current.startsWith("/lecturer/student-attempts") || current.startsWith("/lecturer/monitoring"),
+      questionBank: current.startsWith("/lecturer/question-bank"),
+      reports: current.startsWith("/lecturer/quiz-performance") || current.startsWith("/lecturer/quiz-results"),
+      messages: current.startsWith("/lecturer/reset-requests"),
+      settings: current.startsWith("/lecturer/quiz-settings")
+    };
+    return checks[key];
+  }
+
+  isStudentMenuActive(key: StudentMenuKey): boolean {
+    const current = this.currentPath();
+    const checks: Record<StudentMenuKey, boolean> = {
+      dashboard: current === "/student/dashboard",
+      courses: current === "/student/my-courses" || current.startsWith("/student/courses/"),
+      quizzes: current.startsWith("/student/quiz/"),
+      attempts: current === "/student/history" ||
+        current.startsWith("/student/attempts/") ||
+        current.startsWith("/student/dashboard/grades"),
+      profile: current === "/student/profile",
+      messages: false,
+      settings: false
+    };
+    return checks[key];
   }
 
   @HostListener("document:click")
@@ -188,6 +308,7 @@ export class AppComponent {
   toggleNotifications(event: Event): void {
     event.stopPropagation();
     this.showNotifications = !this.showNotifications;
+    this.showMainMenu = false;
     this.showUserMenu = false;
     this.showStudentDashboardMenu = false;
     this.showLanguageMenu = false;
@@ -202,6 +323,7 @@ export class AppComponent {
     this.showLanguageMenu = !this.showLanguageMenu;
     this.showHelpMenu = false;
     this.showNotifications = false;
+    this.showMainMenu = false;
     this.showUserMenu = false;
     this.showStudentDashboardMenu = false;
   }
@@ -211,6 +333,7 @@ export class AppComponent {
     this.showHelpMenu = !this.showHelpMenu;
     this.showLanguageMenu = false;
     this.showNotifications = false;
+    this.showMainMenu = false;
     this.showUserMenu = false;
     this.showStudentDashboardMenu = false;
   }
@@ -400,6 +523,10 @@ export class AppComponent {
     document.documentElement.lang = this.currentLanguage === "BM" ? "ms" : "en";
   }
 
+  private currentPath(): string {
+    return this.router.url.split("?")[0].split("#")[0];
+  }
+
   private setPageZoom(value: number): void {
     this.pageZoom = this.clampZoom(value);
     localStorage.setItem(this.zoomStorageKey, String(this.pageZoom));
@@ -416,6 +543,7 @@ export class AppComponent {
     }
     const path = typeof window !== "undefined" ? window.location.pathname : this.router.url;
     const isLoginRoute = path.startsWith("/login");
-    document.body.style.zoom = isLoginRoute ? "1" : String(this.pageZoom / 100);
+    document.body.style.zoom = "1";
+    document.documentElement.style.setProperty("--edusim-content-zoom", isLoginRoute ? "1" : String(this.pageZoom / 100));
   }
 }

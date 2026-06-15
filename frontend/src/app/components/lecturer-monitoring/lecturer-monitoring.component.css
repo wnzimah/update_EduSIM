@@ -1339,6 +1339,16 @@
   gap: 18px;
 }
 
+.performance-filter-toolbar {
+  margin-bottom: 0;
+}
+
+.performance-insight-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 18px;
+}
+
 .performance-card {
   padding: 16px;
   display: grid;
@@ -1437,6 +1447,102 @@
   font-size: 12px;
 }
 
+.answer-accuracy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+}
+
+.accuracy-stat {
+  border: 1px solid #e4ebf5;
+  border-radius: 8px;
+  padding: 14px;
+}
+
+.accuracy-stat span {
+  display: block;
+  color: #6b7d9d;
+  font-size: 11px;
+  font-weight: 900;
+}
+
+.accuracy-stat strong {
+  display: block;
+  margin-top: 8px;
+  font-size: 24px;
+}
+
+.accuracy-stat.correct strong {
+  color: #16804d;
+}
+
+.accuracy-stat.wrong strong {
+  color: #e43d50;
+}
+
+.signal-list {
+  display: grid;
+  gap: 10px;
+}
+
+.signal-list p {
+  margin: 0;
+  border: 1px solid #edf2f8;
+  border-radius: 8px;
+  background: #f8fbff;
+  color: #355078;
+  padding: 12px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.hardest-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.hardest-question-list {
+  display: grid;
+  gap: 10px;
+}
+
+.hardest-question-list article {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 10px;
+  align-items: center;
+  border: 1px solid #edf2f8;
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.hardest-question-list strong {
+  display: block;
+  color: #17305f;
+  font-size: 13px;
+}
+
+.hardest-question-list small {
+  display: block;
+  margin-top: 4px;
+  color: #6b7d9d;
+  font-size: 11px;
+  font-weight: 800;
+}
+
+.hardest-answer {
+  grid-column: 1 / -1;
+  margin: 0;
+  border-radius: 7px;
+  background: #eef5ff;
+  color: #17305f;
+  padding: 10px;
+  font-size: 12px;
+  font-weight: 800;
+}
+
 .attempt-tip {
   margin: 0;
   border: 1px solid #dce7ff;
@@ -1470,7 +1576,9 @@
 
   .attempt-metrics-grid,
   .attempt-bottom-grid,
+  .performance-insight-grid,
   .attempt-toolbar,
+  .answer-accuracy-grid,
   .summary-stats {
     grid-template-columns: 1fr;
   }
@@ -1483,5 +1591,48 @@
 
   .attempt-table-footer {
     grid-template-columns: 1fr;
+  }
+}
+
+/* Keep the attempts table card visually grounded even when there are few or no records. */
+.attempts-dashboard {
+  min-height: calc(100dvh - 160px);
+}
+
+.attempts-workspace {
+  align-items: stretch;
+  min-height: calc(100dvh - 370px);
+}
+
+.attempts-main {
+  align-content: start;
+}
+
+.attempt-table-card {
+  min-height: calc(100dvh - 430px);
+  display: flex;
+  flex-direction: column;
+}
+
+.attempt-table-wrap {
+  flex: 1 1 auto;
+}
+
+.attempt-empty {
+  flex: 1 1 auto;
+  min-height: 260px;
+  display: grid;
+  place-items: center;
+  text-align: center;
+}
+
+@media (max-width: 1180px) {
+  .attempts-workspace,
+  .attempt-table-card {
+    min-height: 0;
+  }
+
+  .attempt-empty {
+    min-height: 180px;
   }
 }

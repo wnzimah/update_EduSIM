@@ -96,9 +96,15 @@ export const routes: Routes = [
     path: "lecturer/student-attempts",
     component: LecturerMonitoringComponent,
     canActivate: [authGuard, roleGuard],
-    data: { role: "LECTURER" }
+    data: { role: "LECTURER", view: "attempts" }
   },
   { path: "lecturer/monitoring", redirectTo: "lecturer/student-attempts", pathMatch: "full" },
+  {
+    path: "lecturer/quiz-performance",
+    component: LecturerMonitoringComponent,
+    canActivate: [authGuard, roleGuard],
+    data: { role: "LECTURER", view: "performance" }
+  },
   {
     path: "lecturer/reset-requests",
     component: LecturerResetRequestsComponent,
@@ -125,9 +131,9 @@ export const routes: Routes = [
   },
   {
     path: "lecturer/quiz-results",
-    component: LecturerQuestionBankComponent,
+    component: LecturerMonitoringComponent,
     canActivate: [authGuard, roleGuard],
-    data: { role: "LECTURER", mode: "results" }
+    data: { role: "LECTURER", view: "performance" }
   },
   {
     path: "lecturer/quizzes/:quizId/preview",

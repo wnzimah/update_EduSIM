@@ -4,6 +4,8 @@ import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { LecturerService } from "../../services/lecturer.service";
 
+type MonitoringView = "attempts" | "performance";
+
 @Component({
   selector: "app-lecturer-monitoring",
   standalone: true,
@@ -39,9 +41,13 @@ export class LecturerMonitoringComponent implements OnInit {
   scopedCourseId: number | null = null;
   scopedCourseTitle = "";
   revealedHardestAnswers = new Set<number>();
+  currentView: MonitoringView = "attempts";
   readonly attemptsPageSizes = [10, 20, 50];
 
   ngOnInit(): void {
+    this.route.data.subscribe((data) => {
+      this.currentView = data["view"] === "performance" ? "performance" : "attempts";
+    });
     this.route.queryParamMap.subscribe((params) => {
       const rawCourseId = params.get("courseId");
       const parsedCourseId = rawCourseId ? Number(rawCourseId) : NaN;
@@ -55,6 +61,42 @@ export class LecturerMonitoringComponent implements OnInit {
       this.loadResults();
       this.loadInsights();
     });
+  }
+
+  isPerformancePage(): boolean {
+    return this.currentView === "performance";
+  }
+
+  pageTitle(): string {
+    return this.isPerformancePage() ? "Quiz Performance" : "Quiz Attempts";
+  }
+
+  pageSubtitle(): string {
+    return this.isPerformancePage()
+      ? "Review score trends, weak topics, answer accuracy and learning signals."
+      : "View student attempts, status, scores and detailed attempt review.";
+  }
+
+  switchPageRoute(): string {
+    return this.isPerformancePage() ? "/lecturer/student-attempts" : "/lecturer/quiz-performance";
+  }
+
+  switchPageLabel(): string {
+    return this.isPerformancePage() ? "Quiz Attempts" : "Quiz Performance";
+  }
+
+  monitoringQueryParams(): Record<string, number | string> {
+    const params: Record<string, number | string> = {};
+    if (this.scopedCourseId) {
+      params["courseId"] = this.scopedCourseId;
+    }
+    if (this.scopedCourseTitle) {
+      params["courseTitle"] = this.scopedCourseTitle;
+    }
+    if (this.resultQuizId) {
+      params["quizId"] = this.resultQuizId;
+    }
+    return params;
   }
 
   loadQuizzes(): void {

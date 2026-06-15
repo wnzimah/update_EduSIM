@@ -3,11 +3,11 @@
     <div>
       <nav class="attempts-breadcrumb" aria-label="Breadcrumb">
         <span>Assessments</span>
-        <span>Quiz Attempts</span>
+        <span>{{ pageTitle() }}</span>
         <strong>{{ resultQuizId ? quizFilterLabel() : "All Quizzes" }}</strong>
       </nav>
-      <h1>Quiz Attempts &amp; Performance</h1>
-      <p>View student attempts, performance, weak topics and detailed review.</p>
+      <h1>{{ pageTitle() }}</h1>
+      <p>{{ pageSubtitle() }}</p>
       @if (scopedCourseId) {
         <span class="scope-chip">{{ scopedCourseTitle || ('Course ID ' + scopedCourseId) }}</span>
       }
@@ -18,9 +18,12 @@
       } @else {
         <a class="attempts-light-btn" routerLink="/lecturer/quiz-overview">Back to Quiz List</a>
       }
-      <button class="attempts-light-btn" type="button" [disabled]="loading || filteredResults().length === 0" (click)="downloadScoreReport()">
-        Export
-      </button>
+      <a class="attempts-light-btn" [routerLink]="switchPageRoute()" [queryParams]="monitoringQueryParams()">{{ switchPageLabel() }}</a>
+      @if (!isPerformancePage()) {
+        <button class="attempts-light-btn" type="button" [disabled]="loading || filteredResults().length === 0" (click)="downloadScoreReport()">
+          Export
+        </button>
+      }
     </div>
   </header>
 
@@ -66,6 +69,41 @@
     </article>
   </section>
 
+  @if (isPerformancePage()) {
+    <section class="attempt-toolbar performance-filter-toolbar">
+      <select [ngModel]="statusFilter" (ngModelChange)="onStatusFilterChange($event)" name="performanceStatusFilter">
+        <option value="ALL">All Attempts</option>
+        <option value="COMPLETED">Completed</option>
+        <option value="RELEASED">Released</option>
+        <option value="LOCKED">Locked</option>
+      </select>
+      <input
+        type="search"
+        placeholder="Search student name or ID..."
+        [ngModel]="resultSearch"
+        (ngModelChange)="onResultSearchChange($event)"
+        name="performanceSearch">
+      <select [ngModel]="resultQuizId ?? ''" (ngModelChange)="onResultQuizFilter($event)" name="performanceQuizFilter">
+        <option value="">All Quiz</option>
+        @for (quiz of quizzes; track quiz.quizId) {
+          <option [value]="quiz.quizId">{{ quiz.title }}</option>
+        }
+      </select>
+      <select [ngModel]="studentFilter" (ngModelChange)="onStudentFilterChange($event)" name="performanceStudentFilter">
+        <option value="">All Students</option>
+        @for (studentName of availableStudents(); track studentName) {
+          <option [value]="studentName">{{ studentName }}</option>
+        }
+      </select>
+      <div class="date-range-filter">
+        <input type="date" [(ngModel)]="dateFrom" (ngModelChange)="onDateFilterChange()" name="performanceDateFrom">
+        <span>-</span>
+        <input type="date" [(ngModel)]="dateTo" (ngModelChange)="onDateFilterChange()" name="performanceDateTo">
+      </div>
+    </section>
+  }
+
+  @if (!isPerformancePage()) {
   <section class="attempts-workspace">
     <main class="attempts-main">
       <section class="attempt-toolbar">
@@ -264,7 +302,9 @@
       }
     </aside>
   </section>
+  }
 
+  @if (isPerformancePage()) {
   <section class="attempt-bottom-grid">
     <article class="performance-card">
       <h2>Performance Summary</h2>
@@ -315,7 +355,59 @@
     </article>
   </section>
 
-  <p class="attempt-tip">Tip: Click on a student to view detailed attempt review, answers, and learning recommendations.</p>
+  <section class="performance-insight-grid">
+    <article class="performance-card">
+      <h2>Answer Accuracy</h2>
+      <div class="answer-accuracy-grid">
+        <div class="accuracy-stat correct">
+          <span>Correct Answers</span>
+          <strong>{{ totalCorrectAnswers() }}</strong>
+        </div>
+        <div class="accuracy-stat wrong">
+          <span>Wrong Answers</span>
+          <strong>{{ totalWrongAnswers() }}</strong>
+        </div>
+      </div>
+    </article>
+
+    <article class="performance-card">
+      <h2>Learning Signals</h2>
+      <div class="signal-list">
+        <p>{{ confidenceRiskMessage() }}</p>
+        <p>{{ timeRiskMessage() }}</p>
+      </div>
+    </article>
+  </section>
+
+  <section class="performance-card hardest-question-card">
+    <header class="hardest-card-head">
+      <h2>Hardest Questions</h2>
+      @if (hardestQuestions().length > 0) {
+        <button class="attempts-light-btn" type="button" (click)="revealAllHardestAnswers()">Reveal All Answers</button>
+      }
+    </header>
+    @if (hardestQuestions().length === 0) {
+      <p class="muted">No hardest question pattern yet.</p>
+    } @else {
+      <div class="hardest-question-list">
+        @for (question of hardestQuestions(); track question.questionId) {
+          <article>
+            <div>
+              <strong>{{ question.prompt }}</strong>
+              <small>{{ question.topicTag }} | Wrong rate {{ question.wrongRate }}% | {{ question.wrongCount }} wrong of {{ question.answerCount }}</small>
+            </div>
+            <button class="icon-action" type="button" (click)="toggleHardestAnswer(question.questionId)">
+              {{ isHardestAnswerVisible(question.questionId) ? "Hide Answer" : "Show Answer" }}
+            </button>
+            @if (isHardestAnswerVisible(question.questionId)) {
+              <p class="hardest-answer">Correct answer: {{ formatAnswer(question.correctAnswer) }}</p>
+            }
+          </article>
+        }
+      </div>
+    }
+  </section>
+  }
 
   @if (showResultDetailModal && resultDetail) {
     <div class="modal-backdrop" (click)="closeResultDetail()">
