@@ -6727,6 +6727,50 @@
   color: #b91c1c;
 }
 
+/* Shared tab strip for quiz, question builder, and question bank pages. */
+.quiz-workspace-tab-strip {
+  margin: 10px 0 18px;
+  padding: 0 18px;
+  border-bottom: 1px solid #9aa9c5;
+  background: transparent;
+}
+
+.quiz-workspace-tabs {
+  display: flex;
+  align-items: flex-end;
+  gap: 12px;
+  min-height: 52px;
+  overflow-x: auto;
+}
+
+.quiz-workspace-tabs a {
+  min-height: 52px;
+  min-width: 128px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  border: 1px solid transparent;
+  border-bottom: 0;
+  border-radius: 8px 8px 0 0;
+  padding: 0 22px;
+  color: #4e5d7d;
+  font-size: 15px;
+  font-weight: 900;
+  white-space: nowrap;
+}
+
+.quiz-workspace-tabs a:hover {
+  color: #0c3c99;
+  background: rgba(255, 255, 255, 0.55);
+}
+
+.quiz-workspace-tabs a.active {
+  border-color: #8fa0bf;
+  background: #ffffff;
+  color: #061b4a;
+  transform: translateY(1px);
+}
+
 /* Keep quiz pages contrasted against white cards. */
 :host,
 .quiz-page,

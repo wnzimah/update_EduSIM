@@ -16,6 +16,17 @@
     </div>
   }
 
+  @if (!showCreateModal) {
+    <section class="quiz-workspace-tab-strip">
+      <nav class="quiz-workspace-tabs" aria-label="Quiz workspace navigation">
+        <a [routerLink]="['/lecturer/quiz-overview']" [queryParams]="tabQueryParams()" [class.active]="isQuizMode() || isResultsMode()">Quiz List</a>
+        <a [routerLink]="['/lecturer/quiz-settings']" [queryParams]="tabQueryParams()" [class.active]="isSettingsMode()">Create / Settings</a>
+        <a [routerLink]="['/lecturer/quiz-builder']" [queryParams]="tabQueryParams()" [class.active]="isQuestionsMode()">Questions</a>
+        <a [routerLink]="['/lecturer/question-bank']" [queryParams]="tabQueryParams()" [class.active]="isBankMode()">Question Bank</a>
+      </nav>
+    </section>
+  }
+
   @if (!isSettingsMode() && !isQuestionsMode() && !isBankMode()) {
     <section class="style-hero lecturer-course-topbar panel">
       <button class="lecturer-course-brand" type="button" routerLink="/lecturer/dashboard">
@@ -37,16 +48,6 @@
       <div class="lecturer-window-actions">
         <button class="mini-action" type="button" routerLink="/lecturer/dashboard">Hub</button>
       </div>
-    </section>
-
-    <section class="workspace-tabs-shell panel">
-      <nav class="workspace-tabs" aria-label="Quiz workspace tabs">
-        <a [routerLink]="['/lecturer/manage']" [queryParams]="tabQueryParams()">My Course</a>
-        <a [routerLink]="['/lecturer/quiz-overview']" [queryParams]="tabQueryParams()" [class.active]="isQuizMode() || isResultsMode()">Quiz</a>
-        <a [routerLink]="['/lecturer/quiz-settings']" [queryParams]="tabQueryParams()" [class.active]="isSettingsMode()">Settings</a>
-        <a [routerLink]="['/lecturer/quiz-builder']" [queryParams]="tabQueryParams()" [class.active]="isQuestionsMode()">Questions</a>
-        <a [routerLink]="['/lecturer/question-bank']" [queryParams]="tabQueryParams()" [class.active]="isBankMode()">Question Bank</a>
-      </nav>
     </section>
 
     <section class="course-filter-shell panel">
