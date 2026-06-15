@@ -5,7 +5,7 @@
     [class.academy-shell-sidebar-collapsed]="showSidebar() && !isSidebarOpen">
     <section class="updates-strip" aria-label="Learning pulse">
       <div class="updates-copy">
-        <strong>EduSIM Learning Hub</strong>
+        <strong>Educational System Material Learning Hub</strong>
         <span>Keep lessons, quizzes, study materials, and progress in sync before the next assessment opens.</span>
       </div>
       <div class="updates-actions" aria-hidden="true">
@@ -304,14 +304,19 @@
       aria-label="Main sidebar navigation">
       <div class="sidebar-head">
         <button
-          class="sidebar-logo"
+          class="sidebar-logo sidebar-home-link"
           type="button"
-          [attr.aria-label]="isSidebarOpen ? 'Go to EduSIM home' : 'Expand sidebar'"
-          (click)="handleSidebarLogoClick($event)">
-          <span class="sidebar-logo-icon" aria-hidden="true"></span>
+          aria-label="Go to homepage"
+          title="Homepage"
+          (click)="navigateHome()">
+          <span class="sidebar-home-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24">
+              <path d="M3 10.8 12 3l9 7.8-1.35 1.55L18 10.9V20h-5v-6h-2v6H6v-9.1l-1.65 1.45L3 10.8Z" />
+            </svg>
+          </span>
           <span class="sidebar-logo-copy">
-            <strong>EDUSIM</strong>
-            <small>{{ isLecturer() ? "Lecturer Hub" : "Learner Hub" }}</small>
+            <strong>Homepage</strong>
+            <small>Login Page</small>
           </span>
         </button>
         <button

@@ -207,15 +207,6 @@ export class AppComponent {
     this.showHelpMenu = false;
   }
 
-  handleSidebarLogoClick(event: Event): void {
-    event.stopPropagation();
-    if (!this.isSidebarOpen) {
-      this.isSidebarOpen = true;
-      return;
-    }
-    this.navigateHome();
-  }
-
   showSidebar(): boolean {
     return !this.isLoginPage() && !this.isTrackerPage() && !!this.session();
   }
