@@ -8,6 +8,7 @@ import org.springframework.data.jpa.repository.JpaRepository;
 public interface QuizRepository extends JpaRepository<Quiz, Long> {
     List<Quiz> findByCourseId(Long courseId);
     List<Quiz> findByCourseIdAndPublishedTrue(Long courseId);
+    List<Quiz> findTop10ByCourseLecturerIdOrderByCreatedAtDesc(Long lecturerId);
     long countByCourseId(Long courseId);
     Optional<Quiz> findByIdAndCourseLecturerId(Long id, Long lecturerId);
     void deleteByCourseId(Long courseId);

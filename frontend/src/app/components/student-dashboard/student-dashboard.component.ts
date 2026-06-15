@@ -15,6 +15,7 @@ type PlannerEvent = {
   quizId?: number;
   videoId?: number;
   auto?: boolean;
+  dateLabel?: string;
 };
 
 @Component({
@@ -973,44 +974,39 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
       return;
     }
 
-    const daysInMonth = new Date(this.viewingDate.getFullYear(), this.viewingDate.getMonth() + 1, 0).getDate();
     const autoEvents: PlannerEvent[] = [];
     let autoId = -1;
+    const todayKey = this.todayDateKey();
 
     for (const quiz of this.dashboard.availableQuizzes ?? []) {
-      const day = this.seededDay(`quiz-${quiz.quizId}-${quiz.title}`, daysInMonth);
+      if (quiz?.alreadySubmitted) {
+        continue;
+      }
+      const quizDate = this.toDateKey(quiz?.closeAt) ?? this.toDateKey(quiz?.openAt);
+      if (!quizDate) {
+        continue;
+      }
       autoEvents.push({
         id: autoId--,
-        title: quiz.title,
-        date: this.dateForCell(day),
+        title: `Quiz: ${quiz.title}`,
+        date: quizDate,
         category: "QUIZ",
         courseId: quiz.courseId ?? null,
         quizId: quiz.quizId ?? undefined,
+        dateLabel: this.quizPlannerDateLabel(quiz),
         auto: true
       });
     }
 
     for (const video of this.dashboard.pendingVideos ?? []) {
-      const day = this.seededDay(`video-${video.videoId}-${video.title}`, daysInMonth);
       autoEvents.push({
         id: autoId--,
         title: `Watch: ${video.title}`,
-        date: this.dateForCell(day),
+        date: todayKey,
         category: "VIDEO",
         courseId: video.courseId ?? null,
         videoId: video.videoId ?? undefined,
-        auto: true
-      });
-    }
-
-    for (const course of this.dashboard.courses ?? []) {
-      const day = this.seededDay(`study-${course.courseId}-${course.title}`, daysInMonth);
-      autoEvents.push({
-        id: autoId--,
-        title: `Revision slot - ${course.title}`,
-        date: this.dateForCell(day),
-        category: "STUDY",
-        courseId: course.courseId ?? null,
+        dateLabel: "Today",
         auto: true
       });
     }
@@ -1025,20 +1021,39 @@ export class StudentDashboardComponent implements OnInit, OnDestroy {
     return event.courseId === Number(this.calendarCourseFilter);
   }
 
-  private seededDay(seed: string, maxDay: number): number {
-    let hash = 0;
-    for (let index = 0; index < seed.length; index++) {
-      hash = (hash << 5) - hash + seed.charCodeAt(index);
-      hash |= 0;
-    }
-    return Math.abs(hash % maxDay) + 1;
-  }
-
   private dateForCell(day: number): string {
     const year = this.viewingDate.getFullYear();
     const month = String(this.viewingDate.getMonth() + 1).padStart(2, "0");
     const dayValue = String(day).padStart(2, "0");
     return `${year}-${month}-${dayValue}`;
+  }
+
+  private todayDateKey(): string {
+    const today = new Date();
+    const month = String(today.getMonth() + 1).padStart(2, "0");
+    const day = String(today.getDate()).padStart(2, "0");
+    return `${today.getFullYear()}-${month}-${day}`;
+  }
+
+  private quizPlannerDateLabel(quiz: any): string {
+    const closeDate = this.toDateKey(quiz?.closeAt);
+    if (closeDate) {
+      return `Due ${this.formatPlannerDate(closeDate)}`;
+    }
+    const openDate = this.toDateKey(quiz?.openAt);
+    return openDate ? `Open ${this.formatPlannerDate(openDate)}` : "No date";
+  }
+
+  private formatPlannerDate(dateKey: string): string {
+    const date = new Date(`${dateKey}T00:00:00`);
+    if (Number.isNaN(date.getTime())) {
+      return dateKey;
+    }
+    return date.toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+      year: "numeric"
+    });
   }
 
   private defaultEventDate(): string {

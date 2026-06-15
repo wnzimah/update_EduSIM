@@ -1,5 +1,5 @@
 import { CommonModule } from "@angular/common";
-import { Component, ElementRef, HostListener, OnInit, ViewChild, inject } from "@angular/core";
+import { Component, ElementRef, HostListener, OnDestroy, OnInit, ViewChild, inject } from "@angular/core";
 import { FormsModule } from "@angular/forms";
 import { ActivatedRoute, Router, RouterLink } from "@angular/router";
 import { forkJoin } from "rxjs";
@@ -42,11 +42,12 @@ type DeleteConfirmState = {
   templateUrl: "./lecturer-question-bank.component.html",
   styleUrl: "./lecturer-question-bank.component.css"
 })
-export class LecturerQuestionBankComponent implements OnInit {
+export class LecturerQuestionBankComponent implements OnInit, OnDestroy {
   private readonly lecturerService = inject(LecturerService);
   private readonly router = inject(Router);
   private readonly route = inject(ActivatedRoute);
   private readonly quickControlsStorageKey = "edusim.quizQuickControls";
+  private readonly quizDraftStorageKey = "edusim.quizDraft";
   @ViewChild("createWrap") private createWrapRef?: ElementRef<HTMLElement>;
   @ViewChild("importQuestionFileInput") private importQuestionFileInput?: ElementRef<HTMLInputElement>;
 
@@ -58,6 +59,7 @@ export class LecturerQuestionBankComponent implements OnInit {
   selectedCourseId: number | null = null;
   selectedQuestionIds: number[] = [];
   editingQuestionId: number | null = null;
+  editingQuizId: number | null = null;
 
   private readonly statusToastDurationMs = 1500;
   private statusMessageTimer: number | null = null;
@@ -87,6 +89,9 @@ export class LecturerQuestionBankComponent implements OnInit {
   quizTransferStatusMessage = "";
   quizTransferErrorMessage = "";
   bulkSelectionMode = false;
+  canvasSelectionMode = false;
+  selectedCanvasDraftIds: number[] = [];
+  selectedCanvasQuestionIds: number[] = [];
   pageMode: "quiz" | "settings" | "questions" | "results" | "bank" = "questions";
   settingsSectionState: Record<SettingsSection, boolean> = {
     general: true,
@@ -99,6 +104,7 @@ export class LecturerQuestionBankComponent implements OnInit {
   private requestedMode = "";
   private requestedSource = "";
   private nextDraftQuestionId = -1;
+  private skipPersistOnDestroy = false;
 
   readonly questionBankPageSizes = [10, 20, 50];
 
@@ -288,8 +294,8 @@ export class LecturerQuestionBankComponent implements OnInit {
         const requested = this.requestedCourseId;
         if (requested && courses.some((course) => course.courseId === requested)) {
           this.selectedCourseId = requested;
-        } else if (!this.selectedCourseId && courses.length > 0) {
-          this.selectedCourseId = courses[0].courseId;
+        } else {
+          this.selectedCourseId = null;
         }
 
         const selectedCourse = this.currentCourse();
@@ -301,7 +307,7 @@ export class LecturerQuestionBankComponent implements OnInit {
         }
         const fromQuizBuilderFlow = this.isBankMode() && this.requestedSource === "quiz";
         if (!this.isBankMode() || fromQuizBuilderFlow) {
-          this.restoreQuizDraftFromStorage(!fromQuizBuilderFlow);
+          this.restoreQuizDraftFromStorage(false, Boolean(requested || fromQuizBuilderFlow));
         }
         this.applyRequestedModeMessage();
         this.loadQuestionBank();
@@ -309,6 +315,12 @@ export class LecturerQuestionBankComponent implements OnInit {
       },
       error: (error) => this.errorMessage = this.extractApiMessage(error, "Failed to load courses")
     });
+  }
+
+  ngOnDestroy(): void {
+    if (!this.skipPersistOnDestroy && this.hasQuizDraftWork()) {
+      this.persistQuizDraftToStorage();
+    }
   }
 
   loadQuestionBank(): void {
@@ -363,6 +375,7 @@ export class LecturerQuestionBankComponent implements OnInit {
     this.selectedCourseId = raw ? Number(raw) : null;
     this.selectedQuestionIds = [];
     this.draftQuestions = [];
+    this.editingQuizId = null;
     const course = this.currentCourse();
     if (course) {
       this.questionForm.moduleTag = course.title;
@@ -425,6 +438,7 @@ export class LecturerQuestionBankComponent implements OnInit {
 
     const draft = this.createDraftQuestion(type);
     this.draftQuestions = [...this.draftQuestions, draft];
+    this.persistQuizDraftToStorage();
     this.statusMessage = `${this.questionTypeLabel(type)} widget added below. Fill it in, then save the question.`;
   }
 
@@ -435,42 +449,7 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   openEditQuestion(item: any): void {
     this.editingQuestionId = Number(item.questionBankId);
-    this.questionForm = this.defaultQuestionForm();
-    this.questionForm.questionType = item.questionType as QuestionType;
-    this.questionForm.difficultyLevel = (item.difficultyLevel || "MEDIUM") as DifficultyLevel;
-    this.questionForm.topicTag = item.topicTag ?? "";
-    this.questionForm.moduleTag = item.moduleTag ?? "";
-    this.questionForm.prompt = item.prompt ?? "";
-    this.questionForm.explanation = item.explanation ?? "";
-    this.questionForm.mediaUrl = item.mediaUrl ?? "";
-    this.questionForm.mediaType = (item.mediaType || "") as MediaType;
-    this.questionForm.points = Number(item.points ?? 1);
-
-    if (this.questionForm.questionType === "TRUE_FALSE") {
-      this.questionForm.trueFalseCorrect = String(item.correctAnswer ?? "True");
-    } else if (this.questionForm.questionType === "SHORT_ANSWER") {
-      this.questionForm.shortAnswer = typeof item.correctAnswer === "string" ? item.correctAnswer : "";
-      const keywords = Array.isArray(item.options?.keywords) ? item.options.keywords : [];
-      this.questionForm.shortAnswerKeywords = keywords.join(", ");
-    } else if (this.questionForm.questionType === "MATCHING") {
-      const left = Array.isArray(item.options?.left) ? item.options.left : [];
-      const right = Array.isArray(item.options?.right) ? item.options.right : [];
-      this.questionForm.matchingPrompts = left.length ? [...left] : ["", "", "", ""];
-      this.questionForm.matchingOptions = right.length ? [...right] : ["", "", "", ""];
-      const map = item.correctAnswer ?? {};
-      this.questionForm.matchingCorrect = this.questionForm.matchingPrompts.map((prompt: string) => map?.[prompt] ?? "");
-      this.questionForm.scoringType = item.options?.scoringType === "PARTIAL" ? "PARTIAL" : "EXACT";
-      this.questionForm.allowDuplicateResponse = Boolean(item.options?.allowDuplicateResponse);
-    } else {
-      const options = Array.isArray(item.options) ? item.options : [];
-      const correctValues = new Set(
-        Array.isArray(item.correctAnswer) ? item.correctAnswer : [item.correctAnswer]
-      );
-      this.questionForm.options = options.length
-        ? options.map((text: string) => ({ text, correct: correctValues.has(text) }))
-        : [{ text: "", correct: true }, { text: "", correct: false }];
-    }
-
+    this.questionForm = this.questionFormFromItem(item);
     this.showCreateModal = true;
   }
 
@@ -514,10 +493,12 @@ export class LecturerQuestionBankComponent implements OnInit {
     return this.pageMode === "bank";
   }
 
+  isCourseLockedByRoute(): boolean {
+    return Boolean(this.requestedCourseId && this.currentCourse());
+  }
+
   tabQueryParams(): Record<string, any> {
-    return {
-      courseId: this.selectedCourseId ?? null
-    };
+    return this.selectedCourseId ? { courseId: this.selectedCourseId } : {};
   }
 
   goToBuilderStep(step: 1 | 2 | 3): void {
@@ -562,6 +543,10 @@ export class LecturerQuestionBankComponent implements OnInit {
     return `${count} ${count === 1 ? "quiz" : "quizzes"}`;
   }
 
+  questionCountLabel(count: number): string {
+    return `${count} ${count === 1 ? "question" : "questions"}`;
+  }
+
   useSelectedInQuizDraft(): void {
     if (this.selectedQuestionIds.length === 0) {
       this.errorMessage = "Please select at least one question first.";
@@ -599,55 +584,34 @@ export class LecturerQuestionBankComponent implements OnInit {
       this.selectedCourseId = courseId;
     }
 
-    const feedbackSettings = quiz?.feedbackSettings && typeof quiz.feedbackSettings === "object"
-      ? quiz.feedbackSettings
-      : {};
-    const reviewTiming = this.normalizeReviewTiming(
-      quiz?.reviewTiming ?? feedbackSettings.reviewTiming ?? (quiz?.showResultImmediately ? "IMMEDIATE_AFTER_SUBMISSION" : "AFTER_DUE_DATE")
-    );
+    this.previewLoading = true;
+    this.lecturerService.previewQuiz(quizId).subscribe({
+      next: (data: any) => {
+        const quizDetails = data?.quiz && typeof data.quiz === "object" ? data.quiz : quiz;
+        const previewQuestions = Array.isArray(data?.questions) ? data.questions : [];
+        this.applyQuizDetailsToForm(quizDetails, previewQuestions);
+        this.editingQuizId = quizId;
+        this.selectedQuestionIds = [];
+        this.draftQuestions = previewQuestions.map((question: any) => this.draftQuestionFromQuizQuestion(question));
 
-    this.quizForm = {
-      ...this.defaultQuizForm(),
-      title: String(quiz?.title ?? ""),
-      description: String(quiz?.description ?? ""),
-      openDate: this.datePartFromDateTime(quiz?.openAt),
-      openTime: this.timePartFromDateTime(quiz?.openAt),
-      closeDate: this.datePartFromDateTime(quiz?.closeAt),
-      closeTime: this.timePartFromDateTime(quiz?.closeAt),
-      resultReleaseDate: this.datePartFromDateTime(quiz?.resultReleaseAt),
-      resultReleaseTime: this.timePartFromDateTime(quiz?.resultReleaseAt),
-      timeLimitMinutes: this.toNonNegativeInt(quiz?.timeLimitMinutes) || "",
-      maxAttempts: this.toNonNegativeInt(quiz?.maxAttempts) || "",
-      passingMark: this.toNonNegativeInt(quiz?.passingMark),
-      published: Boolean(quiz?.published),
-      shuffleQuestions: Boolean(quiz?.shuffleQuestions),
-      shuffleAnswers: Boolean(quiz?.shuffleAnswers),
-      questionDisplayMode: String(quiz?.questionDisplayMode ?? ""),
-      reviewTiming,
-      showResultImmediately: Boolean(quiz?.showResultImmediately),
-      showScoreAfterSubmission: Boolean(feedbackSettings.showScoreAfterSubmission),
-      showSelectedAnswer: Boolean(feedbackSettings.showSelectedAnswer),
-      showCorrectAnswer: Boolean(feedbackSettings.showCorrectAnswer),
-      showExplanation: Boolean(feedbackSettings.showExplanation),
-      showRelatedConcept: Boolean(feedbackSettings.showRelatedConcept),
-      showLearningRecommendation: Boolean(feedbackSettings.showLearningRecommendation),
-      showConfidence: Boolean(feedbackSettings.showConfidence),
-      showScoreBreakdown: Boolean(feedbackSettings.showScoreBreakdown),
-      showStudentAnswerReview: Boolean(feedbackSettings.showStudentAnswerReview)
-    };
-    this.syncTimeLimitPartsFromMinutes();
+        if (!this.persistQuizDraftToStorage()) {
+          this.errorMessage = "Unable to prepare quiz editor.";
+          this.previewLoading = false;
+          return;
+        }
 
-    if (!this.persistQuizDraftToStorage()) {
-      this.errorMessage = "Unable to prepare quiz editor.";
-      return;
-    }
-
-    this.router.navigate(["/lecturer/quiz-builder"], {
-      queryParams: {
-        courseId: (this.selectedCourseId ?? courseId) || null,
-        courseTitle: this.currentCourseTitle() || quiz?.courseTitle || null,
-        quizId,
-        mode: "edit"
+        this.previewLoading = false;
+        this.router.navigate(["/lecturer/quiz-builder"], {
+          queryParams: {
+            courseId: (this.selectedCourseId ?? courseId) || null,
+            courseTitle: this.currentCourseTitle() || quizDetails?.courseTitle || quiz?.courseTitle || null,
+            mode: "edit"
+          }
+        });
+      },
+      error: (error) => {
+        this.errorMessage = this.extractApiMessage(error, "Unable to load quiz for editing.");
+        this.previewLoading = false;
       }
     });
   }
@@ -663,6 +627,53 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   addDraftOption(draft: any): void {
     draft.options.push({ text: `Option ${draft.options.length + 1}`, correct: false });
+    this.persistQuizDraftToStorage();
+  }
+
+  moveOption(index: number, direction: -1 | 1): void {
+    this.moveArrayItem(this.questionForm.options, index, direction);
+  }
+
+  moveDraftOption(draft: any, index: number, direction: -1 | 1): void {
+    if (!Array.isArray(draft?.options)) {
+      return;
+    }
+    this.moveArrayItem(draft.options, index, direction);
+    this.persistQuizDraftToStorage();
+  }
+
+  moveMatchingOption(index: number, direction: -1 | 1): void {
+    this.moveArrayItem(this.questionForm.matchingOptions, index, direction);
+  }
+
+  moveDraftMatchingOption(draft: any, index: number, direction: -1 | 1): void {
+    if (!Array.isArray(draft?.matchingOptions)) {
+      return;
+    }
+    this.moveArrayItem(draft.matchingOptions, index, direction);
+    this.persistQuizDraftToStorage();
+  }
+
+  moveMatchingPrompt(index: number, direction: -1 | 1): void {
+    const target = index + direction;
+    if (!this.canMoveArrayItem(this.questionForm.matchingPrompts, index, direction)) {
+      return;
+    }
+    this.swapArrayItems(this.questionForm.matchingPrompts, index, target);
+    this.swapArrayItems(this.questionForm.matchingCorrect, index, target);
+  }
+
+  moveDraftMatchingPrompt(draft: any, index: number, direction: -1 | 1): void {
+    if (!Array.isArray(draft?.matchingPrompts) || !Array.isArray(draft?.matchingCorrect)) {
+      return;
+    }
+    const target = index + direction;
+    if (!this.canMoveArrayItem(draft.matchingPrompts, index, direction)) {
+      return;
+    }
+    this.swapArrayItems(draft.matchingPrompts, index, target);
+    this.swapArrayItems(draft.matchingCorrect, index, target);
+    this.persistQuizDraftToStorage();
   }
 
   removeOption(index: number): void {
@@ -683,6 +694,7 @@ export class LecturerQuestionBankComponent implements OnInit {
     if (draft.questionType === "MCQ" && !draft.options.some((option: any) => option.correct)) {
       draft.options[0].correct = true;
     }
+    this.persistQuizDraftToStorage();
   }
 
   setSingleCorrect(index: number): void {
@@ -697,6 +709,7 @@ export class LecturerQuestionBankComponent implements OnInit {
       ...option,
       correct: i === index
     }));
+    this.persistQuizDraftToStorage();
   }
 
   setMultiCorrect(index: number, checked: boolean): void {
@@ -705,6 +718,7 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   setDraftMultiCorrect(draft: any, index: number, checked: boolean): void {
     draft.options[index].correct = checked;
+    this.persistQuizDraftToStorage();
   }
 
   addMatchingPrompt(): void {
@@ -763,6 +777,11 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   removeDraftQuestion(tempId: number): void {
     this.draftQuestions = this.draftQuestions.filter((question) => question.tempId !== tempId);
+    this.selectedCanvasDraftIds = this.selectedCanvasDraftIds.filter((id) => id !== Number(tempId));
+    if (!this.hasCanvasQuestions()) {
+      this.canvasSelectionMode = false;
+    }
+    this.persistQuizDraftToStorage();
   }
 
   saveDraftQuestion(draft: any): void {
@@ -790,6 +809,7 @@ export class LecturerQuestionBankComponent implements OnInit {
           this.selectedQuestionIds = [...this.selectedQuestionIds, newId];
         }
         this.draftQuestions = this.draftQuestions.filter((question) => question.tempId !== draft.tempId);
+        this.persistQuizDraftToStorage();
         this.statusMessage = "Question saved and added to quiz.";
         this.loadQuestionBank();
       },
@@ -832,6 +852,7 @@ export class LecturerQuestionBankComponent implements OnInit {
         const newId = Number(response?.questionBankId);
         if (!wasEditing && newId && !this.selectedQuestionIds.includes(newId)) {
           this.selectedQuestionIds.push(newId);
+          this.persistQuizDraftToStorage();
         }
 
         this.loadQuestionBank();
@@ -901,7 +922,7 @@ export class LecturerQuestionBankComponent implements OnInit {
         const typeSummary = this.importedQuestionTypeSummary(generatedQuestions);
         this.importStatusMessage = response?.message
           ? `${response.message}${typeSummary ? " " + typeSummary : ""}`
-          : `${generatedCount || generatedIds.length} question(s) generated from PDF.${typeSummary ? " " + typeSummary : ""}`;
+          : `${this.questionCountLabel(generatedCount || generatedIds.length)} generated from PDF.${typeSummary ? " " + typeSummary : ""}`;
         this.statusMessage = this.importStatusMessage;
         this.importingQuestions = false;
         this.importQuestionFile = null;
@@ -920,6 +941,7 @@ export class LecturerQuestionBankComponent implements OnInit {
         }
         if (this.isQuestionsMode() && generatedIds.length > 0) {
           this.selectedQuestionIds = Array.from(new Set([...this.selectedQuestionIds, ...generatedIds]));
+          this.persistQuizDraftToStorage();
         }
         if (this.importQuestionFileInput?.nativeElement) {
           this.importQuestionFileInput.nativeElement.value = "";
@@ -1009,11 +1031,6 @@ export class LecturerQuestionBankComponent implements OnInit {
       return;
     }
 
-    if (this.draftQuestions.length > 0) {
-      this.errorMessage = "Please save the draft question widgets first before saving the quiz.";
-      return;
-    }
-
     this.onTimeLimitPartChange();
 
     const questionBankIds = Array.from(new Set(
@@ -1021,7 +1038,14 @@ export class LecturerQuestionBankComponent implements OnInit {
         .map((id) => this.asQuestionBankId(id))
         .filter((id: number | null): id is number => id !== null)
     ));
-    if (questionBankIds.length === 0) {
+    let questions: any[] = [];
+    try {
+      questions = this.draftQuestions.map((draft) => this.buildQuestionPayloadFrom(draft));
+    } catch (error) {
+      this.errorMessage = String(error);
+      return;
+    }
+    if (questionBankIds.length === 0 && questions.length === 0) {
       this.errorMessage = "Please select at least one question before creating quiz.";
       return;
     }
@@ -1044,7 +1068,7 @@ export class LecturerQuestionBankComponent implements OnInit {
     }
 
     this.savingQuiz = true;
-    this.lecturerService.createQuiz({
+    const payload = {
       courseId: this.selectedCourseId,
       title: this.quizForm.title.trim(),
       description: this.quizForm.description.trim(),
@@ -1071,19 +1095,32 @@ export class LecturerQuestionBankComponent implements OnInit {
       closeAt,
       resultReleaseAt,
       questionBankIds,
+      questions,
       autoSelect: null
-    }).subscribe({
+    };
+    const editingQuizId = this.asQuestionBankId(this.editingQuizId);
+    const saveRequest = editingQuizId
+      ? this.lecturerService.updateQuiz(editingQuizId, payload)
+      : this.lecturerService.createQuiz(payload);
+
+    saveRequest.subscribe({
       next: (response: any) => {
-        const successMessage = String(response?.message ?? "Quiz successfully created.");
+        const successMessage = String(response?.message ?? (editingQuizId ? "Quiz successfully updated." : "Quiz successfully created."));
         this.showStatusMessage(successMessage);
         if (closeAfterSave) {
-          this.statusMessage = "Quiz successfully created. Returning to course management.";
+          this.statusMessage = `${editingQuizId ? "Quiz successfully updated" : "Quiz successfully created"}. Returning to course management.`;
         } else if (displayAfterSave) {
           this.statusMessage = "Quiz settings saved. Opening Questions page.";
         } else {
-          this.statusMessage = "Quiz successfully created.";
+          this.statusMessage = editingQuizId
+            ? "Quiz successfully updated. Opening Quiz List."
+            : "Quiz successfully created. Opening Quiz List.";
         }
         this.selectedQuestionIds = [];
+        this.draftQuestions = [];
+        this.editingQuizId = null;
+        this.clearQuizDraftStorage();
+        this.skipPersistOnDestroy = true;
         this.refreshQuizList();
         this.savingQuiz = false;
         if (closeAfterSave) {
@@ -1098,7 +1135,13 @@ export class LecturerQuestionBankComponent implements OnInit {
               mode: "edit"
             }
           });
+          return;
         }
+        this.router.navigate(["/lecturer/quiz-overview"], {
+          queryParams: {
+            courseId: this.selectedCourseId ?? null
+          }
+        });
       },
       error: (error) => {
         this.errorMessage = this.extractApiMessage(error, "Failed to save quiz");
@@ -1315,14 +1358,17 @@ export class LecturerQuestionBankComponent implements OnInit {
 
   cancelDraft(): void {
     this.selectedQuestionIds = [];
+    this.draftQuestions = [];
+    this.editingQuizId = null;
     this.quizForm = this.defaultQuizForm();
+    this.clearQuizDraftStorage();
     this.statusMessage = "Draft cleared.";
     this.errorMessage = "";
   }
 
   cancelSettingsDraft(): void {
     this.cancelDraft();
-    sessionStorage.removeItem("edusim.quizDraft");
+    this.skipPersistOnDestroy = true;
     this.returnToCourseManagement();
   }
 
@@ -1419,12 +1465,29 @@ export class LecturerQuestionBankComponent implements OnInit {
   }
 
   setReviewTiming(timing: ReviewTiming): void {
+    this.normalizeQuizDateTimeFields();
     this.quizForm.reviewTiming = timing;
     this.quizForm.showResultImmediately = timing === "IMMEDIATE_AFTER_SUBMISSION";
     if (timing === "AFTER_DUE_DATE") {
       this.quizForm.resultReleaseDate = this.quizForm.closeDate || this.defaultDueDate();
       this.quizForm.resultReleaseTime = this.quizForm.closeTime || "23:59";
     }
+  }
+
+  setQuizDateField(field: "openDate" | "closeDate" | "resultReleaseDate", value: string): void {
+    this.quizForm[field] = this.normalizeDateInput(value);
+    if (field === "closeDate" && this.quizForm.reviewTiming === "AFTER_DUE_DATE") {
+      this.quizForm.resultReleaseDate = this.quizForm.closeDate;
+    }
+    this.persistQuizDraftToStorage();
+  }
+
+  setQuizTimeField(field: "openTime" | "closeTime" | "resultReleaseTime", value: string): void {
+    this.quizForm[field] = this.normalizeTimeInput(value);
+    if (field === "closeTime" && this.quizForm.reviewTiming === "AFTER_DUE_DATE") {
+      this.quizForm.resultReleaseTime = this.quizForm.closeTime;
+    }
+    this.persistQuizDraftToStorage();
   }
 
   reviewTimingLabel(quiz: any): string {
@@ -1549,10 +1612,12 @@ export class LecturerQuestionBankComponent implements OnInit {
     if (checked) {
       if (!this.selectedQuestionIds.includes(normalizedId)) {
         this.selectedQuestionIds = [...this.selectedQuestionIds, normalizedId];
+        this.persistQuizDraftToStorage();
       }
       return;
     }
     this.selectedQuestionIds = this.selectedQuestionIds.filter((id) => id !== normalizedId);
+    this.persistQuizDraftToStorage();
   }
 
   removeSelectedQuestion(questionId: number): void {
@@ -1561,6 +1626,11 @@ export class LecturerQuestionBankComponent implements OnInit {
       return;
     }
     this.selectedQuestionIds = this.selectedQuestionIds.filter((id) => id !== normalizedId);
+    this.selectedCanvasQuestionIds = this.selectedCanvasQuestionIds.filter((id) => id !== normalizedId);
+    if (!this.hasCanvasQuestions()) {
+      this.canvasSelectionMode = false;
+    }
+    this.persistQuizDraftToStorage();
   }
 
   moveSelectedQuestion(questionId: number, direction: -1 | 1): void {
@@ -1581,6 +1651,7 @@ export class LecturerQuestionBankComponent implements OnInit {
     swapped[index] = swapped[target];
     swapped[target] = temp;
     this.selectedQuestionIds = swapped;
+    this.persistQuizDraftToStorage();
   }
 
   repaginateSelectedQuestions(): void {
@@ -1590,6 +1661,7 @@ export class LecturerQuestionBankComponent implements OnInit {
       .map((item) => Number(item.questionBankId));
     if (ordered.length > 0) {
       this.selectedQuestionIds = ordered;
+      this.persistQuizDraftToStorage();
     }
     this.statusMessage = "Question order updated.";
     this.errorMessage = "";
@@ -1603,6 +1675,90 @@ export class LecturerQuestionBankComponent implements OnInit {
     this.errorMessage = "";
   }
 
+  toggleCanvasSelectionMode(): void {
+    if (!this.hasCanvasQuestions()) {
+      return;
+    }
+    this.canvasSelectionMode = !this.canvasSelectionMode;
+    if (!this.canvasSelectionMode) {
+      this.clearCanvasSelection();
+    }
+    this.statusMessage = this.canvasSelectionMode
+      ? "Select questions to delete from this quiz."
+      : "Question selection cancelled.";
+    this.errorMessage = "";
+  }
+
+  clearCanvasSelection(): void {
+    this.selectedCanvasDraftIds = [];
+    this.selectedCanvasQuestionIds = [];
+  }
+
+  canvasSelectionCount(): number {
+    return this.selectedCanvasDraftIds.length + this.selectedCanvasQuestionIds.length;
+  }
+
+  isCanvasDraftSelected(tempId: number): boolean {
+    return this.selectedCanvasDraftIds.includes(Number(tempId));
+  }
+
+  isCanvasQuestionSelected(questionId: number): boolean {
+    const normalizedId = this.asQuestionBankId(questionId);
+    return normalizedId === null ? false : this.selectedCanvasQuestionIds.includes(normalizedId);
+  }
+
+  toggleCanvasDraftSelection(tempId: number, checked: boolean): void {
+    const normalizedId = Number(tempId);
+    if (!Number.isFinite(normalizedId)) {
+      return;
+    }
+    this.selectedCanvasDraftIds = checked
+      ? Array.from(new Set([...this.selectedCanvasDraftIds, normalizedId]))
+      : this.selectedCanvasDraftIds.filter((id) => id !== normalizedId);
+  }
+
+  toggleCanvasQuestionSelection(questionId: number, checked: boolean): void {
+    const normalizedId = this.asQuestionBankId(questionId);
+    if (normalizedId === null) {
+      return;
+    }
+    this.selectedCanvasQuestionIds = checked
+      ? Array.from(new Set([...this.selectedCanvasQuestionIds, normalizedId]))
+      : this.selectedCanvasQuestionIds.filter((id) => id !== normalizedId);
+  }
+
+  areAllCanvasQuestionsSelected(): boolean {
+    return this.hasCanvasQuestions() && this.canvasSelectionCount() === this.canvasQuestionCount();
+  }
+
+  toggleSelectAllCanvasQuestions(): void {
+    if (this.areAllCanvasQuestionsSelected()) {
+      this.clearCanvasSelection();
+      return;
+    }
+    this.selectedCanvasDraftIds = this.draftQuestions
+      .map((draft) => Number(draft.tempId))
+      .filter((id) => Number.isFinite(id));
+    this.selectedCanvasQuestionIds = [...this.selectedQuestionIds];
+  }
+
+  deleteSelectedCanvasQuestions(): void {
+    const selectedDrafts = new Set(this.selectedCanvasDraftIds);
+    const selectedQuestions = new Set(this.selectedCanvasQuestionIds);
+    const total = selectedDrafts.size + selectedQuestions.size;
+    if (total === 0) {
+      this.errorMessage = "Please select at least one question to delete.";
+      return;
+    }
+
+    this.draftQuestions = this.draftQuestions.filter((draft) => !selectedDrafts.has(Number(draft.tempId)));
+    this.selectedQuestionIds = this.selectedQuestionIds.filter((id) => !selectedQuestions.has(id));
+    this.clearCanvasSelection();
+    this.canvasSelectionMode = this.hasCanvasQuestions();
+    this.persistQuizDraftToStorage();
+    this.showStatusMessage(`${total} question${total === 1 ? "" : "s"} removed from this quiz.`);
+  }
+
   saveMaximumGrade(): void {
     this.statusMessage = `Maximum grade set to ${Number(this.quizForm.gradeOut || 0).toFixed(2)}.`;
     this.errorMessage = "";
@@ -1611,6 +1767,9 @@ export class LecturerQuestionBankComponent implements OnInit {
   clearSelectedQuestions(): void {
     this.selectedQuestionIds = [];
     this.draftQuestions = [];
+    this.clearCanvasSelection();
+    this.canvasSelectionMode = false;
+    this.persistQuizDraftToStorage();
   }
 
   isSelected(questionId: number): boolean {
@@ -1670,7 +1829,16 @@ export class LecturerQuestionBankComponent implements OnInit {
   }
 
   needsMixedQuestionWarning(ids = this.selectedQuestionIds): boolean {
-    return ids.length > 1 && this.availableQuestionTypeCount() > 1 && this.selectedQuestionTypeCount(ids) < 2;
+    const types = new Set<string>();
+    ids
+      .map((id) => this.questionBank.find((item) => this.asQuestionBankId(item.questionBankId) === id)?.questionType)
+      .filter(Boolean)
+      .forEach((type) => types.add(String(type)));
+    this.draftQuestions
+      .map((question) => question?.questionType)
+      .filter(Boolean)
+      .forEach((type) => types.add(String(type)));
+    return ids.length + this.draftQuestions.length > 1 && this.availableQuestionTypeCount() > 1 && types.size < 2;
   }
 
   mixSelectedQuestionTypes(): void {
@@ -1857,13 +2025,6 @@ export class LecturerQuestionBankComponent implements OnInit {
       return "Advanced";
     }
     return "Intermediate";
-  }
-
-  copyQuestion(item: any): void {
-    this.openEditQuestion(item);
-    this.editingQuestionId = null;
-    this.questionForm.prompt = `${this.questionForm.prompt} (Copy)`;
-    this.statusMessage = "Question copied into a new draft. Save it to add the copy.";
   }
 
   taggedQuestionCount(): number {
@@ -2055,6 +2216,46 @@ export class LecturerQuestionBankComponent implements OnInit {
     return String.fromCharCode(65 + index);
   }
 
+  canReorderAnswerDetails(item: any): boolean {
+    const type = String(item?.questionType ?? "").toUpperCase();
+    const options = item?.options;
+    return (type === "MCQ" || type === "MULTI_SELECT") && Array.isArray(options) && options.length > 1;
+  }
+
+  reorderSavedQuestionAnswer(item: any, index: number, direction: -1 | 1): void {
+    if (!this.canReorderAnswerDetails(item)) {
+      return;
+    }
+    const questionId = this.asQuestionBankId(item?.questionBankId);
+    if (questionId === null) {
+      return;
+    }
+
+    const form = this.questionFormFromItem(item);
+    if (!this.canMoveArrayItem(form.options, index, direction)) {
+      return;
+    }
+
+    this.moveArrayItem(form.options, index, direction);
+    let payload: any;
+    try {
+      payload = this.buildQuestionPayloadFrom(form);
+    } catch (error) {
+      this.errorMessage = String(error);
+      return;
+    }
+
+    this.lecturerService.updateQuestionBank(questionId, payload).subscribe({
+      next: () => {
+        item.options = payload.options;
+        item.correctAnswer = payload.correctAnswer;
+        this.showStatusMessage("Answer order updated.");
+        this.loadQuestionBank();
+      },
+      error: (error) => this.errorMessage = error?.error?.message ?? "Failed to reorder answer options"
+    });
+  }
+
   questionAnswerDetails(item: any): Array<{ label: string; text: string; correct: boolean }> {
     const type = String(item?.questionType ?? "").toUpperCase();
 
@@ -2234,20 +2435,98 @@ export class LecturerQuestionBankComponent implements OnInit {
   }
 
   private combineDateTime(dateValue: string, timeValue: string): string | null {
-    if (!dateValue || !timeValue) {
+    const date = this.normalizeDateInput(dateValue);
+    const time = this.normalizeTimeInput(timeValue);
+    if (!date || !time) {
       return null;
     }
-    return `${dateValue}T${timeValue}:00`;
+    return `${date}T${time}:00`;
   }
 
   private datePartFromDateTime(value: unknown): string {
-    const match = String(value ?? "").match(/^(\d{4}-\d{2}-\d{2})[T\s]/);
-    return match?.[1] ?? "";
+    const text = String(value ?? "").trim();
+    const match = text.match(/^(\d{4}-\d{2}-\d{2})(?:[T\s]|$)/);
+    return this.normalizeDateInput(match?.[1] ?? text);
   }
 
   private timePartFromDateTime(value: unknown): string {
-    const match = String(value ?? "").match(/^[\d-]+[T\s](\d{2}:\d{2})/);
-    return match?.[1] ?? "";
+    const text = String(value ?? "").trim();
+    const match = text.match(/^[\d-]+[T\s](\d{1,2}:\d{2}(?::\d{2})?(?:\s*[AP]M)?)/i);
+    return this.normalizeTimeInput(match?.[1] ?? text);
+  }
+
+  private normalizeQuizDateTimeFields(): void {
+    this.quizForm.openDate = this.normalizeDateInput(this.quizForm.openDate);
+    this.quizForm.openTime = this.normalizeTimeInput(this.quizForm.openTime);
+    this.quizForm.closeDate = this.normalizeDateInput(this.quizForm.closeDate);
+    this.quizForm.closeTime = this.normalizeTimeInput(this.quizForm.closeTime);
+    this.quizForm.resultReleaseDate = this.normalizeDateInput(this.quizForm.resultReleaseDate);
+    this.quizForm.resultReleaseTime = this.normalizeTimeInput(this.quizForm.resultReleaseTime);
+  }
+
+  private normalizeDateInput(value: unknown): string {
+    const text = String(value ?? "").trim();
+    if (!text) {
+      return "";
+    }
+
+    const iso = text.match(/^(\d{4})-(\d{1,2})-(\d{1,2})/);
+    if (iso) {
+      return this.formatValidDate(Number(iso[1]), Number(iso[2]), Number(iso[3]));
+    }
+
+    const local = text.match(/^(\d{1,2})[\/.-](\d{1,2})[\/.-](\d{4})$/);
+    if (local) {
+      return this.formatValidDate(Number(local[3]), Number(local[2]), Number(local[1]));
+    }
+
+    return "";
+  }
+
+  private normalizeTimeInput(value: unknown): string {
+    let text = String(value ?? "").trim();
+    if (!text) {
+      return "";
+    }
+
+    text = text.replace(/[–—-]\s*$/, "").trim();
+    const match = text.match(/^(\d{1,2}):(\d{2})(?::\d{2})?\s*([AP]M)?$/i);
+    if (!match) {
+      return "";
+    }
+
+    let hours = Number(match[1]);
+    const minutes = Number(match[2]);
+    const meridiem = match[3]?.toUpperCase();
+
+    if (meridiem) {
+      if (hours < 1 || hours > 12) {
+        return "";
+      }
+      if (meridiem === "PM" && hours < 12) {
+        hours += 12;
+      }
+      if (meridiem === "AM" && hours === 12) {
+        hours = 0;
+      }
+    }
+
+    if (!Number.isInteger(hours) || !Number.isInteger(minutes) || hours < 0 || hours > 23 || minutes < 0 || minutes > 59) {
+      return "";
+    }
+
+    return `${String(hours).padStart(2, "0")}:${String(minutes).padStart(2, "0")}`;
+  }
+
+  private formatValidDate(year: number, month: number, day: number): string {
+    if (!Number.isInteger(year) || !Number.isInteger(month) || !Number.isInteger(day)) {
+      return "";
+    }
+    const value = new Date(year, month - 1, day);
+    if (value.getFullYear() !== year || value.getMonth() !== month - 1 || value.getDate() !== day) {
+      return "";
+    }
+    return `${String(year).padStart(4, "0")}-${String(month).padStart(2, "0")}-${String(day).padStart(2, "0")}`;
   }
 
   private normalizeReviewTiming(value: unknown): ReviewTiming {
@@ -2265,6 +2544,7 @@ export class LecturerQuestionBankComponent implements OnInit {
   }
 
   private persistQuizDraftToStorage(): boolean {
+    this.normalizeQuizDateTimeFields();
     this.onTimeLimitPartChange();
 
     const questionIds = Array.from(new Set(
@@ -2274,15 +2554,43 @@ export class LecturerQuestionBankComponent implements OnInit {
     ));
     const payload = {
       courseId: this.selectedCourseId,
+      editingQuizId: this.editingQuizId,
       questionIds,
-      quizForm: this.quizForm
+      quizForm: this.quizForm,
+      draftQuestions: this.draftQuestions.map((draft) => ({
+        ...draft,
+        saving: false,
+        errorMessage: draft?.errorMessage ?? ""
+      }))
     };
     try {
-      sessionStorage.setItem("edusim.quizDraft", JSON.stringify(payload));
+      sessionStorage.setItem(this.quizDraftStorageKey, JSON.stringify(payload));
       return true;
     } catch {
       return false;
     }
+  }
+
+  private clearQuizDraftStorage(): void {
+    try {
+      sessionStorage.removeItem(this.quizDraftStorageKey);
+    } catch {
+      // Ignore unavailable browser storage.
+    }
+  }
+
+  private hasQuizDraftWork(): boolean {
+    const form = this.quizForm ?? {};
+    return Boolean(
+      this.selectedCourseId ||
+      this.selectedQuestionIds.length > 0 ||
+      this.draftQuestions.length > 0 ||
+      String(form.title ?? "").trim() ||
+      String(form.description ?? "").trim() ||
+      String(form.openDate ?? "").trim() ||
+      String(form.closeDate ?? "").trim() ||
+      String(form.gradeOut ?? "").trim()
+    );
   }
 
   private returnToCourseManagement(): void {
@@ -2342,8 +2650,8 @@ export class LecturerQuestionBankComponent implements OnInit {
     }
   }
 
-  private restoreQuizDraftFromStorage(consumeAfterRestore = true): void {
-    const raw = sessionStorage.getItem("edusim.quizDraft");
+  private restoreQuizDraftFromStorage(consumeAfterRestore = true, allowCourseRestore = true): void {
+    const raw = sessionStorage.getItem(this.quizDraftStorageKey);
     if (!raw) {
       return;
     }
@@ -2351,28 +2659,48 @@ export class LecturerQuestionBankComponent implements OnInit {
     try {
       const parsed = JSON.parse(raw);
       const storedCourseId = Number(parsed?.courseId ?? 0);
+      const storedEditingQuizId = Number(parsed?.editingQuizId ?? 0);
       const ids: number[] = Array.isArray(parsed?.questionIds)
         ? parsed.questionIds.map((item: unknown) => Number(item)).filter((item: number) => Number.isFinite(item) && item > 0)
         : [];
 
-      if (storedCourseId > 0 && (!this.selectedCourseId || this.selectedCourseId === storedCourseId)) {
+      if (allowCourseRestore && storedCourseId > 0 && (!this.selectedCourseId || this.selectedCourseId === storedCourseId)) {
         this.selectedCourseId = storedCourseId;
       }
       if (ids.length > 0) {
         this.selectedQuestionIds = Array.from(new Set(ids));
+      }
+      if (storedEditingQuizId > 0) {
+        this.editingQuizId = storedEditingQuizId;
       }
       if (parsed?.quizForm && typeof parsed.quizForm === "object") {
         this.quizForm = {
           ...this.quizForm,
           ...parsed.quizForm
         };
+        this.normalizeQuizDateTimeFields();
         this.syncTimeLimitPartsFromMinutes();
+      }
+      if (Array.isArray(parsed?.draftQuestions)) {
+        this.draftQuestions = parsed.draftQuestions
+          .filter((item: any) => item && typeof item === "object")
+          .map((item: any) => ({
+            ...this.defaultQuestionForm(),
+            ...item,
+            tempId: Number(item.tempId) < 0 ? Number(item.tempId) : this.nextDraftQuestionId--,
+            saving: false,
+            errorMessage: String(item.errorMessage ?? "")
+          }));
+        const tempIds = this.draftQuestions.map((item) => Number(item.tempId)).filter((id) => Number.isFinite(id));
+        if (tempIds.length > 0) {
+          this.nextDraftQuestionId = Math.min(this.nextDraftQuestionId, Math.min(...tempIds) - 1);
+        }
       }
     } catch {
       // ignore invalid draft payload
     } finally {
       if (consumeAfterRestore) {
-        sessionStorage.removeItem("edusim.quizDraft");
+        this.clearQuizDraftStorage();
       }
     }
   }
@@ -2579,6 +2907,129 @@ export class LecturerQuestionBankComponent implements OnInit {
       allowDuplicateResponse: false,
       scoringType: "EXACT" as MatchingScoringType
     };
+  }
+
+  private applyQuizDetailsToForm(quiz: any, questions: any[] = []): void {
+    const feedbackSettings = quiz?.feedbackSettings && typeof quiz.feedbackSettings === "object"
+      ? quiz.feedbackSettings
+      : {};
+    const reviewTiming = this.normalizeReviewTiming(
+      quiz?.reviewTiming ?? feedbackSettings.reviewTiming ?? (quiz?.showResultImmediately ? "IMMEDIATE_AFTER_SUBMISSION" : "AFTER_DUE_DATE")
+    );
+    const gradeOut = Number(quiz?.gradeOut ?? this.sumQuestionPoints(questions));
+
+    this.quizForm = {
+      ...this.defaultQuizForm(),
+      title: String(quiz?.title ?? ""),
+      description: String(quiz?.description ?? ""),
+      gradeOut: Number.isFinite(gradeOut) && gradeOut > 0 ? gradeOut : "",
+      openDate: this.datePartFromDateTime(quiz?.openAt),
+      openTime: this.timePartFromDateTime(quiz?.openAt),
+      closeDate: this.datePartFromDateTime(quiz?.closeAt),
+      closeTime: this.timePartFromDateTime(quiz?.closeAt),
+      resultReleaseDate: this.datePartFromDateTime(quiz?.resultReleaseAt),
+      resultReleaseTime: this.timePartFromDateTime(quiz?.resultReleaseAt),
+      timeLimitMinutes: this.toNonNegativeInt(quiz?.timeLimitMinutes) || "",
+      maxAttempts: this.toNonNegativeInt(quiz?.maxAttempts) || "",
+      passingMark: this.toNonNegativeInt(quiz?.passingMark),
+      published: Boolean(quiz?.published),
+      unlockAfterVideos: Boolean(quiz?.unlockAfterVideos),
+      shuffleQuestions: Boolean(quiz?.shuffleQuestions),
+      shuffleAnswers: Boolean(quiz?.shuffleAnswers),
+      questionDisplayMode: String(quiz?.questionDisplayMode ?? ""),
+      reviewTiming,
+      showResultImmediately: Boolean(quiz?.showResultImmediately),
+      showScoreAfterSubmission: Boolean(feedbackSettings.showScoreAfterSubmission),
+      showSelectedAnswer: Boolean(feedbackSettings.showSelectedAnswer),
+      showCorrectAnswer: Boolean(feedbackSettings.showCorrectAnswer),
+      showExplanation: Boolean(feedbackSettings.showExplanation),
+      showRelatedConcept: Boolean(feedbackSettings.showRelatedConcept),
+      showLearningRecommendation: Boolean(feedbackSettings.showLearningRecommendation),
+      showConfidence: Boolean(feedbackSettings.showConfidence),
+      showScoreBreakdown: Boolean(feedbackSettings.showScoreBreakdown),
+      showStudentAnswerReview: Boolean(feedbackSettings.showStudentAnswerReview)
+    };
+    this.syncTimeLimitPartsFromMinutes();
+  }
+
+  private sumQuestionPoints(questions: any[]): number {
+    return questions.reduce((sum, question) => sum + Math.max(0, Number(question?.points ?? 0)), 0);
+  }
+
+  private draftQuestionFromQuizQuestion(question: any): any {
+    const form = this.questionFormFromItem({
+      ...question,
+      topicTag: question?.topicTag ?? question?.topic ?? "",
+      moduleTag: (question?.moduleTag ?? this.currentCourseTitle()) || "General"
+    });
+
+    return {
+      ...form,
+      tempId: this.nextDraftQuestionId--,
+      saving: false,
+      errorMessage: ""
+    };
+  }
+
+  private questionFormFromItem(item: any): ReturnType<LecturerQuestionBankComponent["defaultQuestionForm"]> {
+    const form = this.defaultQuestionForm();
+    form.questionType = item.questionType as QuestionType;
+    form.difficultyLevel = (item.difficultyLevel || "MEDIUM") as DifficultyLevel;
+    form.topicTag = item.topicTag ?? "";
+    form.moduleTag = item.moduleTag ?? "";
+    form.prompt = item.prompt ?? "";
+    form.explanation = item.explanation ?? "";
+    form.mediaUrl = item.mediaUrl ?? "";
+    form.mediaType = (item.mediaType || "") as MediaType;
+    form.points = Number(item.points ?? 1);
+
+    if (form.questionType === "TRUE_FALSE") {
+      form.trueFalseCorrect = String(item.correctAnswer ?? "True");
+    } else if (form.questionType === "SHORT_ANSWER") {
+      form.shortAnswer = typeof item.correctAnswer === "string" ? item.correctAnswer : "";
+      const keywords = Array.isArray(item.options?.keywords) ? item.options.keywords : [];
+      form.shortAnswerKeywords = keywords.join(", ");
+    } else if (form.questionType === "MATCHING") {
+      const left = Array.isArray(item.options?.left) ? item.options.left : [];
+      const right = Array.isArray(item.options?.right) ? item.options.right : [];
+      form.matchingPrompts = left.length ? [...left] : ["", "", "", ""];
+      form.matchingOptions = right.length ? [...right] : ["", "", "", ""];
+      const map = item.correctAnswer ?? {};
+      form.matchingCorrect = form.matchingPrompts.map((prompt: string) => map?.[prompt] ?? "");
+      form.scoringType = item.options?.scoringType === "PARTIAL" ? "PARTIAL" : "EXACT";
+      form.allowDuplicateResponse = Boolean(item.options?.allowDuplicateResponse);
+    } else {
+      const options = Array.isArray(item.options) ? item.options : [];
+      const correctValues = new Set(
+        Array.isArray(item.correctAnswer) ? item.correctAnswer : [item.correctAnswer]
+      );
+      form.options = options.length
+        ? options.map((text: string) => ({ text, correct: correctValues.has(text) }))
+        : [{ text: "", correct: true }, { text: "", correct: false }];
+    }
+
+    return form;
+  }
+
+  private moveArrayItem<T>(items: T[], index: number, direction: -1 | 1): void {
+    if (!this.canMoveArrayItem(items, index, direction)) {
+      return;
+    }
+    this.swapArrayItems(items, index, index + direction);
+  }
+
+  private canMoveArrayItem(items: unknown[] | undefined, index: number, direction: -1 | 1): boolean {
+    if (!Array.isArray(items)) {
+      return false;
+    }
+    const target = index + direction;
+    return index >= 0 && target >= 0 && index < items.length && target < items.length;
+  }
+
+  private swapArrayItems<T>(items: T[], sourceIndex: number, targetIndex: number): void {
+    const source = items[sourceIndex];
+    items[sourceIndex] = items[targetIndex];
+    items[targetIndex] = source;
   }
 
   private createDraftQuestion(type: QuestionType): any {

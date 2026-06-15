@@ -241,6 +241,16 @@ public class LecturerController {
         return lecturerService.createQuiz(request, lecturer);
     }
 
+    @PutMapping("/quizzes/{quizId}")
+    public Map<String, Object> updateQuiz(
+        @PathVariable Long quizId,
+        @Valid @RequestBody QuizRequest request,
+        Authentication authentication
+    ) {
+        UserAccount lecturer = authService.getCurrentUser(authentication);
+        return lecturerService.updateQuiz(quizId, request, lecturer);
+    }
+
     @GetMapping("/quizzes")
     public List<Map<String, Object>> quizzes(
         @RequestParam(required = false) Long courseId,

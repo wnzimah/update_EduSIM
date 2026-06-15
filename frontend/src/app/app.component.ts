@@ -46,7 +46,7 @@ export class AppComponent {
   showNotifications = false;
   showLanguageMenu = false;
   showHelpMenu = false;
-  isSidebarOpen = true;
+  isSidebarOpen = false;
   notificationLoading = false;
   notificationError = "";
   notifications: AppNotification[] = [];
@@ -73,7 +73,7 @@ export class AppComponent {
           this.isSidebarOpen = false;
           this.hasOpenedAuthenticatedShell = false;
         } else if (this.session() && !this.hasOpenedAuthenticatedShell) {
-          this.isSidebarOpen = true;
+          this.isSidebarOpen = false;
           this.hasOpenedAuthenticatedShell = true;
         }
       }
@@ -443,7 +443,7 @@ export class AppComponent {
 
   private lecturerNotifications(dashboard: any): AppNotification[] {
     const recent = Array.isArray(dashboard?.recentActivity) ? dashboard.recentActivity : [];
-    return recent.slice(0, 6).map((item: any) => ({
+    const submissions = recent.map((item: any) => ({
       id: `submission-${item.attemptId}`,
       title: "New quiz submission",
       detail: `${item.studentName} submitted ${item.quizTitle}`,
@@ -451,6 +451,23 @@ export class AppComponent {
       createdAt: item.submittedAt,
       tone: item.passed ? "success" : "warning"
     }));
+    const recentQuizzes = Array.isArray(dashboard?.recentQuizzes) ? dashboard.recentQuizzes : [];
+    const quizzes = recentQuizzes.map((item: any) => ({
+      id: `quiz-${item.quizId}`,
+      title: item.published ? "Quiz published" : "Quiz created",
+      detail: `${item.quizTitle} in ${item.courseTitle}`,
+      route: `/lecturer/quiz-overview?courseId=${item.courseId}`,
+      createdAt: item.createdAt,
+      tone: "info" as const
+    }));
+    return [...quizzes, ...submissions]
+      .sort((a, b) => this.notificationTimestamp(b.createdAt) - this.notificationTimestamp(a.createdAt))
+      .slice(0, 6);
+  }
+
+  private notificationTimestamp(value: unknown): number {
+    const timestamp = new Date(String(value ?? "")).getTime();
+    return Number.isFinite(timestamp) ? timestamp : 0;
   }
 
   private studentNotifications(dashboard: any): AppNotification[] {

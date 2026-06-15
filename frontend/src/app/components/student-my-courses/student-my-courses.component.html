@@ -166,7 +166,7 @@
           <div class="empty-assignments">
             <span class="assignment-art" aria-hidden="true"></span>
             <h3>No upcoming tasks for now</h3>
-            <p>Your next quiz, video, or revision slot will appear here.</p>
+            <p>Your next quiz, pending video, or custom planner task will appear here.</p>
           </div>
         } @else {
           <ul class="assignment-list">
@@ -174,7 +174,7 @@
               <li [class]="eventClass(event)" (click)="openPlannerEvent(event)">
                 <div>
                   <strong>{{ event.title }}</strong>
-                  <span>{{ event.date }} · {{ event.category }}</span>
+                  <span>{{ plannerEventMeta(event) }}</span>
                 </div>
                 <button type="button" [disabled]="!canOpenPlannerEvent(event)">Open</button>
               </li>
@@ -241,7 +241,7 @@
                 <li [class]="eventClass(event)">
                   <div>
                     <strong>{{ event.title }}</strong>
-                    <span>{{ event.category }} · {{ event.auto ? "Auto" : "Custom" }}</span>
+                    <span>{{ plannerEventMeta(event) }} | {{ event.auto ? "Auto" : "Custom" }}</span>
                   </div>
                   <div class="planner-event-actions">
                     @if (canOpenPlannerEvent(event)) {

@@ -96,7 +96,7 @@
           <h2>Find Questions</h2>
           <p>Use topic, type, difficulty, date, or keyword to narrow the list.</p>
         </div>
-        <strong>{{ filteredQuestionBank().length }} question(s)</strong>
+        <strong>{{ questionCountLabel(filteredQuestionBank().length) }}</strong>
       </header>
       <div class="filter-grid">
         <div class="field-block">
@@ -190,6 +190,17 @@
                 <p>Add questions manually or import from your question bank.</p>
               </div>
               <div>
+                @if (!canvasSelectionMode) {
+                  <button class="modern-btn ghost canvas-select-toggle" type="button" [disabled]="!hasCanvasQuestions()" (click)="toggleCanvasSelectionMode()">Select</button>
+                } @else {
+                  <button class="modern-btn ghost canvas-select-toggle" type="button" (click)="toggleSelectAllCanvasQuestions()">
+                    {{ areAllCanvasQuestionsSelected() ? "Unselect All" : "Select All" }}
+                  </button>
+                  <button class="modern-btn danger canvas-delete-selected" type="button" [disabled]="canvasSelectionCount() === 0" (click)="deleteSelectedCanvasQuestions()">
+                    Delete Selected ({{ canvasSelectionCount() }})
+                  </button>
+                  <button class="modern-btn ghost canvas-select-toggle" type="button" (click)="toggleCanvasSelectionMode()">Cancel</button>
+                }
                 <button class="modern-btn ghost pdf-generate-btn" type="button" [disabled]="importingQuestions || !selectedCourseId" (click)="openPdfQuestionGenerator()">
                   {{ importingQuestions ? "Generating..." : "Generate Question from PDF" }}
                 </button>
@@ -207,11 +218,20 @@
               }
 
               @for (draft of draftQuestions; track draft.tempId; let draftIndex = $index) {
-                <article class="modern-question-card draft">
+                <article class="modern-question-card draft" [class.selection-mode]="canvasSelectionMode" [class.selected]="isCanvasDraftSelected(draft.tempId)">
                   <span class="drag-handle">&#8942;&#8942;</span>
+                  @if (canvasSelectionMode) {
+                    <label class="canvas-question-check" [attr.aria-label]="'Select question ' + (selectedQuestions().length + draftIndex + 1)">
+                      <input
+                        type="checkbox"
+                        [checked]="isCanvasDraftSelected(draft.tempId)"
+                        (change)="toggleCanvasDraftSelection(draft.tempId, $any($event.target).checked)">
+                      <span aria-hidden="true"></span>
+                    </label>
+                  }
                   <div class="modern-question-body">
                     <div class="modern-question-card-head">
-                      <span class="modern-q-number">Q{{ draftIndex + 1 }}</span>
+                      <span class="modern-q-number">Q{{ selectedQuestions().length + draftIndex + 1 }}</span>
                       <span class="modern-type-pill">{{ questionTypeLabel(draft.questionType) }}</span>
                       <label class="modern-points-inline">
                         Points
@@ -227,14 +247,20 @@
                     @if (draft.questionType === "MCQ" || draft.questionType === "MULTI_SELECT") {
                       <div class="modern-draft-options">
                         @for (option of draft.options; track $index; let optionIndex = $index) {
-                          <label [class.correct]="draft.options[optionIndex].correct">
-                            @if (draft.questionType === "MCQ") {
-                              <input type="radio" [name]="'modernDraftCorrect' + draft.tempId" [checked]="draft.options[optionIndex].correct" (change)="setDraftSingleCorrect(draft, optionIndex)">
-                            } @else {
-                              <input type="checkbox" [checked]="draft.options[optionIndex].correct" (change)="setDraftMultiCorrect(draft, optionIndex, $any($event.target).checked)">
-                            }
+                          <div class="modern-draft-option-row" [class.correct]="draft.options[optionIndex].correct">
+                            <label class="option-correct-toggle">
+                              @if (draft.questionType === "MCQ") {
+                                <input type="radio" [name]="'modernDraftCorrect' + draft.tempId" [checked]="draft.options[optionIndex].correct" (change)="setDraftSingleCorrect(draft, optionIndex)">
+                              } @else {
+                                <input type="checkbox" [checked]="draft.options[optionIndex].correct" (change)="setDraftMultiCorrect(draft, optionIndex, $any($event.target).checked)">
+                              }
+                            </label>
                             <input [(ngModel)]="draft.options[optionIndex].text" [name]="'modernDraftOption' + draft.tempId + '-' + optionIndex" [placeholder]="'Option ' + (optionIndex + 1)">
-                          </label>
+                            <div class="answer-reorder-controls" aria-label="Reorder answer">
+                              <button type="button" [disabled]="optionIndex === 0" (click)="moveDraftOption(draft, optionIndex, -1)">&#8593;</button>
+                              <button type="button" [disabled]="optionIndex === draft.options.length - 1" (click)="moveDraftOption(draft, optionIndex, 1)">&#8595;</button>
+                            </div>
+                          </div>
                         }
                         <button type="button" class="modern-link-btn" (click)="addDraftOption(draft)">Add Option</button>
                       </div>
@@ -259,7 +285,7 @@
                                   [(ngModel)]="draft.matchingPrompts[matchIndex]"
                                   [name]="'modernDraftPromptMatch' + draft.tempId + '-' + matchIndex"
                                   [placeholder]="'Prompt ' + (matchIndex + 1)">
-                                <button type="button" aria-label="Remove prompt" (click)="removeDraftMatchingPrompt(draft, matchIndex)">Delete</button>
+                                <button type="button" class="inline-delete-option" aria-label="Remove prompt" title="Remove prompt" (click)="removeDraftMatchingPrompt(draft, matchIndex)">X</button>
                               </div>
                             }
                             <button type="button" class="modern-link-btn" (click)="addDraftMatchingPrompt(draft)">Add Prompt</button>
@@ -273,7 +299,11 @@
                                   [(ngModel)]="draft.matchingOptions[answerIndex]"
                                   [name]="'modernDraftAnswerMatch' + draft.tempId + '-' + answerIndex"
                                   [placeholder]="'Answer ' + (answerIndex + 1)">
-                                <button type="button" aria-label="Remove answer" (click)="removeDraftMatchingOption(draft, answerIndex)">Delete</button>
+                                <div class="answer-reorder-controls" aria-label="Reorder answer">
+                                  <button type="button" [disabled]="answerIndex === 0" (click)="moveDraftMatchingOption(draft, answerIndex, -1)">&#8593;</button>
+                                  <button type="button" [disabled]="answerIndex === draft.matchingOptions.length - 1" (click)="moveDraftMatchingOption(draft, answerIndex, 1)">&#8595;</button>
+                                </div>
+                                <button type="button" class="inline-delete-option" aria-label="Remove answer" title="Remove answer" (click)="removeDraftMatchingOption(draft, answerIndex)">X</button>
                               </div>
                             }
                             <button type="button" class="modern-link-btn" (click)="addDraftMatchingOption(draft)">Add Answer</button>
@@ -323,18 +353,27 @@
                     </div>
                   </div>
                 </article>
-                <div class="modern-insert-row">
+                <div class="modern-insert-row draft-insert-row">
                   <button type="button" (click)="openModernWidgetList()">+</button>
                   <span>Add question here</span>
                 </div>
               }
 
               @for (item of selectedQuestions(); track item.questionBankId; let i = $index) {
-                <article class="modern-question-card">
+                <article class="modern-question-card" [class.selection-mode]="canvasSelectionMode" [class.selected]="isCanvasQuestionSelected(item.questionBankId)">
                   <span class="drag-handle">&#8942;&#8942;</span>
+                  @if (canvasSelectionMode) {
+                    <label class="canvas-question-check" [attr.aria-label]="'Select question ' + (i + 1)">
+                      <input
+                        type="checkbox"
+                        [checked]="isCanvasQuestionSelected(item.questionBankId)"
+                        (change)="toggleCanvasQuestionSelection(item.questionBankId, $any($event.target).checked)">
+                      <span aria-hidden="true"></span>
+                    </label>
+                  }
                   <div class="modern-question-body">
                     <div class="modern-question-card-head">
-                      <span class="modern-q-number">Q{{ draftQuestions.length + i + 1 }}</span>
+                      <span class="modern-q-number">Q{{ i + 1 }}</span>
                       <span
                         class="modern-type-pill"
                         [class.tf]="item.questionType === 'TRUE_FALSE'"
@@ -358,6 +397,12 @@
                             <div class="modern-answer-row" [class.correct]="answer.correct">
                               <span class="modern-answer-label">{{ answer.label }}</span>
                               <span class="modern-answer-text">{{ answer.text }}</span>
+                              @if (canReorderAnswerDetails(item)) {
+                                <div class="answer-reorder-controls compact" aria-label="Reorder answer">
+                                  <button type="button" [disabled]="$index === 0" (click)="reorderSavedQuestionAnswer(item, $index, -1)">&#8593;</button>
+                                  <button type="button" [disabled]="$index === questionAnswerDetails(item).length - 1" (click)="reorderSavedQuestionAnswer(item, $index, 1)">&#8595;</button>
+                                </div>
+                              }
                               @if (answer.correct) {
                                 <span class="modern-answer-correct">Correct</span>
                               }
@@ -368,12 +413,12 @@
                     }
                   </div>
                   <div class="modern-question-actions">
-                    <button type="button" class="modern-icon-btn" (click)="openEditQuestion(item)">Copy</button>
+                    <button type="button" class="modern-icon-btn" title="Edit question" aria-label="Edit question" (click)="openEditQuestion(item)">Edit</button>
                     <button type="button" class="modern-icon-btn danger" (click)="removeSelectedQuestion(item.questionBankId)">Delete</button>
                     <button type="button" class="modern-icon-btn">&#8964;</button>
                   </div>
                 </article>
-                <div class="modern-insert-row">
+                <div class="modern-insert-row selected-insert-row">
                   <button type="button" (click)="openModernWidgetList()">+</button>
                   <span>Add question here</span>
                 </div>
@@ -594,7 +639,7 @@
             <ul class="moodle-question-list">
               @for (draft of draftQuestions; track draft.tempId; let draftIndex = $index) {
                 <li class="canvas-question-card inline-draft-card">
-                  <div class="idx-col">Q{{ draftIndex + 1 }}</div>
+                  <div class="idx-col">Q{{ selectedQuestions().length + draftIndex + 1 }}</div>
                   <div class="question-col inline-draft-body">
                     <div class="inline-draft-head">
                       <span
@@ -642,7 +687,7 @@
                               [(ngModel)]="draft.options[optionIndex].text"
                               [name]="'draftOption' + draft.tempId + '-' + optionIndex"
                               [placeholder]="'Option ' + (optionIndex + 1)">
-                            <button type="button" class="inline-delete-option" (click)="removeDraftOption(draft, optionIndex)">&#128465;</button>
+                            <button type="button" class="inline-delete-option" aria-label="Remove option" title="Remove option" (click)="removeDraftOption(draft, optionIndex)">X</button>
                           </div>
                         }
                         <button type="button" class="inline-add-option" (click)="addDraftOption(draft)">Add Option</button>
@@ -682,7 +727,7 @@
                           @for (prompt of draft.matchingPrompts; track $index; let matchIndex = $index) {
                             <div class="inline-pair-row">
                               <input [(ngModel)]="draft.matchingPrompts[matchIndex]" [name]="'draftPromptMatch' + draft.tempId + '-' + matchIndex">
-                              <button type="button" class="inline-delete-option" (click)="removeDraftMatchingPrompt(draft, matchIndex)">&#128465;</button>
+                              <button type="button" class="inline-delete-option" aria-label="Remove prompt" title="Remove prompt" (click)="removeDraftMatchingPrompt(draft, matchIndex)">X</button>
                             </div>
                           }
                           <button type="button" class="inline-add-option" (click)="addDraftMatchingPrompt(draft)">Add Prompt</button>
@@ -692,7 +737,7 @@
                           @for (answer of draft.matchingOptions; track $index; let answerIndex = $index) {
                             <div class="inline-pair-row">
                               <input [(ngModel)]="draft.matchingOptions[answerIndex]" [name]="'draftAnswerMatch' + draft.tempId + '-' + answerIndex">
-                              <button type="button" class="inline-delete-option" (click)="removeDraftMatchingOption(draft, answerIndex)">&#128465;</button>
+                              <button type="button" class="inline-delete-option" aria-label="Remove answer" title="Remove answer" (click)="removeDraftMatchingOption(draft, answerIndex)">X</button>
                             </div>
                           }
                           <button type="button" class="inline-add-option" (click)="addDraftMatchingOption(draft)">Add Answer</button>
@@ -756,7 +801,7 @@
                     <button class="mini-icon" type="button" [disabled]="i === 0" (click)="moveSelectedQuestion(item.questionBankId, -1)">&#8593;</button>
                     <button class="mini-icon" type="button" [disabled]="i === selectedQuestions().length - 1" (click)="moveSelectedQuestion(item.questionBankId, 1)">&#8595;</button>
                   </div>
-                  <div class="idx-col">Q{{ draftQuestions.length + i + 1 }}</div>
+                  <div class="idx-col">Q{{ i + 1 }}</div>
                   <div class="question-col">
                     <p class="question-label">Question</p>
                     <p class="selected-title">{{ item.prompt }}</p>
@@ -859,7 +904,7 @@
         <div>
           <nav class="modern-breadcrumb" aria-label="Breadcrumb">
             <span>Assessment Hub</span>
-            <span>{{ currentCourse()?.title || "Course" }}</span>
+            <span>{{ currentCourse()?.title || "Select course" }}</span>
             <strong>Quiz Settings</strong>
           </nav>
           <h1>Create New Quiz</h1>
@@ -928,6 +973,21 @@
               </header>
 
               <label class="modern-field full">
+                <span>Course *</span>
+                <select
+                  [ngModel]="selectedCourseId ?? ''"
+                  (ngModelChange)="onCourseChange($event)"
+                  [disabled]="isCourseLockedByRoute()"
+                  name="modernCourseIdSettings">
+                  <option value="">Select course</option>
+                  @for (course of courses; track course.courseId) {
+                    <option [value]="course.courseId">{{ course.title }}</option>
+                  }
+                </select>
+                <small>{{ isCourseLockedByRoute() ? "Course fixed from dashboard." : "Choose the course this quiz belongs to." }}</small>
+              </label>
+
+              <label class="modern-field full">
                 <span>Quiz Name *</span>
                 <input id="quizTitleSettings" name="modernQuizTitleSettings" [(ngModel)]="quizForm.title" placeholder="Enter quiz name">
                 <small>{{ quizForm.title.length || 0 }}/100</small>
@@ -961,15 +1021,15 @@
                 <label class="modern-field">
                   <span>Open Date / Time</span>
                   <div class="modern-date-row">
-                    <input type="date" [(ngModel)]="quizForm.openDate" name="modernOpenDateSettings">
-                    <input type="time" [(ngModel)]="quizForm.openTime" name="modernOpenTimeSettings">
+                    <input type="date" [ngModel]="quizForm.openDate" (ngModelChange)="setQuizDateField('openDate', $event)" name="modernOpenDateSettings" autocomplete="off">
+                    <input type="time" [ngModel]="quizForm.openTime" (ngModelChange)="setQuizTimeField('openTime', $event)" name="modernOpenTimeSettings" autocomplete="off">
                   </div>
                 </label>
                 <label class="modern-field">
                   <span>Close Date / Time</span>
                   <div class="modern-date-row">
-                    <input type="date" [(ngModel)]="quizForm.closeDate" name="modernCloseDateSettings">
-                    <input type="time" [(ngModel)]="quizForm.closeTime" name="modernCloseTimeSettings">
+                    <input type="date" [ngModel]="quizForm.closeDate" (ngModelChange)="setQuizDateField('closeDate', $event)" name="modernCloseDateSettings" autocomplete="off">
+                    <input type="time" [ngModel]="quizForm.closeTime" (ngModelChange)="setQuizTimeField('closeTime', $event)" name="modernCloseTimeSettings" autocomplete="off">
                   </div>
                 </label>
               </div>
@@ -1518,12 +1578,17 @@
                   </span>
                 </td>
                 <td class="table-actions premium-actions">
-                  <button class="mini-link-btn" type="button" (click)="togglePublish(quiz.quizId, !quiz.published)">
+                  <button
+                    class="mini-link-btn"
+                    type="button"
+                    [title]="quiz.published ? 'Off / Unpublish' : 'Publish'"
+                    [attr.aria-label]="quiz.published ? 'Off / Unpublish' : 'Publish'"
+                    (click)="togglePublish(quiz.quizId, !quiz.published)">
                     <span class="mini-action-icon" aria-hidden="true">{{ quiz.published ? "⏻" : "✓" }}</span>
                     <span>{{ quiz.published ? "Off / Unpublish" : "Publish" }}</span>
                   </button>
                   @if (canReleaseQuizResult(quiz)) {
-                  <button class="mini-link-btn" type="button" (click)="releaseQuizResult(quiz)">
+                  <button class="mini-link-btn" type="button" title="Release Result" aria-label="Release Result" (click)="releaseQuizResult(quiz)">
                       <span class="mini-action-icon" aria-hidden="true">↗</span>
                       <span>Release Result</span>
                     </button>
@@ -1546,11 +1611,7 @@
                     </span>
                     <span>Preview</span>
                   </button>
-                  <button class="mini-link-btn" type="button" (click)="duplicateQuiz(quiz.quizId)">
-                    <span class="mini-action-icon" aria-hidden="true">⧉</span>
-                    <span>Copy / Duplicate</span>
-                  </button>
-                  <button class="mini-link-btn" type="button" (click)="exportQuizBackup(quiz.quizId)">
+                  <button class="mini-link-btn quiz-export-btn" type="button" (click)="exportQuizBackup(quiz.quizId)">
                     <span class="mini-action-icon" aria-hidden="true">↓</span>
                     <span>Export (DL)</span>
                   </button>
@@ -1560,6 +1621,8 @@
                   </button>
                   <a
                     class="mini-link-btn"
+                    title="Attempts"
+                    aria-label="Attempts"
                     routerLink="/lecturer/student-attempts"
                     [queryParams]="{ courseId: selectedCourseId ?? quiz.courseId, courseTitle: currentCourseTitle() || quiz.courseTitle, quizId: quiz.quizId }">
                     <span class="mini-action-icon" aria-hidden="true">↗</span>
@@ -1612,9 +1675,13 @@
         <div class="bank-selection-toolbar">
           <div>
             <strong>{{ selectedCountLabel() }}</strong>
-            <span>Choose an action for the selected question(s).</span>
+            <span>Choose an action for the selected {{ questionCountLabel(selectedQuestionIds.length) }}.</span>
           </div>
           <div class="bank-selection-actions">
+            <button type="button" class="bank-import-selection" (click)="useSelectedInQuizDraft()">
+              <span aria-hidden="true">+</span>
+              {{ selectedQuestionIds.length === 1 ? "Import Question" : "Import Questions" }}
+            </button>
             <button type="button" class="bank-clear-selection" (click)="clearSelectedQuestions()">
               Clear selection
             </button>
@@ -1703,7 +1770,6 @@
                 <td class="center-col">
                   <div class="bank-row-actions">
                     <button type="button" class="bank-icon-btn view" title="View question" aria-label="View question" (click)="openEditQuestion(item)"></button>
-                    <button type="button" class="bank-icon-btn copy" title="Copy question" aria-label="Copy question" (click)="copyQuestion(item)"></button>
                     <button type="button" class="bank-icon-btn edit" title="Edit question" aria-label="Edit question" (click)="openEditQuestion(item)"></button>
                     <button type="button" class="bank-icon-btn delete" title="Delete question" aria-label="Delete question" (click)="deleteQuestion(item.questionBankId)"></button>
                   </div>
@@ -1874,7 +1940,11 @@
                       [(ngModel)]="questionForm.options[i].text"
                       [placeholder]="'Option ' + (i + 1)"
                       required>
-                    <button type="button" class="simple-delete-btn" (click)="removeOption(i)" aria-label="Remove option">Delete</button>
+                    <div class="answer-reorder-controls" aria-label="Reorder answer">
+                      <button type="button" [disabled]="i === 0" (click)="moveOption(i, -1)">&#8593;</button>
+                      <button type="button" [disabled]="i === questionForm.options.length - 1" (click)="moveOption(i, 1)">&#8595;</button>
+                    </div>
+                    <button type="button" class="simple-delete-btn" (click)="removeOption(i)" aria-label="Remove option" title="Remove option">X</button>
                   </div>
                 }
               </div>
@@ -1925,7 +1995,11 @@
                   @for (prompt of questionForm.matchingPrompts; track $index; let i = $index) {
                     <div class="simple-inline-row">
                       <input [name]="'prompt' + i" [placeholder]="'Prompt ' + (i + 1)" [(ngModel)]="questionForm.matchingPrompts[i]">
-                      <button type="button" class="simple-delete-btn" (click)="removeMatchingPrompt(i)">Delete</button>
+                      <div class="answer-reorder-controls" aria-label="Reorder prompt">
+                        <button type="button" [disabled]="i === 0" (click)="moveMatchingPrompt(i, -1)">&#8593;</button>
+                        <button type="button" [disabled]="i === questionForm.matchingPrompts.length - 1" (click)="moveMatchingPrompt(i, 1)">&#8595;</button>
+                      </div>
+                      <button type="button" class="simple-delete-btn" (click)="removeMatchingPrompt(i)" aria-label="Remove prompt" title="Remove prompt">X</button>
                     </div>
                   }
                   <button type="button" class="simple-link-btn" (click)="addMatchingPrompt()">Add Prompt</button>
@@ -1935,7 +2009,11 @@
                   @for (item of questionForm.matchingOptions; track $index; let i = $index) {
                     <div class="simple-inline-row">
                       <input [name]="'possible' + i" [placeholder]="'Answer ' + (i + 1)" [(ngModel)]="questionForm.matchingOptions[i]">
-                      <button type="button" class="simple-delete-btn" (click)="removeMatchingOption(i)">Delete</button>
+                      <div class="answer-reorder-controls" aria-label="Reorder answer">
+                        <button type="button" [disabled]="i === 0" (click)="moveMatchingOption(i, -1)">&#8593;</button>
+                        <button type="button" [disabled]="i === questionForm.matchingOptions.length - 1" (click)="moveMatchingOption(i, 1)">&#8595;</button>
+                      </div>
+                      <button type="button" class="simple-delete-btn" (click)="removeMatchingOption(i)" aria-label="Remove answer" title="Remove answer">X</button>
                     </div>
                   }
                   <button type="button" class="simple-link-btn" (click)="addMatchingOption()">Add Answer</button>

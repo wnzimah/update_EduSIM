@@ -77,10 +77,9 @@ public class DataSeeder implements CommandLineRunner {
 
     @Override
     public void run(String... args) throws Exception {
-        UserAccount lecturer = userAccountRepository.findByEmail("lecturer@edusim.com")
-            .orElseGet(() -> createUser("Dr. Nadia Rahman", "lecturer@edusim.com", Role.LECTURER));
-        UserAccount student = userAccountRepository.findByEmail("student@edusim.com")
-            .orElseGet(() -> createUser("Aiman Hakim", "student@edusim.com", Role.STUDENT));
+        UserAccount lecturer = ensureUser("Dr. Nadia Rahman", "lecturer@edusim.com", Role.LECTURER, "password123");
+        UserAccount student = ensureUser("Aiman Hakim", "student@edusim.com", Role.STUDENT, "password123");
+        UserAccount alia = ensureUser("Alia", "alia141@gmail.com", Role.STUDENT, "141@Edusim");
 
         if (courseRepository.findByLecturerId(lecturer.getId()).isEmpty()) {
             seedAcademicData(lecturer, student);
@@ -89,15 +88,41 @@ public class DataSeeder implements CommandLineRunner {
         ensureDefaultCourseCatalog(lecturer, student);
         ensureDataIntegrationVideoLink();
         ensureDataIntegrationMaterials();
+        enrollStudentInLecturerCourses(alia, lecturer);
     }
 
-    private UserAccount createUser(String fullName, String email, Role role) {
+    private UserAccount ensureUser(String fullName, String email, Role role, String password) {
+        return userAccountRepository.findByEmail(email)
+            .map(user -> {
+                boolean changed = false;
+                if (!fullName.equals(user.getFullName())) {
+                    user.setFullName(fullName);
+                    changed = true;
+                }
+                if (user.getRole() != role) {
+                    user.setRole(role);
+                    changed = true;
+                }
+                if (!passwordEncoder.matches(password, user.getPasswordHash())) {
+                    user.setPasswordHash(passwordEncoder.encode(password));
+                    changed = true;
+                }
+                return changed ? userAccountRepository.save(user) : user;
+            })
+            .orElseGet(() -> createUser(fullName, email, role, password));
+    }
+
+    private UserAccount createUser(String fullName, String email, Role role, String password) {
         UserAccount user = new UserAccount();
         user.setFullName(fullName);
         user.setEmail(email);
         user.setRole(role);
-        user.setPasswordHash(passwordEncoder.encode("password123"));
+        user.setPasswordHash(passwordEncoder.encode(password));
         return userAccountRepository.save(user);
+    }
+
+    private void enrollStudentInLecturerCourses(UserAccount student, UserAccount lecturer) {
+        courseRepository.findByLecturerId(lecturer.getId()).forEach(course -> enroll(student, course));
     }
 
     private void seedAcademicData(UserAccount lecturer, UserAccount student) throws JsonProcessingException {

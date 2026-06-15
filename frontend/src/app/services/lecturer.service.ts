@@ -168,6 +168,10 @@ export class LecturerService {
     return this.http.post(`${environment.apiBaseUrl}/lecturer/quizzes`, payload);
   }
 
+  updateQuiz(quizId: number, payload: any): Observable<any> {
+    return this.http.put(`${environment.apiBaseUrl}/lecturer/quizzes/${quizId}`, payload);
+  }
+
   quizzes(courseId?: number): Observable<any[]> {
     const suffix = courseId ? `?courseId=${courseId}` : "";
     return this.http.get<any[]>(`${environment.apiBaseUrl}/lecturer/quizzes${suffix}`);

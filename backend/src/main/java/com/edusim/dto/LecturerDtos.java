@@ -70,6 +70,20 @@ public class LecturerDtos {
     ) {
     }
 
+    public record QuizQuestionRequest(
+        @NotNull QuestionType questionType,
+        DifficultyLevel difficultyLevel,
+        String topicTag,
+        @NotBlank String prompt,
+        String explanation,
+        String mediaUrl,
+        String mediaType,
+        Object options,
+        Object correctAnswer,
+        @NotNull @Min(1) Integer points
+    ) {
+    }
+
     public record QuizRequest(
         @NotNull Long courseId,
         @NotBlank String title,
@@ -98,6 +112,7 @@ public class LecturerDtos {
         LocalDateTime closeAt,
         LocalDateTime resultReleaseAt,
         @NotNull List<Long> questionBankIds,
+        List<QuizQuestionRequest> questions,
         QuizAutoSelectRequest autoSelect
     ) {
     }

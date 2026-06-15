@@ -7,6 +7,7 @@ import com.edusim.dto.LecturerDtos.MaterialRequest;
 import com.edusim.dto.LecturerDtos.PublishRequest;
 import com.edusim.dto.LecturerDtos.QuestionBankRequest;
 import com.edusim.dto.LecturerDtos.QuizAutoSelectRequest;
+import com.edusim.dto.LecturerDtos.QuizQuestionRequest;
 import com.edusim.dto.LecturerDtos.QuizRequest;
 import com.edusim.dto.LecturerDtos.VideoRequest;
 import com.edusim.model.Course;
@@ -198,6 +199,19 @@ public class LecturerService {
             ))
             .toList();
 
+        List<Map<String, Object>> recentQuizzes = quizRepository
+            .findTop10ByCourseLecturerIdOrderByCreatedAtDesc(lecturer.getId())
+            .stream()
+            .map(quiz -> Map.<String, Object>of(
+                "quizId", quiz.getId(),
+                "quizTitle", quiz.getTitle(),
+                "courseId", quiz.getCourse().getId(),
+                "courseTitle", quiz.getCourse().getTitle(),
+                "published", quiz.isPublished(),
+                "createdAt", quiz.getCreatedAt()
+            ))
+            .toList();
+
         return Map.of(
             "lecturer", Map.of(
                 "id", lecturer.getId(),
@@ -210,7 +224,8 @@ public class LecturerService {
                 "quizzes", quizzes,
                 "students", studentIds.size()
             ),
-            "recentActivity", recentActivity
+            "recentActivity", recentActivity,
+            "recentQuizzes", recentQuizzes
         );
     }
 
@@ -531,7 +546,13 @@ public class LecturerService {
 
         String fileName = trimToDefault(file.getOriginalFilename(), "uploaded-file");
         String text = extractImportText(file, fileName);
-        List<ImportedQuestionSeed> explicitQuestions = explicitImportedQuestions(text);
+        List<ImportedQuestionSeed> explicitQuestions = explicitMatchingWorksheetQuestions(text);
+        if (explicitQuestions.isEmpty()) {
+            explicitQuestions = explicitMcqWorksheetQuestions(text);
+        }
+        if (explicitQuestions.isEmpty()) {
+            explicitQuestions = explicitImportedQuestions(text);
+        }
         List<String> sourceSentences = explicitQuestions.isEmpty() ? sourceSentences(text) : List.of();
         if (explicitQuestions.isEmpty() && sourceSentences.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Not enough readable text found to generate questions.");
@@ -606,25 +627,79 @@ public class LecturerService {
         LocalDateTime releaseAt = resolveResultReleaseAt(reviewTiming, request.closeAt(), request.resultReleaseAt());
         validateQuizSchedule(request.openAt(), request.closeAt(), releaseAt, reviewTiming);
 
-        List<QuestionBankItem> bankItems = new ArrayList<>();
-        if (!request.questionBankIds().isEmpty()) {
-            bankItems = questionBankItemRepository
-                .findByIdInAndCourseLecturerId(request.questionBankIds(), lecturer.getId());
-            if (bankItems.size() != request.questionBankIds().size()) {
-                throw new ApiException(HttpStatus.BAD_REQUEST, "Some question bank items are invalid");
-            }
-        } else if (request.autoSelect() != null) {
+        List<QuestionBankItem> bankItems = resolveQuestionBankItems(request, course, lecturer);
+        List<QuizQuestionRequest> inlineQuestions = inlineQuizQuestions(request);
+        if (bankItems.isEmpty() && inlineQuestions.isEmpty() && request.autoSelect() != null) {
             bankItems = autoSelectBankItems(course, lecturer, request.autoSelect());
             if (bankItems.isEmpty()) {
                 throw new ApiException(HttpStatus.BAD_REQUEST, "No question found for auto selection criteria");
             }
         }
-        if (bankItems.isEmpty()) {
+        if (bankItems.isEmpty() && inlineQuestions.isEmpty()) {
             throw new ApiException(HttpStatus.BAD_REQUEST, "Please select at least one question before creating quiz.");
         }
-        ensureQuizHasMixedQuestionTypes(course, lecturer, bankItems);
+        ensureQuizHasMixedQuestionTypes(course, lecturer, bankItems, inlineQuestions);
 
         Quiz quiz = new Quiz();
+        applyQuizRequest(quiz, course, request, reviewTiming, releaseAt);
+        quizRepository.save(quiz);
+
+        List<Question> questions = buildQuizQuestions(quiz, course, bankItems, inlineQuestions);
+        questionRepository.saveAll(questions);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "Quiz successfully created.");
+        response.put("quizId", quiz.getId());
+        response.put("questionCount", questions.size());
+        response.put("openAt", quiz.getOpenAt());
+        response.put("closeAt", quiz.getCloseAt());
+        response.put("resultReleaseAt", effectiveResultReleaseAt(quiz));
+        return response;
+    }
+
+    @Transactional
+    public Map<String, Object> updateQuiz(Long quizId, QuizRequest request, UserAccount lecturer) {
+        Quiz quiz = getOwnedQuiz(quizId, lecturer);
+        Course course = getOwnedCourse(request.courseId(), lecturer);
+        if (request.closeAt() == null) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Due date/time is required for quiz.");
+        }
+        ReviewTiming reviewTiming = resolveReviewTiming(request.reviewTiming(), request.showResultImmediately());
+        LocalDateTime releaseAt = resolveResultReleaseAt(reviewTiming, request.closeAt(), request.resultReleaseAt());
+        validateQuizSchedule(request.openAt(), request.closeAt(), releaseAt, reviewTiming);
+
+        List<QuestionBankItem> bankItems = resolveQuestionBankItems(request, course, lecturer);
+        List<QuizQuestionRequest> inlineQuestions = inlineQuizQuestions(request);
+        if (bankItems.isEmpty() && inlineQuestions.isEmpty()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Please select at least one question before saving quiz.");
+        }
+        ensureQuizHasMixedQuestionTypes(course, lecturer, bankItems, inlineQuestions);
+
+        applyQuizRequest(quiz, course, request, reviewTiming, releaseAt);
+        quizRepository.save(quiz);
+        clearQuizRuntimeData(quiz.getId());
+        questionRepository.deleteByQuizId(quiz.getId());
+
+        List<Question> questions = buildQuizQuestions(quiz, course, bankItems, inlineQuestions);
+        questionRepository.saveAll(questions);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("message", "Quiz successfully updated.");
+        response.put("quizId", quiz.getId());
+        response.put("questionCount", questions.size());
+        response.put("openAt", quiz.getOpenAt());
+        response.put("closeAt", quiz.getCloseAt());
+        response.put("resultReleaseAt", effectiveResultReleaseAt(quiz));
+        return response;
+    }
+
+    private void applyQuizRequest(
+        Quiz quiz,
+        Course course,
+        QuizRequest request,
+        ReviewTiming reviewTiming,
+        LocalDateTime releaseAt
+    ) {
         quiz.setCourse(course);
         quiz.setTitle(request.title());
         quiz.setDescription(trimToNull(request.description()));
@@ -644,8 +719,40 @@ public class LecturerService {
         quiz.setShowExplanation(enabled(request.showExplanation()));
         quiz.setShowRelatedConcept(enabled(request.showRelatedConcept()));
         quiz.setShowLearningRecommendation(enabled(request.showLearningRecommendation()));
-        quizRepository.save(quiz);
+    }
 
+    private List<QuestionBankItem> resolveQuestionBankItems(QuizRequest request, Course course, UserAccount lecturer) {
+        List<Long> questionBankIds = request.questionBankIds() == null ? List.of() : request.questionBankIds();
+        if (questionBankIds.isEmpty()) {
+            return new ArrayList<>();
+        }
+        List<QuestionBankItem> bankItems = questionBankItemRepository
+            .findByIdInAndCourseLecturerId(questionBankIds, lecturer.getId());
+        if (bankItems.size() != questionBankIds.size()) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Some question bank items are invalid");
+        }
+        if (bankItems.stream().anyMatch(item -> !Objects.equals(item.getCourse().getId(), course.getId()))) {
+            throw new ApiException(HttpStatus.BAD_REQUEST, "Some question bank items are not in the selected course.");
+        }
+
+        Map<Long, QuestionBankItem> byId = bankItems.stream()
+            .collect(LinkedHashMap::new, (map, item) -> map.put(item.getId(), item), Map::putAll);
+        return questionBankIds.stream()
+            .map(byId::get)
+            .filter(Objects::nonNull)
+            .toList();
+    }
+
+    private List<QuizQuestionRequest> inlineQuizQuestions(QuizRequest request) {
+        return request.questions() == null ? List.of() : request.questions();
+    }
+
+    private List<Question> buildQuizQuestions(
+        Quiz quiz,
+        Course course,
+        List<QuestionBankItem> bankItems,
+        List<QuizQuestionRequest> inlineQuestions
+    ) {
         List<Question> questions = new ArrayList<>();
         int sort = 1;
         for (QuestionBankItem bank : bankItems) {
@@ -664,16 +771,23 @@ public class LecturerService {
             question.setDifficultyLevel(bank.getDifficultyLevel() == null ? DifficultyLevel.MEDIUM : bank.getDifficultyLevel());
             questions.add(question);
         }
-        questionRepository.saveAll(questions);
-
-        Map<String, Object> response = new LinkedHashMap<>();
-        response.put("message", "Quiz successfully created.");
-        response.put("quizId", quiz.getId());
-        response.put("questionCount", questions.size());
-        response.put("openAt", quiz.getOpenAt());
-        response.put("closeAt", quiz.getCloseAt());
-        response.put("resultReleaseAt", effectiveResultReleaseAt(quiz));
-        return response;
+        for (QuizQuestionRequest inline : inlineQuestions) {
+            Question question = new Question();
+            question.setQuiz(quiz);
+            question.setQuestionType(inline.questionType());
+            question.setPrompt(inline.prompt());
+            question.setExplanation(trimToNull(inline.explanation()));
+            question.setMediaUrl(trimToNull(inline.mediaUrl()));
+            question.setMediaType(trimToNull(inline.mediaType()));
+            question.setOptionsJson(writeSafe(inline.options()));
+            question.setCorrectAnswerJson(writeSafe(inline.correctAnswer()));
+            question.setPoints(inline.points());
+            question.setSortOrder(sort++);
+            question.setTopic(trimToDefault(inline.topicTag(), course.getTitle()));
+            question.setDifficultyLevel(inline.difficultyLevel() == null ? DifficultyLevel.MEDIUM : inline.difficultyLevel());
+            questions.add(question);
+        }
+        return questions;
     }
 
     @Transactional(readOnly = true)
@@ -1819,8 +1933,14 @@ public class LecturerService {
         return selected;
     }
 
-    private void ensureQuizHasMixedQuestionTypes(Course course, UserAccount lecturer, List<QuestionBankItem> bankItems) {
-        if (bankItems.size() <= 1 || countQuestionTypes(bankItems) > 1) {
+    private void ensureQuizHasMixedQuestionTypes(
+        Course course,
+        UserAccount lecturer,
+        List<QuestionBankItem> bankItems,
+        List<QuizQuestionRequest> inlineQuestions
+    ) {
+        long questionCount = bankItems.size() + inlineQuestions.size();
+        if (questionCount <= 1 || countQuestionTypes(bankItems, inlineQuestions) > 1) {
             return;
         }
 
@@ -1831,6 +1951,19 @@ public class LecturerService {
                 "Please include mixed question types in this quiz, for example MCQ with multi-select, true/false, short answer, or matching."
             );
         }
+    }
+
+    private long countQuestionTypes(List<QuestionBankItem> bankItems, List<QuizQuestionRequest> inlineQuestions) {
+        Set<QuestionType> types = new LinkedHashSet<>();
+        bankItems.stream()
+            .map(QuestionBankItem::getQuestionType)
+            .filter(Objects::nonNull)
+            .forEach(types::add);
+        inlineQuestions.stream()
+            .map(QuizQuestionRequest::questionType)
+            .filter(Objects::nonNull)
+            .forEach(types::add);
+        return types.size();
     }
 
     private long countQuestionTypes(List<QuestionBankItem> bankItems) {
@@ -1997,11 +2130,20 @@ public class LecturerService {
             text.append(unescapePdfText(matcher.group(1))).append(" ");
         }
 
+        Matcher hexMatcher = Pattern.compile("<([0-9A-Fa-f\\s]{4,4000})>\\s*T[Jj]").matcher(source);
+        while (hexMatcher.find() && text.length() < 20000) {
+            text.append(decodePdfHexText(hexMatcher.group(1))).append(" ");
+        }
+
         Matcher arrayMatcher = Pattern.compile("\\[(.*?)\\]\\s*TJ", Pattern.DOTALL).matcher(source);
         while (arrayMatcher.find() && text.length() < 20000) {
             Matcher chunkMatcher = Pattern.compile("\\(([^()]{1,800})\\)").matcher(arrayMatcher.group(1));
             while (chunkMatcher.find()) {
                 text.append(unescapePdfText(chunkMatcher.group(1))).append(" ");
+            }
+            Matcher hexChunkMatcher = Pattern.compile("<([0-9A-Fa-f\\s]{2,4000})>").matcher(arrayMatcher.group(1));
+            while (hexChunkMatcher.find() && text.length() < 20000) {
+                text.append(decodePdfHexText(hexChunkMatcher.group(1))).append(" ");
             }
         }
     }
@@ -2072,6 +2214,37 @@ public class LecturerService {
             .replace("\\n", " ")
             .replace("\\r", " ")
             .replace("\\t", " ");
+    }
+
+    private String decodePdfHexText(String hex) {
+        String cleaned = hex == null ? "" : hex.replaceAll("\\s+", "");
+        if (cleaned.length() < 2) {
+            return "";
+        }
+        if (cleaned.length() % 2 != 0) {
+            cleaned = cleaned + "0";
+        }
+        byte[] bytes = new byte[cleaned.length() / 2];
+        for (int i = 0; i < cleaned.length(); i += 2) {
+            try {
+                bytes[i / 2] = (byte) Integer.parseInt(cleaned.substring(i, i + 2), 16);
+            } catch (NumberFormatException ex) {
+                return "";
+            }
+        }
+        if (bytes.length >= 2 && bytes[0] == (byte) 0xFE && bytes[1] == (byte) 0xFF) {
+            return new String(bytes, 2, bytes.length - 2, StandardCharsets.UTF_16BE);
+        }
+        int zeroBytes = 0;
+        for (int i = 0; i < bytes.length; i += 2) {
+            if (bytes[i] == 0) {
+                zeroBytes++;
+            }
+        }
+        if (bytes.length >= 4 && zeroBytes >= bytes.length / 4) {
+            return new String(bytes, StandardCharsets.UTF_16BE);
+        }
+        return new String(bytes, StandardCharsets.ISO_8859_1);
     }
 
     private String normalizeImportedText(String text) {
@@ -2172,6 +2345,162 @@ public class LecturerService {
             }
         }
         return questions;
+    }
+
+    private List<ImportedQuestionSeed> explicitMatchingWorksheetQuestions(String text) {
+        String source = normalizeImportedText(text);
+        String normalized = normalize(source);
+        if (!normalized.contains("answer key") || !normalized.contains("correct answer")) {
+            return List.of();
+        }
+        if (!normalized.contains("match") && !normalized.contains("column a") && !normalized.contains("column b")) {
+            return List.of();
+        }
+
+        List<MatchingAnswerKeyEntry> entries = matchingAnswerKeyEntries(source);
+        if (entries.size() < 2) {
+            return List.of();
+        }
+
+        String title = matchingWorksheetTitle(source);
+        String instruction = matchingWorksheetInstruction(source);
+        String prompt = trimToDefault(title, "Matching Question")
+            + ". "
+            + trimToDefault(instruction, "Match the item in Column A with the correct answer in Column B.")
+            + ": "
+            + String.join("; ", entries.stream().map(MatchingAnswerKeyEntry::left).toList());
+        String answer = String.join("; ", entries.stream().map(MatchingAnswerKeyEntry::right).toList());
+        return List.of(new ImportedQuestionSeed(1, prompt, answer));
+    }
+
+    private List<MatchingAnswerKeyEntry> matchingAnswerKeyEntries(String text) {
+        String answerKeyText = text.replaceFirst("(?is)^.*?\\bAnswer\\s+Key\\b", "");
+        Matcher matcher = Pattern
+            .compile(
+                "(?is)(?:^|\\s)(\\d{1,3})\\s*[.)]\\s+(.{2,90}?)\\s+([A-Z])\\s*[-–—]\\s*(.+?)(?=(?:\\s+\\d{1,3}\\s*[.)]\\s+.{2,90}?\\s+[A-Z]\\s*[-–—])|\\s+Topic\\s*:|$)"
+            )
+            .matcher(answerKeyText);
+        List<MatchingAnswerKeyEntry> entries = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        while (matcher.find() && entries.size() < 30) {
+            String left = cleanMatchingWorksheetCell(matcher.group(2));
+            String right = cleanMatchingWorksheetCell(matcher.group(4));
+            if (left.isBlank() || right.isBlank()) {
+                continue;
+            }
+            String key = normalize(left);
+            if (seen.add(key)) {
+                entries.add(new MatchingAnswerKeyEntry(left, right));
+            }
+        }
+        return entries;
+    }
+
+    private List<ImportedQuestionSeed> explicitMcqWorksheetQuestions(String text) {
+        String source = normalizeImportedText(text);
+        String normalized = normalize(source);
+        if (!normalized.contains("answer key") && !normalized.contains("ringkasan jawapan")) {
+            return List.of();
+        }
+        if (!normalized.contains("multiple choice") && !normalized.contains("mcq") && !normalized.contains("pilih satu jawapan")) {
+            return List.of();
+        }
+
+        Map<Integer, String> answers = mcqAnswerKey(source);
+        if (answers.isEmpty()) {
+            return List.of();
+        }
+
+        String questionText = source
+            .replaceFirst("(?is)\\bAnswer\\s+Key\\b.*$", "")
+            .replaceFirst("(?is)\\bRingkasan\\s+Jawapan\\b.*$", "");
+        Matcher matcher = Pattern
+            .compile(
+                "(?is)(?:^|\\s)(\\d{1,3})\\s*[.)]\\s*(.+?)\\s+A\\s*[.)]\\s*(.+?)\\s+B\\s*[.)]\\s*(.+?)\\s+C\\s*[.)]\\s*(.+?)\\s+D\\s*[.)]\\s*(.+?)(?=(?:\\s+\\d{1,3}\\s*[.)]\\s*)|$)"
+            )
+            .matcher(questionText);
+        List<ImportedQuestionSeed> questions = new ArrayList<>();
+        Set<Integer> seen = new HashSet<>();
+        while (matcher.find() && questions.size() < 50) {
+            int number = Integer.parseInt(matcher.group(1));
+            if (!seen.add(number)) {
+                continue;
+            }
+            String answer = answers.get(number);
+            if (answer == null || answer.isBlank()) {
+                continue;
+            }
+            String prompt = cleanMcqPrompt(matcher.group(2))
+                + " A. " + cleanMcqOption(matcher.group(3))
+                + " B. " + cleanMcqOption(matcher.group(4))
+                + " C. " + cleanMcqOption(matcher.group(5))
+                + " D. " + cleanMcqOption(matcher.group(6));
+            if (!prompt.isBlank()) {
+                questions.add(new ImportedQuestionSeed(number, prompt, answer));
+            }
+        }
+        return questions;
+    }
+
+    private Map<Integer, String> mcqAnswerKey(String text) {
+        String answerText = text;
+        Matcher sectionMatcher = Pattern
+            .compile("(?is)(?:\\bAnswer\\s+Key\\b|\\bRingkasan\\s+Jawapan\\b)(.*)$")
+            .matcher(text);
+        if (sectionMatcher.find()) {
+            answerText = sectionMatcher.group(1);
+        }
+
+        Map<Integer, String> answers = new LinkedHashMap<>();
+        Matcher matcher = Pattern
+            .compile("(?is)(?:^|\\s)(\\d{1,3})\\s*[.)]?\\s+([A-D])\\b")
+            .matcher(answerText);
+        while (matcher.find() && answers.size() < 50) {
+            int number = Integer.parseInt(matcher.group(1));
+            answers.putIfAbsent(number, matcher.group(2).toUpperCase());
+        }
+        return answers;
+    }
+
+    private String cleanMcqPrompt(String value) {
+        return cleanMatchingWorksheetCell(value)
+            .replaceAll("(?i)^(Arahan|Instructions?)\\s*[:\\-].*?\\s+", "")
+            .replaceAll("(?i)^Topic\\s*:.+?\\s+", "")
+            .trim();
+    }
+
+    private String cleanMcqOption(String value) {
+        return cleanMatchingWorksheetCell(value)
+            .replaceAll("(?is)\\s+(?:Answer\\s+Key|Ringkasan\\s+Jawapan).*$", "")
+            .trim();
+    }
+
+    private String matchingWorksheetTitle(String text) {
+        Matcher matcher = Pattern.compile("(?is)^\\s*(.{8,120}?Matching Questions?)\\b").matcher(text);
+        if (matcher.find()) {
+            return cleanMatchingWorksheetCell(matcher.group(1));
+        }
+        return "Matching Question";
+    }
+
+    private String matchingWorksheetInstruction(String text) {
+        Matcher matcher = Pattern
+            .compile("(?is)\\b(Match\\s+the\\s+.{8,180}?Column\\s+B\\.)")
+            .matcher(text);
+        if (matcher.find()) {
+            return cleanMatchingWorksheetCell(matcher.group(1));
+        }
+        return "Match the item in Column A with the correct answer in Column B.";
+    }
+
+    private String cleanMatchingWorksheetCell(String value) {
+        return value == null ? "" : value
+            .replaceAll("_{2,}", "")
+            .replaceAll("(?i)^Correct\\s+Answer\\s*", "")
+            .replaceAll("(?i)^Question\\s*", "")
+            .replaceAll("\\s+", " ")
+            .replaceAll("[.;,\\s]+$", "")
+            .trim();
     }
 
     private String cleanImportedQuestionText(String value) {
@@ -2863,6 +3192,9 @@ public class LecturerService {
     }
 
     private record ImportedQuestionSeed(int sourceNumber, String prompt, String answer) {
+    }
+
+    private record MatchingAnswerKeyEntry(String left, String right) {
     }
 
     private QuizResetRequest getOwnedResetRequest(UserAccount lecturer, Long requestId) {
