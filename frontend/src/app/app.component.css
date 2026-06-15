@@ -4052,3 +4052,138 @@ main.page {
   width: calc(100% - var(--portal-sidebar-collapsed-width)) !important;
   max-width: calc(100% - var(--portal-sidebar-collapsed-width)) !important;
 }
+
+/* Device-adaptive shell: phones use full-width content and horizontal nav. */
+@media (max-width: 900px) {
+  :host {
+    --portal-sidebar-width: 0px;
+    --portal-sidebar-collapsed-width: 0px;
+    --portal-nav-height: auto;
+  }
+
+  :host .academy-shell,
+  :host .academy-shell.academy-shell-with-sidebar,
+  :host .academy-shell.academy-shell-with-sidebar.academy-shell-sidebar-collapsed {
+    position: sticky;
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  :host .updates-strip {
+    min-height: 0;
+    padding: 10px 14px;
+  }
+
+  :host .updates-copy strong {
+    font-size: 16px;
+  }
+
+  :host .updates-copy span {
+    font-size: 12px;
+    white-space: normal;
+  }
+
+  :host .academy-nav {
+    min-height: 0;
+    padding: 8px 10px;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  :host .academy-brand,
+  :host .academy-search,
+  :host .top-actions {
+    display: none !important;
+  }
+
+  :host .main-menu-trigger,
+  :host .sidebar-toggle {
+    width: 42px;
+    height: 42px;
+  }
+
+  :host .academy-links {
+    order: 3;
+    width: 100%;
+    height: auto;
+    margin-left: 0;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    padding: 4px 0 2px;
+    gap: 6px;
+  }
+
+  :host .academy-links a {
+    min-width: max-content;
+    min-height: 38px;
+    border: 1px solid #e2e8f0;
+    border-radius: 8px;
+    background: #ffffff;
+    padding: 0 12px;
+  }
+
+  :host .academy-links a.active-link {
+    border-color: #bfd2ff;
+    background: #eef6ff;
+  }
+
+  :host .portal-sidebar,
+  :host .portal-sidebar.portal-sidebar-collapsed {
+    position: fixed !important;
+    inset: auto 10px 10px 10px !important;
+    z-index: 120;
+    width: auto !important;
+    min-width: 0 !important;
+    max-height: min(70dvh, 520px);
+    border-radius: 12px;
+    transform: translateY(calc(100% + 18px));
+    transition: transform 0.2s ease;
+    overflow: auto;
+  }
+
+  :host .portal-sidebar:not(.portal-sidebar-collapsed) {
+    transform: translateY(0);
+  }
+
+  :host .portal-sidebar-collapsed .sidebar-logo-copy,
+  :host .portal-sidebar-collapsed .sidebar-link-text,
+  :host .portal-sidebar-collapsed .sidebar-nav-title,
+  :host .portal-sidebar-collapsed .sidebar-section-title,
+  :host .portal-sidebar-collapsed .sidebar-user-copy,
+  :host .portal-sidebar-collapsed .sidebar-user-chevron {
+    display: initial !important;
+  }
+
+  :host main.page.page-with-sidebar,
+  :host main.page.page-with-sidebar.page-sidebar-collapsed,
+  :host .page-with-sidebar,
+  :host .page-with-sidebar.page-sidebar-collapsed {
+    margin-left: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  :host .portal-footer.portal-footer-with-sidebar,
+  :host main.page.page-sidebar-collapsed ~ .portal-footer.portal-footer-with-sidebar {
+    left: 0 !important;
+    width: 100% !important;
+  }
+}
+
+@media (max-width: 560px) {
+  :host .updates-strip {
+    display: none;
+  }
+
+  :host .academy-nav {
+    border-bottom-color: #dbe4f0;
+  }
+
+  :host .main-menu-drawer {
+    left: 8px;
+    right: 8px;
+    width: auto;
+    max-width: none;
+  }
+}

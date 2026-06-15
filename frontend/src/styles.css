@@ -629,3 +629,76 @@ tbody tr:hover {
   background: var(--edusim-danger-soft) !important;
   color: var(--edusim-danger) !important;
 }
+
+/* Adaptive baseline for phones, tablets, and narrow browser windows. */
+img,
+video,
+canvas,
+svg {
+  max-width: 100%;
+}
+
+:where(.page, .container, .panel, section, article, form, table, input, select, textarea, button) {
+  min-width: 0;
+}
+
+@media (max-width: 900px) {
+  :root {
+    --layout-container-max: 100%;
+    --field-control-height: 44px;
+    --field-control-font-size: 15px;
+    --field-max-width: 100%;
+    --textarea-max-width: 100%;
+  }
+
+  body {
+    overflow-x: hidden;
+  }
+
+  .container {
+    width: min(100% - 24px, 100%);
+  }
+
+  .page {
+    padding: 16px 0 28px;
+  }
+
+  :where(.panel) {
+    border-radius: 8px;
+  }
+
+  :where(table) {
+    min-width: 760px;
+  }
+
+  :where(.table-wrap, .quiz-table-wrap, .attempt-table-wrap, .bank-table-wrap) {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+@media (max-width: 560px) {
+  .container {
+    width: min(100% - 16px, 100%);
+  }
+
+  h1 {
+    font-size: clamp(26px, 8vw, 36px);
+  }
+
+  h2 {
+    font-size: clamp(20px, 6vw, 28px);
+  }
+
+  :where(.modal-backdrop, .confirm-backdrop, .planner-modal-backdrop, .submit-modal-backdrop, .login-modal-backdrop, .forgot-modal-backdrop) {
+    align-items: end;
+    padding: 10px;
+  }
+
+  :where(.modal-shell, .confirm-modal, .planner-modal, .submit-modal, .forgot-modal, .auth-card[role="dialog"]) {
+    width: 100% !important;
+    max-width: 100% !important;
+    max-height: calc(100dvh - 20px);
+    overflow: auto;
+  }
+}
