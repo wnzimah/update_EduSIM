@@ -41,6 +41,7 @@ export class LecturerMonitoringComponent implements OnInit {
   scopedCourseId: number | null = null;
   scopedCourseTitle = "";
   revealedHardestAnswers = new Set<number>();
+  releasingQuizIds = new Set<number>();
   currentView: MonitoringView = "attempts";
   readonly attemptsPageSizes = [10, 20, 50];
 
@@ -253,11 +254,11 @@ export class LecturerMonitoringComponent implements OnInit {
   }
 
   displayedPassCount(): number {
-    return this.filteredResults().filter((item) => item.passed).length;
+    return this.filteredResults().filter((item) => this.isScorePassed(item)).length;
   }
 
   displayedFailCount(): number {
-    return this.filteredResults().filter((item) => !item.passed).length;
+    return this.filteredResults().filter((item) => !this.isScorePassed(item)).length;
   }
 
   completedAttemptsCount(): number {
@@ -328,11 +329,15 @@ export class LecturerMonitoringComponent implements OnInit {
     if (rows.length === 0) {
       return 0;
     }
-    const passCount = rows.filter((item) => item.passed).length;
+    const passCount = rows.filter((item) => this.isScorePassed(item)).length;
     return Math.round((passCount / rows.length) * 100);
   }
 
   weakTopics(): any[] {
+    const rows = this.filteredResults();
+    if (rows.some((item) => Array.isArray(item?.weakTopics))) {
+      return this.aggregateWeakTopics(rows);
+    }
     return Array.isArray(this.insights?.weakTopics) ? this.insights.weakTopics : [];
   }
 
@@ -341,10 +346,18 @@ export class LecturerMonitoringComponent implements OnInit {
   }
 
   totalCorrectAnswers(): number {
+    const rows = this.filteredResults();
+    if (rows.some((item) => item?.correctAnswerCount !== undefined)) {
+      return rows.reduce((sum, item) => sum + Number(item?.correctAnswerCount ?? 0), 0);
+    }
     return Number(this.insights?.correctAnswerCount ?? 0);
   }
 
   totalWrongAnswers(): number {
+    const rows = this.filteredResults();
+    if (rows.some((item) => item?.wrongAnswerCount !== undefined)) {
+      return rows.reduce((sum, item) => sum + Number(item?.wrongAnswerCount ?? 0), 0);
+    }
     return Number(this.insights?.wrongAnswerCount ?? 0);
   }
 
@@ -375,10 +388,30 @@ export class LecturerMonitoringComponent implements OnInit {
   }
 
   confidenceRiskMessage(): string {
+    const highConfidenceWrong = this.filteredResults()
+      .reduce((sum, item) => sum + Number(item?.highConfidenceWrong ?? 0), 0);
+    if (highConfidenceWrong > 0) {
+      return `${highConfidenceWrong} high-confidence wrong answer(s) detected.`;
+    }
+    if (this.filteredResults().some((item) => item?.highConfidenceWrong !== undefined)) {
+      return "No high-confidence wrong answers detected.";
+    }
     return String(this.insights?.confidenceRisk?.message ?? "No confidence insight yet.");
   }
 
   timeRiskMessage(): string {
+    const rows = this.filteredResults();
+    const fastWrong = rows.reduce((sum, item) => sum + Number(item?.fastWrong ?? 0), 0);
+    const slowWrong = rows.reduce((sum, item) => sum + Number(item?.slowWrong ?? 0), 0);
+    if (fastWrong > 0) {
+      return `${fastWrong} fast wrong answer(s) suggest students may be rushing.`;
+    }
+    if (slowWrong > 0) {
+      return `${slowWrong} slow wrong answer(s) show students spent time but missed key concepts.`;
+    }
+    if (rows.some((item) => item?.fastWrong !== undefined || item?.slowWrong !== undefined)) {
+      return "Timing pattern is stable.";
+    }
     return String(this.insights?.timeRisk?.message ?? "No timing insight yet.");
   }
 
@@ -397,8 +430,8 @@ export class LecturerMonitoringComponent implements OnInit {
 
   weakTopicStudentsLabel(topic: any): string {
     const wrong = Number(topic?.wrongCount ?? 0);
-    const total = Math.max(1, this.displayedAttemptsCount());
-    return `${wrong} (${Math.round((wrong / total) * 100)}%)`;
+    const totalWrong = Math.max(1, this.totalWrongAnswers());
+    return `${wrong} wrong (${Math.round((wrong / totalWrong) * 100)}%)`;
   }
 
   studentInitials(name: string): string {
@@ -432,6 +465,44 @@ export class LecturerMonitoringComponent implements OnInit {
     return "Released";
   }
 
+  canReleaseAttemptResult(item: any): boolean {
+    return item?.resultReleased === false
+      && String(item?.reviewTiming ?? "") === "MANUAL_RELEASE"
+      && !Boolean(item?.manualReleaseStatus)
+      && !this.isReleasingQuiz(item);
+  }
+
+  isReleasingQuiz(item: any): boolean {
+    const quizId = Number(item?.quizId ?? 0);
+    return Number.isFinite(quizId) && this.releasingQuizIds.has(quizId);
+  }
+
+  releaseAttemptResult(item: any): void {
+    const quizId = Number(item?.quizId ?? 0);
+    if (!Number.isFinite(quizId) || quizId <= 0 || this.isReleasingQuiz(item)) {
+      return;
+    }
+
+    this.errorMessage = "";
+    this.statusMessage = "";
+    this.releasingQuizIds.add(quizId);
+    this.lecturerService.releaseQuizResult(quizId).subscribe({
+      next: () => {
+        this.results = this.results.map((row) =>
+          Number(row?.quizId ?? 0) === quizId
+            ? { ...row, resultReleased: true, manualReleaseStatus: true }
+            : row
+        );
+        this.releasingQuizIds.delete(quizId);
+        this.statusMessage = "Quiz result released. Students can now view their result.";
+      },
+      error: (error) => {
+        this.releasingQuizIds.delete(quizId);
+        this.errorMessage = error?.error?.message ?? "Failed to release result.";
+      }
+    });
+  }
+
   scoreBandLabel(score: unknown): string {
     const value = Number(score ?? 0);
     if (value >= 80) {
@@ -450,7 +521,79 @@ export class LecturerMonitoringComponent implements OnInit {
     }).length;
   }
 
+  scoreBandFlex(min: number, max: number): number {
+    const total = this.filteredResults().length;
+    if (total === 0) {
+      return 0;
+    }
+    return this.scoreBandCount(min, max);
+  }
+
+  private isScorePassed(item: any): boolean {
+    const score = Number(item?.score ?? 0);
+    const passingMark = Number.isFinite(Number(item?.passingMark)) ? Number(item.passingMark) : 50;
+    return score >= passingMark;
+  }
+
+  private aggregateWeakTopics(rows: any[]): any[] {
+    const topicMap = new Map<string, {
+      topicTag: string;
+      answerCount: number;
+      wrongCount: number;
+      totalPoints: number;
+      awardedPoints: number;
+    }>();
+
+    for (const row of rows) {
+      const topics = Array.isArray(row?.weakTopics) ? row.weakTopics : [];
+      for (const topic of topics) {
+        const topicTag = String(topic?.topicTag ?? "General").trim() || "General";
+        const current = topicMap.get(topicTag) ?? {
+          topicTag,
+          answerCount: 0,
+          wrongCount: 0,
+          totalPoints: 0,
+          awardedPoints: 0
+        };
+        const answerCount = Number(topic?.answerCount ?? 0);
+        const wrongCount = Number(topic?.wrongCount ?? 0);
+        const totalPoints = Number(topic?.totalPoints ?? 0);
+        const awardedPoints = Number(topic?.awardedPoints ?? 0);
+        current.answerCount += Number.isFinite(answerCount) ? answerCount : 0;
+        current.wrongCount += Number.isFinite(wrongCount) ? wrongCount : 0;
+        current.totalPoints += Number.isFinite(totalPoints) ? totalPoints : 0;
+        current.awardedPoints += Number.isFinite(awardedPoints) ? awardedPoints : 0;
+        topicMap.set(topicTag, current);
+      }
+    }
+
+    return Array.from(topicMap.values())
+      .map((topic) => {
+        const score = topic.totalPoints > 0
+          ? Math.round((topic.awardedPoints / topic.totalPoints) * 10000) / 100
+          : 0;
+        return {
+          ...topic,
+          score,
+          riskLabel: score < 60 ? "High risk" : score < 75 ? "Needs reinforcement" : "Stable"
+        };
+      })
+      .filter((topic) => topic.wrongCount > 0)
+      .sort((left, right) => {
+        const wrongCompare = right.wrongCount - left.wrongCount;
+        return wrongCompare !== 0 ? wrongCompare : left.score - right.score;
+      });
+  }
+
   confidenceSummary(): Array<{ label: string; value: number; tone: string }> {
+    const rows = this.filteredResults();
+    if (rows.some((item) => item?.highConfidenceWrong !== undefined)) {
+      return [
+        { label: "High", value: rows.reduce((sum, item) => sum + Number(item?.highConfidenceWrong ?? 0), 0), tone: "high" },
+        { label: "Medium", value: rows.reduce((sum, item) => sum + Number(item?.mediumConfidenceWrong ?? 0), 0), tone: "medium" },
+        { label: "Low", value: rows.reduce((sum, item) => sum + Number(item?.lowConfidenceWrong ?? 0), 0), tone: "low" }
+      ];
+    }
     const risk = this.insights?.confidenceRisk ?? {};
     return [
       { label: "High", value: Number(risk.highConfidenceWrong ?? 0), tone: "high" },

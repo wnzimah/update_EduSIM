@@ -408,6 +408,7 @@
 .option-tag {
   width: 24px;
   height: 24px;
+  flex: 0 0 24px;
   border-radius: 999px;
   display: inline-flex;
   align-items: center;
@@ -415,6 +416,14 @@
   background: #2563eb;
   color: #fff;
   font-size: 12px;
+}
+
+.option-text {
+  display: block;
+  min-width: 0;
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+  line-height: 1.45;
 }
 
 .option-line {

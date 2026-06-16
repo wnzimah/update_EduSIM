@@ -16,7 +16,7 @@ type AppNotification = {
 
 type LanguageCode = "EN" | "BM";
 type LecturerMenuKey = "dashboard" | "courses" | "quizzes" | "students" | "questionBank" | "reports" | "messages" | "settings";
-type StudentMenuKey = "dashboard" | "courses" | "quizzes" | "attempts" | "profile" | "messages" | "settings";
+type StudentMenuKey = "dashboard" | "courses" | "quizzes" | "attempts" | "messages" | "settings";
 
 @Component({
   selector: "app-root",
@@ -143,9 +143,6 @@ export class AppComponent {
     if (this.router.url.startsWith("/student/attempts/")) {
       return "Attempt Review";
     }
-    if (this.router.url.startsWith("/student/profile")) {
-      return "Profile";
-    }
     return "EduSIM Portal";
   }
 
@@ -268,7 +265,6 @@ export class AppComponent {
       attempts: current === "/student/history" ||
         current.startsWith("/student/attempts/") ||
         current.startsWith("/student/dashboard/grades"),
-      profile: current === "/student/profile",
       messages: false,
       settings: false
     };
@@ -340,7 +336,7 @@ export class AppComponent {
     return this.currentLanguage === "BM" ? "Bahasa Melayu" : "English";
   }
 
-  openHelpTarget(target: "home" | "courses" | "monitoring" | "questions" | "profile" | "history"): void {
+  openHelpTarget(target: "home" | "courses" | "monitoring" | "questions" | "history"): void {
     this.closeMenus();
     if (target === "home") {
       this.navigateHome();
@@ -356,10 +352,6 @@ export class AppComponent {
     }
     if (target === "questions") {
       this.router.navigateByUrl("/lecturer/question-bank");
-      return;
-    }
-    if (target === "profile") {
-      this.router.navigateByUrl("/student/profile");
       return;
     }
     this.router.navigateByUrl("/student/history");
@@ -396,7 +388,6 @@ export class AppComponent {
     }
     return (
       this.router.url.startsWith("/student/dashboard") ||
-      this.router.url.startsWith("/student/profile") ||
       this.router.url.startsWith("/student/history") ||
       this.router.url.startsWith("/student/courses/")
     );
@@ -466,22 +457,38 @@ export class AppComponent {
       ? dashboard.resultNotifications
       : [];
     const pendingVideos = Array.isArray(dashboard?.pendingVideos) ? dashboard.pendingVideos : [];
+    const availableQuizzes = Array.isArray(dashboard?.availableQuizzes)
+      ? dashboard.availableQuizzes
+      : [];
     const results = resultNotifications.slice(0, 5).map((item: any) => ({
       id: `result-${item.attemptId}`,
       title: "Result available",
       detail: `${item.quizTitle} feedback is ready`,
       route: "/student/history",
-      createdAt: item.submittedAt,
+      createdAt: item.releaseAt ?? item.submittedAt,
       tone: "success" as const
     }));
-    const videos = pendingVideos.slice(0, Math.max(0, 6 - results.length)).map((item: any) => ({
+    const quizzes = availableQuizzes
+      .filter((item: any) => !item.alreadySubmitted)
+      .slice(0, Math.max(0, 6 - results.length))
+      .map((item: any) => ({
+        id: `quiz-${item.quizId}`,
+        title: "New quiz available",
+        detail: `${item.title} in ${item.courseTitle}`,
+        route: `/student/courses/${item.courseId}`,
+        createdAt: item.openAt ?? item.closeAt,
+        tone: item.locked ? "warning" as const : "info" as const
+      }));
+    const videos = pendingVideos.slice(0, Math.max(0, 6 - results.length - quizzes.length)).map((item: any) => ({
       id: `video-${item.videoId}`,
       title: "Lesson pending",
       detail: `${item.title} in ${item.courseTitle}`,
       route: `/student/courses/${item.courseId}`,
       tone: "info" as const
     }));
-    return [...results, ...videos];
+    return [...results, ...quizzes, ...videos]
+      .sort((a, b) => this.notificationTimestamp(b.createdAt) - this.notificationTimestamp(a.createdAt))
+      .slice(0, 6);
   }
 
   openSettings(): void {

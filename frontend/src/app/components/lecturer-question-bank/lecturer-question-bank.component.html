@@ -28,28 +28,6 @@
   }
 
   @if (!isSettingsMode() && !isQuestionsMode() && !isBankMode()) {
-    <section class="style-hero lecturer-course-topbar panel">
-      <button class="lecturer-course-brand" type="button" routerLink="/lecturer/dashboard">
-        <span>EduSIM</span>
-        <strong>Lecturer<br />Hub</strong>
-      </button>
-      <div class="lecturer-title-block">
-        <p>
-          @if (isBankMode()) {
-            Question Bank
-          } @else if (isQuestionsMode()) {
-            Question Builder
-          } @else {
-            Quiz Management
-          }
-        </p>
-        <h1>{{ currentCourse()?.title || "Select a course" }}</h1>
-      </div>
-      <div class="lecturer-window-actions">
-        <button class="mini-action" type="button" routerLink="/lecturer/dashboard">Hub</button>
-      </div>
-    </section>
-
     <section class="course-filter-shell panel">
       <div class="course-pick compact-pick">
         <label for="courseId">Course</label>
@@ -152,7 +130,6 @@
   @if (isQuestionsMode() && !showCreateModal) {
     <section class="modern-builder-shell">
       <header class="modern-builder-head">
-        <button class="modern-menu-btn" type="button" aria-label="Menu">&#9776;</button>
         <div>
           <p>Question Builder</p>
           <h1>{{ quizForm.title.trim() || "Untitled quiz" }}</h1>
@@ -201,9 +178,6 @@
                   </button>
                   <button class="modern-btn ghost canvas-select-toggle" type="button" (click)="toggleCanvasSelectionMode()">Cancel</button>
                 }
-                <button class="modern-btn ghost pdf-generate-btn" type="button" [disabled]="importingQuestions || !selectedCourseId" (click)="openPdfQuestionGenerator()">
-                  {{ importingQuestions ? "Generating..." : "Generate Question from PDF" }}
-                </button>
                 <button class="modern-btn ghost" type="button" (click)="openQuestionLibrary()">Import Question Bank</button>
                 <button class="modern-btn primary" type="button" (click)="openModernWidgetList()">Add Question</button>
               </div>
@@ -244,6 +218,20 @@
                       [name]="'modernDraftPrompt' + draft.tempId"
                       placeholder="Type your question here...">
 
+                    @if (draft.questionType === "TRUE_FALSE") {
+                      <div class="modern-true-false-settings">
+                        <span>Correct answer</span>
+                        <label [class.active]="draft.trueFalseCorrect === 'True'">
+                          <input type="radio" [name]="'modernDraftTf' + draft.tempId" value="True" [(ngModel)]="draft.trueFalseCorrect">
+                          True
+                        </label>
+                        <label [class.active]="draft.trueFalseCorrect === 'False'">
+                          <input type="radio" [name]="'modernDraftTf' + draft.tempId" value="False" [(ngModel)]="draft.trueFalseCorrect">
+                          False
+                        </label>
+                      </div>
+                    }
+
                     @if (draft.questionType === "MCQ" || draft.questionType === "MULTI_SELECT") {
                       <div class="modern-draft-options">
                         @for (option of draft.options; track $index; let optionIndex = $index) {
@@ -264,6 +252,31 @@
                         }
                         <button type="button" class="modern-link-btn" (click)="addDraftOption(draft)">Add Option</button>
                       </div>
+                    }
+
+                    @if (draft.questionType === "SHORT_ANSWER") {
+                      <section class="modern-short-answer-editor">
+                        <div class="modern-short-answer-head">
+                          <strong>Short Answer Settings</strong>
+                          <span>Set the accepted answer and optional keywords for marking.</span>
+                        </div>
+                        <div class="modern-short-answer-grid">
+                          <label>
+                            <span>Expected Answer *</span>
+                            <input
+                              [(ngModel)]="draft.shortAnswer"
+                              [name]="'modernDraftShortAnswer' + draft.tempId"
+                              placeholder="e.g. Authentication">
+                          </label>
+                          <label>
+                            <span>Keywords</span>
+                            <input
+                              [(ngModel)]="draft.shortAnswerKeywords"
+                              [name]="'modernDraftShortKeywords' + draft.tempId"
+                              placeholder="keyword 1, keyword 2">
+                          </label>
+                        </div>
+                      </section>
                     }
 
                     @if (draft.questionType === "MATCHING") {
@@ -348,6 +361,7 @@
                       <p class="inline-draft-error">{{ draft.errorMessage }}</p>
                     }
                     <div class="modern-question-actions">
+                      <button type="button" class="modern-icon-btn" [disabled]="draft.saving" title="Edit question" aria-label="Edit question" (click)="openEditDraftQuestion(draft)">Edit</button>
                       <button type="button" class="modern-icon-btn" [disabled]="draft.saving" (click)="saveDraftQuestion(draft)">Save</button>
                       <button type="button" class="modern-icon-btn danger" [disabled]="draft.saving" (click)="removeDraftQuestion(draft.tempId)">Delete</button>
                     </div>
@@ -415,7 +429,6 @@
                   <div class="modern-question-actions">
                     <button type="button" class="modern-icon-btn" title="Edit question" aria-label="Edit question" (click)="openEditQuestion(item)">Edit</button>
                     <button type="button" class="modern-icon-btn danger" (click)="removeSelectedQuestion(item.questionBankId)">Delete</button>
-                    <button type="button" class="modern-icon-btn">&#8964;</button>
                   </div>
                 </article>
                 <div class="modern-insert-row selected-insert-row">
@@ -467,14 +480,6 @@
                 <em>+</em>
               </button>
             }
-            <button type="button" class="modern-widget-card" (click)="addWidgetQuestion('SHORT_ANSWER')">
-              <span class="fib">FIB</span>
-              <div>
-                <strong>Fill in the Blanks</strong>
-                <small>Fill missing words in a sentence</small>
-              </div>
-              <em>+</em>
-            </button>
           </div>
 
           <article class="modern-widget-tip">
@@ -1658,9 +1663,6 @@
           <p>Select questions for a quiz, create a new item, or generate drafts from documents.</p>
         </div>
         <div class="bank-workspace-actions">
-          <button type="button" class="btn pdf-bank-generate-btn" [disabled]="importingQuestions || !selectedCourseId" (click)="openPdfQuestionGenerator()">
-            {{ importingQuestions ? "Generating..." : "Generate Question from PDF" }}
-          </button>
           <div class="bank-create-wrap">
             <button type="button" class="btn btn-action bank-create-btn" (click)="openCreateQuestionQuick()">
               <span aria-hidden="true">+</span>
@@ -1841,7 +1843,7 @@
         <div>
           <button type="button" class="back-to-questions" (click)="closeCreateModal()">Back to Questions</button>
           <p>Create question</p>
-          <h2>{{ editingQuestionId ? "Edit" : "New" }} {{ questionTypeLabel(questionForm.questionType) }} Question</h2>
+          <h2>{{ isEditingQuestion() ? "Edit" : "New" }} {{ questionTypeLabel(questionForm.questionType) }} Question</h2>
           <span>Complete the setup below, mark the correct answer, then save the question.</span>
         </div>
         <button type="button" class="btn btn-outline" (click)="closeCreateModal()">Cancel</button>
@@ -2079,7 +2081,7 @@
           <div class="simple-form-actions">
             <button type="button" class="btn btn-outline" (click)="closeCreateModal()">Cancel</button>
             <button class="btn btn-action" type="submit" [disabled]="savingQuestion">
-              {{ savingQuestion ? "Saving..." : (editingQuestionId ? "Update Question" : "Save Question") }}
+              {{ savingQuestion ? "Saving..." : (isEditingQuestion() ? "Update Question" : "Save Question") }}
             </button>
           </div>
         </form>

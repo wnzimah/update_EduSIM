@@ -59,6 +59,7 @@ export class LecturerQuestionBankComponent implements OnInit, OnDestroy {
   selectedCourseId: number | null = null;
   selectedQuestionIds: number[] = [];
   editingQuestionId: number | null = null;
+  editingDraftTempId: number | null = null;
   editingQuizId: number | null = null;
 
   private readonly statusToastDurationMs = 1500;
@@ -416,6 +417,7 @@ export class LecturerQuestionBankComponent implements OnInit, OnDestroy {
   openCreateModal(type: QuestionType): void {
     this.showTypeMenu = false;
     this.editingQuestionId = null;
+    this.editingDraftTempId = null;
     this.questionForm = this.defaultQuestionForm();
     this.questionForm.questionType = type;
     const course = this.currentCourse();
@@ -449,13 +451,27 @@ export class LecturerQuestionBankComponent implements OnInit, OnDestroy {
 
   openEditQuestion(item: any): void {
     this.editingQuestionId = Number(item.questionBankId);
+    this.editingDraftTempId = null;
     this.questionForm = this.questionFormFromItem(item);
+    this.showCreateModal = true;
+  }
+
+  openEditDraftQuestion(draft: any): void {
+    this.clearMessages();
+    this.editingQuestionId = null;
+    this.editingDraftTempId = Number(draft.tempId);
+    this.questionForm = this.cloneQuestionForm(draft);
     this.showCreateModal = true;
   }
 
   closeCreateModal(): void {
     this.showCreateModal = false;
     this.editingQuestionId = null;
+    this.editingDraftTempId = null;
+  }
+
+  isEditingQuestion(): boolean {
+    return this.editingQuestionId !== null || this.editingDraftTempId !== null;
   }
 
   openQuestionLibrary(): void {
@@ -833,6 +849,16 @@ export class LecturerQuestionBankComponent implements OnInit, OnDestroy {
       payload = this.buildQuestionPayload();
     } catch (error) {
       this.errorMessage = String(error);
+      return;
+    }
+
+    if (this.editingDraftTempId !== null) {
+      this.updateDraftQuestionFromEditor(this.editingDraftTempId);
+      this.showCreateModal = false;
+      this.editingDraftTempId = null;
+      this.questionForm = this.defaultQuestionForm();
+      this.persistQuizDraftToStorage();
+      this.showStatusMessage("Current question updated.");
       return;
     }
 
@@ -2907,6 +2933,52 @@ export class LecturerQuestionBankComponent implements OnInit, OnDestroy {
       allowDuplicateResponse: false,
       scoringType: "EXACT" as MatchingScoringType
     };
+  }
+
+  private cloneQuestionForm(source: any): ReturnType<LecturerQuestionBankComponent["defaultQuestionForm"]> {
+    const form = {
+      ...this.defaultQuestionForm(),
+      ...source
+    };
+
+    form.options = Array.isArray(source?.options)
+      ? source.options.map((option: any) => {
+          if (typeof option === "string") {
+            return { text: option, correct: false };
+          }
+          return {
+            text: String(option?.text ?? ""),
+            correct: Boolean(option?.correct)
+          };
+        })
+      : this.defaultQuestionForm().options;
+
+    form.matchingPrompts = Array.isArray(source?.matchingPrompts)
+      ? [...source.matchingPrompts]
+      : this.defaultQuestionForm().matchingPrompts;
+    form.matchingOptions = Array.isArray(source?.matchingOptions)
+      ? [...source.matchingOptions]
+      : this.defaultQuestionForm().matchingOptions;
+    form.matchingCorrect = Array.isArray(source?.matchingCorrect)
+      ? [...source.matchingCorrect]
+      : this.defaultQuestionForm().matchingCorrect;
+
+    return form;
+  }
+
+  private updateDraftQuestionFromEditor(tempId: number): void {
+    const updated = this.cloneQuestionForm(this.questionForm);
+    this.draftQuestions = this.draftQuestions.map((draft) =>
+      Number(draft.tempId) === Number(tempId)
+        ? {
+            ...draft,
+            ...updated,
+            tempId: draft.tempId,
+            saving: false,
+            errorMessage: ""
+          }
+        : draft
+    );
   }
 
   private applyQuizDetailsToForm(quiz: any, questions: any[] = []): void {

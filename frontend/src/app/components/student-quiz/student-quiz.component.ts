@@ -270,29 +270,36 @@ export class StudentQuizComponent implements OnInit, OnDestroy {
   }
 
   optionsArray(question: any): string[] {
-    if (!question?.options) {
-      return [];
-    }
-    if (Array.isArray(question.options)) {
-      return question.options;
+    const options = this.parseOptionContainer(question?.options);
+    if (Array.isArray(options)) {
+      return options.map((option) => this.optionValue(option)).filter(Boolean);
     }
     return [];
   }
 
   matchingLeft(question: any): string[] {
-    const options = question?.options;
+    const options = this.parseOptionContainer(question?.options);
     if (!options || typeof options !== "object") {
       return [];
     }
-    return Array.isArray(options.left) ? options.left : [];
+    return Array.isArray((options as any).left)
+      ? (options as any).left.map((option: unknown) => this.optionValue(option)).filter(Boolean)
+      : [];
   }
 
   matchingRight(question: any): string[] {
-    const options = question?.options;
+    const options = this.parseOptionContainer(question?.options);
     if (!options || typeof options !== "object") {
       return [];
     }
-    return Array.isArray(options.right) ? options.right : [];
+    return Array.isArray((options as any).right)
+      ? (options as any).right.map((option: unknown) => this.optionValue(option)).filter(Boolean)
+      : [];
+  }
+
+  optionDisplay(value: unknown): string {
+    const parsed = this.parseDisplayValue(value);
+    return this.formatDisplayValue(parsed);
   }
 
   answerText(questionId: number): string {
@@ -1143,16 +1150,100 @@ export class StudentQuizComponent implements OnInit, OnDestroy {
       return "-";
     }
     if (typeof value === "string") {
-      const trimmed = value.trim();
-      return trimmed || "-";
+      const formatted = this.optionDisplay(value).trim();
+      return formatted || "-";
     }
     if (Array.isArray(value)) {
       return value.map((item) => this.formatAnswer(item)).join(", ");
     }
     if (typeof value === "object") {
-      return JSON.stringify(value);
+      const entries = Object.entries(value as Record<string, unknown>);
+      if (entries.length === 0) {
+        return "-";
+      }
+      return entries
+        .map(([key, item]) => `${key} -> ${this.formatAnswer(item)}`)
+        .join("; ");
     }
     return String(value);
+  }
+
+  private parseOptionContainer(value: unknown): unknown {
+    if (typeof value !== "string") {
+      return value;
+    }
+    const trimmed = value.trim();
+    if (!this.looksLikeJson(trimmed)) {
+      return value;
+    }
+    try {
+      return JSON.parse(trimmed);
+    } catch {
+      return value;
+    }
+  }
+
+  private parseDisplayValue(value: unknown): unknown {
+    let current = value;
+    for (let depth = 0; depth < 3; depth++) {
+      if (typeof current !== "string") {
+        return current;
+      }
+      const trimmed = current.trim();
+      if (!this.looksLikeJson(trimmed)) {
+        return current;
+      }
+      try {
+        current = JSON.parse(trimmed);
+      } catch {
+        return current;
+      }
+    }
+    return current;
+  }
+
+  private optionValue(value: unknown): string {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    if (typeof value === "string") {
+      return value;
+    }
+    if (typeof value === "object") {
+      const record = value as Record<string, unknown>;
+      const text = record["text"] ?? record["value"] ?? record["label"];
+      if (text !== null && text !== undefined && typeof text !== "object") {
+        return String(text);
+      }
+      try {
+        return JSON.stringify(value);
+      } catch {
+        return String(value);
+      }
+    }
+    return String(value);
+  }
+
+  private formatDisplayValue(value: unknown): string {
+    if (value === null || value === undefined) {
+      return "";
+    }
+    if (typeof value === "string") {
+      return value.trim();
+    }
+    if (Array.isArray(value)) {
+      return value.map((item) => this.formatDisplayValue(this.parseDisplayValue(item))).filter(Boolean).join(", ");
+    }
+    if (typeof value === "object") {
+      return Object.entries(value as Record<string, unknown>)
+        .map(([key, item]) => `${key} -> ${this.formatDisplayValue(this.parseDisplayValue(item))}`)
+        .join("\n");
+    }
+    return String(value);
+  }
+
+  private looksLikeJson(value: string): boolean {
+    return (value.startsWith("{") && value.endsWith("}")) || (value.startsWith("[") && value.endsWith("]"));
   }
 
   blockedStateLabel(attempt: any): string {

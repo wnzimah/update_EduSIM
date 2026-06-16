@@ -6,7 +6,6 @@ import { StudentCourseComponent } from "./components/student-course/student-cour
 import { StudentQuizComponent } from "./components/student-quiz/student-quiz.component";
 import { StudentHistoryComponent } from "./components/student-history/student-history.component";
 import { StudentAttemptInsightComponent } from "./components/student-attempt-insight/student-attempt-insight.component";
-import { StudentProfileComponent } from "./components/student-profile/student-profile.component";
 import { LecturerDashboardComponent } from "./components/lecturer-dashboard/lecturer-dashboard.component";
 import { LecturerManageComponent } from "./components/lecturer-manage/lecturer-manage.component";
 import { LecturerMonitoringComponent } from "./components/lecturer-monitoring/lecturer-monitoring.component";
@@ -71,12 +70,6 @@ export const routes: Routes = [
   {
     path: "student/dashboard/grades",
     component: StudentHistoryComponent,
-    canActivate: [authGuard, roleGuard],
-    data: { role: "STUDENT" }
-  },
-  {
-    path: "student/profile",
-    component: StudentProfileComponent,
     canActivate: [authGuard, roleGuard],
     data: { role: "STUDENT" }
   },

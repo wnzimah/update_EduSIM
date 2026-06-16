@@ -13,12 +13,6 @@
       }
     </div>
     <div class="attempts-header-actions">
-      @if (scopedCourseId) {
-        <button class="attempts-light-btn" type="button" (click)="clearCourseScope()">Back to Quiz List</button>
-      } @else {
-        <a class="attempts-light-btn" routerLink="/lecturer/quiz-overview">Back to Quiz List</a>
-      }
-      <a class="attempts-light-btn" [routerLink]="switchPageRoute()" [queryParams]="monitoringQueryParams()">{{ switchPageLabel() }}</a>
       @if (!isPerformancePage()) {
         <button class="attempts-light-btn" type="button" [disabled]="loading || filteredResults().length === 0" (click)="downloadScoreReport()">
           Export
@@ -190,6 +184,15 @@
                     </td>
                     <td>
                       <div class="row-actions" (click)="$event.stopPropagation()">
+                        @if (canReleaseAttemptResult(item)) {
+                          <button class="icon-action release-action" type="button" title="Release Result" (click)="releaseAttemptResult(item)">
+                            Release Result
+                          </button>
+                        } @else if (isReleasingQuiz(item)) {
+                          <button class="icon-action release-action" type="button" disabled>
+                            Releasing...
+                          </button>
+                        }
                         <button class="icon-action" type="button" title="View Attempt Review" (click)="openResultDetail(item.attemptId)">View</button>
                       </div>
                     </td>
@@ -324,9 +327,9 @@
       </div>
       <h3>Score Distribution</h3>
       <div class="distribution-bar">
-        <span class="high" [style.flex]="scoreBandCount(80, 100) || 1"></span>
-        <span class="medium" [style.flex]="scoreBandCount(50, 79.99) || 1"></span>
-        <span class="low" [style.flex]="scoreBandCount(0, 49.99) || 1"></span>
+        <span class="high" [style.flex]="scoreBandFlex(80, 100)"></span>
+        <span class="medium" [style.flex]="scoreBandFlex(50, 79.99)"></span>
+        <span class="low" [style.flex]="scoreBandFlex(0, 49.99)"></span>
       </div>
       <div class="distribution-legend">
         <span>High {{ scoreBandCount(80, 100) }}</span>

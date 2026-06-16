@@ -70,7 +70,7 @@
               </div>
               <div>
                 <span>Time Taken</span>
-                <strong>{{ summary().durationSeconds || 0 }}s</strong>
+                <strong>{{ formatDuration(summary().durationSeconds) }}</strong>
               </div>
               <div>
                 <span>Status</span>
@@ -254,7 +254,7 @@
             </article>
             <article>
               <small>Average Time</small>
-              <strong>{{ timeAnalysis().averageSeconds || 0 }}s</strong>
+              <strong>{{ formatDuration(timeAnalysis().averageSeconds) }}</strong>
               <p>{{ timeAnalysis().message || "Timing pattern will appear when tracked." }}</p>
             </article>
             <article>

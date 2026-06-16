@@ -27,38 +27,71 @@ Seed data is created automatically on first backend run.
 
 ## Local Run Instructions
 
-1. Start Docker Desktop, then start the local MySQL container:
+### Option A: Run Everything With Docker
+
+1. Start Docker Desktop.
+2. From the project root, run:
+
+```bash
+docker compose up -d --build
+```
+
+3. Open:
+
+```text
+http://localhost:4200
+```
+
+The local Docker stack starts:
+
+- MySQL: `localhost:3306`
+- Backend API: `http://localhost:8080`
+- Frontend: `http://localhost:4200`
+
+To see logs:
+
+```bash
+docker compose logs -f backend
+```
+
+To stop:
+
+```bash
+docker compose down
+```
+
+### Option B: Run Backend/Frontend Manually
+
+Use this if you want Angular hot reload while Docker only runs MySQL.
+
+1. Start Docker Desktop, then start MySQL:
 
 ```bash
 docker compose up -d mysql
 ```
 
-2. Confirm MySQL is running:
+2. Start backend:
 
-```bash
-docker ps
-```
-
-You should see `edusim-mysql` with port `3306`.
-
-3. Start backend:
-
-```bash
+```powershell
 cd backend
+$env:EDUSIM_DB_HOST="127.0.0.1"
+$env:EDUSIM_DB_PORT="3306"
+$env:EDUSIM_DB_USER="root"
+$env:EDUSIM_DB_PASSWORD="root"
 mvn spring-boot:run
 ```
 
-4. Start frontend in another terminal:
+3. Start frontend in another terminal:
 
-```bash
+```powershell
 cd frontend
 npm install
 npm start
 ```
 
-5. Open `http://localhost:4200`.
+4. Open `http://localhost:4200`.
 
-If you use a local Windows MySQL service instead of Docker, make sure it is running on port `3306` and set the matching credentials with environment variables such as `EDUSIM_DB_USER` and `EDUSIM_DB_PASSWORD`.
+If you use a local Windows MySQL service instead of Docker, make sure it is running and set the matching `EDUSIM_DB_PORT`, `EDUSIM_DB_USER`, and `EDUSIM_DB_PASSWORD` values before starting the backend.
 
 ## Default Backend DB Config
 

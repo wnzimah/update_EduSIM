@@ -685,23 +685,6 @@
       </section>
     } @else {
       <section class="panel quiz-layout answer-quiz-layout" [class.quiz-nav-collapsed]="!showQuizNavigation">
-        <header class="quiz-player-toolbar">
-          <button class="nav-arrow" type="button" [disabled]="currentIndex === 0" (click)="previousQuestion()">&#8249;</button>
-          <div class="quiz-pill-strip" aria-label="Question navigation">
-            @for (question of allQuestions(); track question.questionId; let i = $index) {
-              <button
-                type="button"
-                [class.current]="currentIndex === i"
-                [class.answered]="isQuestionAnswered(i)"
-                (click)="goToQuestion(i)">
-                Q{{ i + 1 }}
-              </button>
-            }
-          </div>
-          <button class="btn toolbar-submit" type="button" [disabled]="submitting" (click)="submitQuiz()">Submit Page</button>
-          <button class="nav-arrow" type="button" [disabled]="isCurrentLastQuestion()" (click)="nextQuestion()">&#8250;</button>
-        </header>
-
         <div class="quiz-main">
           <div class="attempt-main-tools">
             <span></span>
@@ -754,7 +737,7 @@
                             [class.selected]="answerText(question.questionId) === option"
                             (click)="updateAnswer(question.questionId, option)">
                             <span class="option-tag">{{ optionLabel(optionIndex) }}</span>
-                            <span>{{ option }}</span>
+                            <span class="option-text">{{ optionDisplay(option) }}</span>
                           </button>
                         }
                       </div>
@@ -768,7 +751,7 @@
                               type="checkbox"
                               [checked]="isMultiChecked(question.questionId, option)"
                               (change)="toggleMulti(question.questionId, option, $any($event.target).checked)">
-                            <span>{{ option }}</span>
+                            <span class="option-text">{{ optionDisplay(option) }}</span>
                           </label>
                         }
                       </div>
@@ -786,13 +769,13 @@
                       <div class="matching-answer-list">
                         @for (left of matchingLeft(question); track left) {
                           <label class="matching-answer-row">
-                            <span class="matching-label">{{ left }}</span>
+                            <span class="matching-label">{{ optionDisplay(left) }}</span>
                             <select
                               [ngModel]="matchingValue(question.questionId, left)"
                               (ngModelChange)="updateMatching(question.questionId, left, $event)">
                               <option value="">Please select an option</option>
                               @for (right of matchingRight(question); track right) {
-                                <option [value]="right">{{ right }}</option>
+                                <option [value]="right">{{ optionDisplay(right) }}</option>
                               }
                             </select>
                           </label>
@@ -858,7 +841,7 @@
                           [class.selected]="answerText(currentQuestion.questionId) === option"
                           (click)="updateAnswer(currentQuestion.questionId, option)">
                           <span class="option-tag">{{ optionLabel(optionIndex) }}</span>
-                          <span>{{ option }}</span>
+                          <span class="option-text">{{ optionDisplay(option) }}</span>
                         </button>
                       }
                     </div>
@@ -872,7 +855,7 @@
                             type="checkbox"
                             [checked]="isMultiChecked(currentQuestion.questionId, option)"
                             (change)="toggleMulti(currentQuestion.questionId, option, $any($event.target).checked)">
-                          <span>{{ option }}</span>
+                          <span class="option-text">{{ optionDisplay(option) }}</span>
                         </label>
                       }
                     </div>
@@ -890,13 +873,13 @@
                     <div class="matching-answer-list">
                       @for (left of matchingLeft(currentQuestion); track left) {
                         <label class="matching-answer-row">
-                          <span class="matching-label">{{ left }}</span>
+                          <span class="matching-label">{{ optionDisplay(left) }}</span>
                           <select
                             [ngModel]="matchingValue(currentQuestion.questionId, left)"
                             (ngModelChange)="updateMatching(currentQuestion.questionId, left, $event)">
                             <option value="">Please select an option</option>
                             @for (right of matchingRight(currentQuestion); track right) {
-                              <option [value]="right">{{ right }}</option>
+                              <option [value]="right">{{ optionDisplay(right) }}</option>
                             }
                           </select>
                         </label>

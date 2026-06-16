@@ -546,7 +546,13 @@ public class LecturerService {
 
         String fileName = trimToDefault(file.getOriginalFilename(), "uploaded-file");
         String text = extractImportText(file, fileName);
-        List<ImportedQuestionSeed> explicitQuestions = explicitMatchingWorksheetQuestions(text);
+        List<ImportedQuestionSeed> explicitQuestions = explicitNumberedQuestionBlocks(text);
+        if (explicitQuestions.isEmpty()) {
+            explicitQuestions = explicitMixedQuestionBlocks(text);
+        }
+        if (explicitQuestions.isEmpty()) {
+            explicitQuestions = explicitMatchingWorksheetQuestions(text);
+        }
         if (explicitQuestions.isEmpty()) {
             explicitQuestions = explicitMcqWorksheetQuestions(text);
         }
@@ -1222,10 +1228,25 @@ public class LecturerService {
             getOwnedCourse(courseId, lecturer);
         }
 
-        return attempts.stream()
+        List<QuizAttempt> submittedAttempts = attempts.stream()
             .filter(attempt -> attempt.getSubmittedAt() != null)
             .filter(attempt -> courseId == null || Objects.equals(attempt.getQuiz().getCourse().getId(), courseId))
+            .toList();
+
+        Map<Long, List<QuizAttemptAnswer>> answersByAttempt = new LinkedHashMap<>();
+        List<Long> attemptIds = submittedAttempts.stream().map(QuizAttempt::getId).toList();
+        if (!attemptIds.isEmpty()) {
+            for (QuizAttemptAnswer answer : quizAttemptAnswerRepository.findByAttemptIdIn(attemptIds)) {
+                Long attemptId = answer.getAttempt().getId();
+                answersByAttempt.computeIfAbsent(attemptId, ignored -> new ArrayList<>()).add(answer);
+            }
+        }
+
+        return submittedAttempts.stream()
             .map(attempt -> {
+                Map<String, Object> answerSummary = buildAttemptAnswerSummary(
+                    answersByAttempt.getOrDefault(attempt.getId(), List.of())
+                );
                 Map<String, Object> row = new LinkedHashMap<>();
                 row.put("attemptId", attempt.getId());
                 row.put("studentId", attempt.getStudent().getId());
@@ -1236,16 +1257,94 @@ public class LecturerService {
                 row.put("quizTitle", attempt.getQuiz().getTitle());
                 row.put("attemptNumber", attempt.getAttemptNumber());
                 row.put("score", attempt.getScore());
-                row.put("passed", attempt.getPassed());
+                row.put("passingMark", attempt.getQuiz().getPassingMark());
+                row.put("passed", isScorePassed(attempt));
                 row.put("startedAt", attempt.getStartedAt());
                 row.put("submittedAt", attempt.getSubmittedAt());
                 row.put("durationSeconds", durationSeconds(attempt));
                 row.put("feedback", attempt.getFeedback());
                 row.put("resultReleaseAt", effectiveResultReleaseAt(attempt.getQuiz()));
                 row.put("resultReleased", isResultReleased(attempt.getQuiz(), LocalDateTime.now()));
+                row.put("reviewTiming", attempt.getQuiz().getReviewTiming().name());
+                row.put("manualReleaseStatus", attempt.getQuiz().isManualReleaseStatus());
+                row.putAll(answerSummary);
                 return row;
             })
             .toList();
+    }
+
+    private Map<String, Object> buildAttemptAnswerSummary(List<QuizAttemptAnswer> answers) {
+        Map<String, InsightTopic> topicMap = new LinkedHashMap<>();
+        int correctAnswerCount = 0;
+        int wrongAnswerCount = 0;
+        int highConfidenceWrong = 0;
+        int mediumConfidenceWrong = 0;
+        int lowConfidenceWrong = 0;
+        int fastWrong = 0;
+        int slowWrong = 0;
+        int totalSeconds = 0;
+        int timedAnswers = 0;
+
+        for (QuizAttemptAnswer answer : answers) {
+            double maxPoints = answer.getQuestion().getPoints() == null ? 0.0 : answer.getQuestion().getPoints();
+            double awarded = answer.getAwardedPoints() == null ? 0.0 : answer.getAwardedPoints();
+            String topic = trimToDefault(answer.getTopicTag(), answer.getQuestion().getQuiz().getCourse().getTitle());
+            topicMap.computeIfAbsent(topic, InsightTopic::new).add(maxPoints, awarded, answer.isCorrect());
+
+            if (answer.isCorrect()) {
+                correctAnswerCount++;
+            } else {
+                wrongAnswerCount++;
+                String confidence = answer.getConfidenceLevel() == null ? "" : answer.getConfidenceLevel().toUpperCase();
+                if ("HIGH".equals(confidence)) {
+                    highConfidenceWrong++;
+                } else if ("MEDIUM".equals(confidence)) {
+                    mediumConfidenceWrong++;
+                } else if ("LOW".equals(confidence)) {
+                    lowConfidenceWrong++;
+                }
+            }
+
+            if ("FAST_WRONG".equalsIgnoreCase(answer.getTimeSignal())) {
+                fastWrong++;
+            }
+            if ("SLOW_WRONG".equalsIgnoreCase(answer.getTimeSignal())) {
+                slowWrong++;
+            }
+            if (answer.getTimeSpentSeconds() != null && answer.getTimeSpentSeconds() > 0) {
+                timedAnswers++;
+                totalSeconds += answer.getTimeSpentSeconds();
+            }
+        }
+
+        List<Map<String, Object>> weakTopics = topicMap.values().stream()
+            .map(InsightTopic::toMap)
+            .sorted((left, right) -> {
+                int wrongCompare = Integer.compare(toInt(right.get("wrongCount"), 0), toInt(left.get("wrongCount"), 0));
+                return wrongCompare != 0
+                    ? wrongCompare
+                    : Double.compare(toDouble(left.get("score"), 0.0), toDouble(right.get("score"), 0.0));
+            })
+            .toList();
+
+        return Map.of(
+            "answerCount", answers.size(),
+            "correctAnswerCount", correctAnswerCount,
+            "wrongAnswerCount", wrongAnswerCount,
+            "weakTopics", weakTopics,
+            "highConfidenceWrong", highConfidenceWrong,
+            "mediumConfidenceWrong", mediumConfidenceWrong,
+            "lowConfidenceWrong", lowConfidenceWrong,
+            "fastWrong", fastWrong,
+            "slowWrong", slowWrong,
+            "averageAnswerSeconds", timedAnswers == 0 ? 0 : Math.round(totalSeconds / (float) timedAnswers)
+        );
+    }
+
+    private boolean isScorePassed(QuizAttempt attempt) {
+        double score = attempt.getScore() == null ? 0.0 : attempt.getScore();
+        double passingMark = attempt.getQuiz().getPassingMark() == null ? 50.0 : attempt.getQuiz().getPassingMark();
+        return score >= passingMark;
     }
 
     @Transactional(readOnly = true)
@@ -2071,10 +2170,11 @@ public class LecturerService {
     private String extractBasicPdfText(byte[] bytes) {
         String raw = new String(bytes, StandardCharsets.ISO_8859_1);
         StringBuilder text = new StringBuilder();
-        appendPdfOperatorText(raw, text);
-        appendCompressedPdfStreamText(raw, text);
+        Map<String, Map<String, String>> unicodeMapsByFont = pdfUnicodeMapsByFont(raw);
+        appendPdfOperatorText(raw, text, unicodeMapsByFont);
+        appendCompressedPdfStreamText(raw, text, unicodeMapsByFont);
         if (text.length() < 80) {
-            Matcher fallback = Pattern.compile("\\(([^()]{4,500})\\)").matcher(raw);
+            Matcher fallback = Pattern.compile("\\(((?:\\\\.|[^\\\\()]){4,500})\\)").matcher(raw);
             while (fallback.find() && text.length() < 10000) {
                 text.append(unescapePdfText(fallback.group(1))).append(" ");
             }
@@ -2082,7 +2182,7 @@ public class LecturerService {
         return text.toString();
     }
 
-    private void appendCompressedPdfStreamText(String raw, StringBuilder text) {
+    private void appendCompressedPdfStreamText(String raw, StringBuilder text, Map<String, Map<String, String>> unicodeMapsByFont) {
         int cursor = 0;
         while (text.length() < 20000) {
             int streamStart = raw.indexOf("stream", cursor);
@@ -2116,7 +2216,7 @@ public class LecturerService {
                 if (dictionary.contains("FlateDecode")) {
                     decoded = inflate(decoded);
                 }
-                appendPdfOperatorText(new String(decoded, StandardCharsets.ISO_8859_1), text);
+                appendPdfOperatorText(new String(decoded, StandardCharsets.ISO_8859_1), text, unicodeMapsByFont);
             } catch (IOException | IllegalArgumentException ignored) {
                 // Continue with other streams; unsupported PDF streams should not block readable streams.
             }
@@ -2124,26 +2224,188 @@ public class LecturerService {
         }
     }
 
-    private void appendPdfOperatorText(String source, StringBuilder text) {
-        Matcher matcher = Pattern.compile("\\(([^()]{2,800})\\)\\s*T[Jj]").matcher(source);
+    private void appendPdfOperatorText(String source, StringBuilder text, Map<String, Map<String, String>> unicodeMapsByFont) {
+        Pattern tokenPattern = Pattern.compile(
+            "/([A-Za-z0-9]+)\\s+[0-9.]+\\s+Tf" +
+                "|\\(((?:\\\\.|[^\\\\()]){1,800})\\)\\s*T[Jj]" +
+                "|<([0-9A-Fa-f\\s]{2,4000})>\\s*T[Jj]" +
+                "|\\[(.*?)\\]\\s*TJ",
+            Pattern.DOTALL
+        );
+        Matcher matcher = tokenPattern.matcher(source);
+        String currentFont = "";
         while (matcher.find() && text.length() < 20000) {
-            text.append(unescapePdfText(matcher.group(1))).append(" ");
-        }
-
-        Matcher hexMatcher = Pattern.compile("<([0-9A-Fa-f\\s]{4,4000})>\\s*T[Jj]").matcher(source);
-        while (hexMatcher.find() && text.length() < 20000) {
-            text.append(decodePdfHexText(hexMatcher.group(1))).append(" ");
-        }
-
-        Matcher arrayMatcher = Pattern.compile("\\[(.*?)\\]\\s*TJ", Pattern.DOTALL).matcher(source);
-        while (arrayMatcher.find() && text.length() < 20000) {
-            Matcher chunkMatcher = Pattern.compile("\\(([^()]{1,800})\\)").matcher(arrayMatcher.group(1));
-            while (chunkMatcher.find()) {
-                text.append(unescapePdfText(chunkMatcher.group(1))).append(" ");
+            if (matcher.group(1) != null) {
+                currentFont = matcher.group(1);
+                continue;
             }
-            Matcher hexChunkMatcher = Pattern.compile("<([0-9A-Fa-f\\s]{2,4000})>").matcher(arrayMatcher.group(1));
-            while (hexChunkMatcher.find() && text.length() < 20000) {
-                text.append(decodePdfHexText(hexChunkMatcher.group(1))).append(" ");
+
+            Map<String, String> unicodeMap = unicodeMapsByFont.getOrDefault(currentFont, Map.of());
+            if (matcher.group(2) != null) {
+                text.append(unescapePdfText(matcher.group(2))).append(" ");
+                continue;
+            }
+            if (matcher.group(3) != null) {
+                text.append(decodePdfHexText(matcher.group(3), unicodeMap));
+                continue;
+            }
+            if (matcher.group(4) != null) {
+                appendPdfTextArray(matcher.group(4), text, unicodeMap);
+            }
+        }
+    }
+
+    private void appendPdfTextArray(String arraySource, StringBuilder text, Map<String, String> unicodeMap) {
+        Matcher chunkMatcher = Pattern.compile("\\(((?:\\\\.|[^\\\\()]){1,800})\\)|<([0-9A-Fa-f\\s]{2,4000})>").matcher(arraySource);
+        while (chunkMatcher.find() && text.length() < 20000) {
+            if (chunkMatcher.group(1) != null) {
+                text.append(unescapePdfText(chunkMatcher.group(1))).append(" ");
+            } else {
+                text.append(decodePdfHexText(chunkMatcher.group(2), unicodeMap));
+            }
+        }
+    }
+
+    private Map<String, Map<String, String>> pdfUnicodeMapsByFont(String raw) {
+        Map<Integer, String> objectBodies = pdfObjectBodies(raw);
+        Map<Integer, Map<String, String>> unicodeMapsByObject = new LinkedHashMap<>();
+        Map<Integer, Integer> fontToUnicodeObject = new LinkedHashMap<>();
+
+        for (Map.Entry<Integer, String> entry : objectBodies.entrySet()) {
+            Matcher toUnicodeMatcher = Pattern.compile("/ToUnicode\\s+(\\d+)\\s+0\\s+R").matcher(entry.getValue());
+            if (toUnicodeMatcher.find()) {
+                fontToUnicodeObject.put(entry.getKey(), Integer.parseInt(toUnicodeMatcher.group(1)));
+            }
+
+            String stream = decodedPdfObjectStream(entry.getValue());
+            if (stream.contains("beginbfchar") || stream.contains("beginbfrange")) {
+                Map<String, String> map = new LinkedHashMap<>();
+                appendPdfUnicodeMapEntries(stream, map);
+                if (!map.isEmpty()) {
+                    unicodeMapsByObject.put(entry.getKey(), map);
+                }
+            }
+        }
+
+        Map<String, Map<String, String>> mapsByFont = new LinkedHashMap<>();
+        Matcher fontRefMatcher = Pattern.compile("/([A-Za-z0-9]+)\\s+(\\d+)\\s+0\\s+R").matcher(raw);
+        while (fontRefMatcher.find()) {
+            String fontName = fontRefMatcher.group(1);
+            int fontObject = Integer.parseInt(fontRefMatcher.group(2));
+            Integer unicodeObject = fontToUnicodeObject.get(fontObject);
+            if (unicodeObject != null && unicodeMapsByObject.containsKey(unicodeObject)) {
+                mapsByFont.put(fontName, unicodeMapsByObject.get(unicodeObject));
+            }
+        }
+        return mapsByFont;
+    }
+
+    private Map<Integer, String> pdfObjectBodies(String raw) {
+        Map<Integer, String> objects = new LinkedHashMap<>();
+        Matcher matcher = Pattern.compile("(?s)(\\d+)\\s+0\\s+obj\\s*(.*?)\\s*endobj").matcher(raw);
+        while (matcher.find()) {
+            objects.put(Integer.parseInt(matcher.group(1)), matcher.group(2));
+        }
+        return objects;
+    }
+
+    private String decodedPdfObjectStream(String objectBody) {
+        int streamStart = objectBody.indexOf("stream");
+        if (streamStart < 0) {
+            return "";
+        }
+        int dataStart = streamStart + "stream".length();
+        if (dataStart + 1 < objectBody.length() && objectBody.charAt(dataStart) == '\r' && objectBody.charAt(dataStart + 1) == '\n') {
+            dataStart += 2;
+        } else if (dataStart < objectBody.length() && objectBody.charAt(dataStart) == '\n') {
+            dataStart += 1;
+        }
+        int streamEnd = objectBody.indexOf("endstream", dataStart);
+        if (streamEnd < 0) {
+            return "";
+        }
+
+        String streamData = objectBody.substring(dataStart, streamEnd).stripTrailing();
+        byte[] decoded = streamData.getBytes(StandardCharsets.ISO_8859_1);
+        try {
+            if (objectBody.contains("ASCII85Decode")) {
+                decoded = decodeAscii85(decoded);
+            }
+            if (objectBody.contains("FlateDecode")) {
+                decoded = inflate(decoded);
+            }
+            return new String(decoded, StandardCharsets.ISO_8859_1);
+        } catch (IOException | IllegalArgumentException ignored) {
+            return "";
+        }
+    }
+
+    private Map<String, String> pdfUnicodeMap(String raw) {
+        Map<String, String> map = new LinkedHashMap<>();
+        int cursor = 0;
+        while (cursor < raw.length()) {
+            int streamStart = raw.indexOf("stream", cursor);
+            if (streamStart < 0) {
+                break;
+            }
+            int dataStart = streamStart + "stream".length();
+            if (dataStart + 1 < raw.length() && raw.charAt(dataStart) == '\r' && raw.charAt(dataStart + 1) == '\n') {
+                dataStart += 2;
+            } else if (dataStart < raw.length() && raw.charAt(dataStart) == '\n') {
+                dataStart += 1;
+            }
+
+            int streamEnd = raw.indexOf("endstream", dataStart);
+            if (streamEnd < 0) {
+                break;
+            }
+
+            String dictionary = raw.substring(Math.max(0, streamStart - 300), streamStart);
+            String streamData = raw.substring(dataStart, streamEnd).stripTrailing();
+            byte[] decoded = streamData.getBytes(StandardCharsets.ISO_8859_1);
+            try {
+                if (dictionary.contains("ASCII85Decode")) {
+                    decoded = decodeAscii85(decoded);
+                }
+                if (dictionary.contains("FlateDecode")) {
+                    decoded = inflate(decoded);
+                }
+                String content = new String(decoded, StandardCharsets.ISO_8859_1);
+                appendPdfUnicodeMapEntries(content, map);
+            } catch (IOException | IllegalArgumentException ignored) {
+                // Skip streams that are not decodable by this lightweight importer.
+            }
+            cursor = streamEnd + "endstream".length();
+        }
+        return map;
+    }
+
+    private void appendPdfUnicodeMapEntries(String content, Map<String, String> map) {
+        Matcher charMatcher = Pattern
+            .compile("<([0-9A-Fa-f]{2,8})>\\s*<([0-9A-Fa-f]{4,})>")
+            .matcher(content);
+        while (charMatcher.find()) {
+            String source = charMatcher.group(1).toUpperCase();
+            String target = decodeUtf16Hex(charMatcher.group(2));
+            if (!source.isBlank() && !target.isBlank()) {
+                map.put(source, target);
+            }
+        }
+
+        Matcher rangeMatcher = Pattern
+            .compile("<([0-9A-Fa-f]{2,8})>\\s*<([0-9A-Fa-f]{2,8})>\\s*<([0-9A-Fa-f]{4,})>")
+            .matcher(content);
+        while (rangeMatcher.find()) {
+            try {
+                int start = Integer.parseInt(rangeMatcher.group(1), 16);
+                int end = Integer.parseInt(rangeMatcher.group(2), 16);
+                int target = Integer.parseInt(rangeMatcher.group(3), 16);
+                int width = rangeMatcher.group(1).length();
+                for (int code = start; code <= end && code - start < 500; code++) {
+                    map.put(String.format("%0" + width + "X", code), new String(Character.toChars(target + (code - start))));
+                }
+            } catch (IllegalArgumentException ignored) {
+                // Ignore malformed bfrange entries.
             }
         }
     }
@@ -2217,9 +2479,19 @@ public class LecturerService {
     }
 
     private String decodePdfHexText(String hex) {
+        return decodePdfHexText(hex, Map.of());
+    }
+
+    private String decodePdfHexText(String hex, Map<String, String> unicodeMap) {
         String cleaned = hex == null ? "" : hex.replaceAll("\\s+", "");
         if (cleaned.length() < 2) {
             return "";
+        }
+        if (unicodeMap != null && !unicodeMap.isEmpty()) {
+            String mapped = decodeMappedPdfHexText(cleaned, unicodeMap);
+            if (!mapped.isBlank()) {
+                return mapped;
+            }
         }
         if (cleaned.length() % 2 != 0) {
             cleaned = cleaned + "0";
@@ -2245,6 +2517,52 @@ public class LecturerService {
             return new String(bytes, StandardCharsets.UTF_16BE);
         }
         return new String(bytes, StandardCharsets.ISO_8859_1);
+    }
+
+    private String decodeMappedPdfHexText(String cleaned, Map<String, String> unicodeMap) {
+        StringBuilder text = new StringBuilder();
+        int cursor = 0;
+        while (cursor < cleaned.length()) {
+            String chunk = "";
+            if (cursor + 4 <= cleaned.length()) {
+                String four = cleaned.substring(cursor, cursor + 4).toUpperCase();
+                if (unicodeMap.containsKey(four)) {
+                    chunk = unicodeMap.get(four);
+                    cursor += 4;
+                }
+            }
+            if (chunk.isBlank() && cursor + 2 <= cleaned.length()) {
+                String two = cleaned.substring(cursor, cursor + 2).toUpperCase();
+                if (unicodeMap.containsKey(two)) {
+                    chunk = unicodeMap.get(two);
+                    cursor += 2;
+                }
+            }
+            if (chunk.isBlank()) {
+                return "";
+            }
+            text.append(chunk);
+        }
+        return text.toString();
+    }
+
+    private String decodeUtf16Hex(String hex) {
+        String cleaned = hex == null ? "" : hex.replaceAll("\\s+", "");
+        if (cleaned.length() < 4) {
+            return "";
+        }
+        if (cleaned.length() % 2 != 0) {
+            cleaned = cleaned + "0";
+        }
+        byte[] bytes = new byte[cleaned.length() / 2];
+        for (int i = 0; i < cleaned.length(); i += 2) {
+            try {
+                bytes[i / 2] = (byte) Integer.parseInt(cleaned.substring(i, i + 2), 16);
+            } catch (NumberFormatException ex) {
+                return "";
+            }
+        }
+        return new String(bytes, StandardCharsets.UTF_16BE);
     }
 
     private String normalizeImportedText(String text) {
@@ -2323,6 +2641,300 @@ public class LecturerService {
         if (seen.add(key)) {
             sentences.add(sentence);
         }
+    }
+
+    private List<ImportedQuestionSeed> explicitNumberedQuestionBlocks(String text) {
+        String source = normalizeImportedText(text)
+            .replace('–', '-')
+            .replace('—', '-');
+        Matcher matcher = Pattern
+            .compile("(?is)(?:^|\\s*)(\\d{1,3})\\s*[.)]\\s*Question\\s*\\d*\\s*[-:]?\\s*(.+?)(?=(?:\\s*\\d{1,3}\\s*[.)]\\s*Question\\s*\\d*)|$)")
+            .matcher(source);
+        List<ImportedQuestionSeed> questions = new ArrayList<>();
+        Set<Integer> seen = new HashSet<>();
+        while (matcher.find() && questions.size() < 50) {
+            int number = Integer.parseInt(matcher.group(1));
+            if (!seen.add(number)) {
+                continue;
+            }
+            ImportedQuestionSeed seed = numberedQuestionSeed(number, matcher.group(2));
+            if (seed != null) {
+                questions.add(seed);
+            }
+        }
+        return questions;
+    }
+
+    private ImportedQuestionSeed numberedQuestionSeed(int number, String rawBlock) {
+        String block = rawBlock == null ? "" : rawBlock.trim();
+        String type = numberedQuestionType(block);
+        String body = stripNumberedQuestionType(block, type);
+        if (type.isBlank() || body.isBlank()) {
+            return null;
+        }
+
+        return switch (type) {
+            case "TRUE_FALSE" -> trueFalseSeed(number, body);
+            case "MATCHING" -> matchingSeed(number, body);
+            case "MULTI_SELECT" -> multiSelectSeed(number, body);
+            case "MCQ" -> mcqSeed(number, body);
+            case "SHORT_ANSWER" -> shortAnswerSeed(number, body);
+            default -> null;
+        };
+    }
+
+    private String numberedQuestionType(String block) {
+        String compact = block == null ? "" : block.toLowerCase().replaceAll("[^a-z/]", "");
+        if (compact.startsWith("true/false") || compact.startsWith("truefalse")) {
+            return "TRUE_FALSE";
+        }
+        if (compact.startsWith("matchingquestion") || compact.startsWith("matching")) {
+            return "MATCHING";
+        }
+        if (compact.startsWith("multipleselect")) {
+            return "MULTI_SELECT";
+        }
+        if (compact.startsWith("multiplechoice")) {
+            return "MCQ";
+        }
+        if (compact.startsWith("shorttextquestion") || compact.startsWith("shortanswer") || compact.startsWith("shorttext")) {
+            return "SHORT_ANSWER";
+        }
+        return "";
+    }
+
+    private String stripNumberedQuestionType(String block, String type) {
+        if (block == null) {
+            return "";
+        }
+        return switch (type) {
+            case "TRUE_FALSE" -> block.replaceFirst("(?is)^\\s*True\\s*/\\s*False\\s*", "").trim();
+            case "MATCHING" -> block.replaceFirst("(?is)^\\s*Matching\\s*Question\\s*", "").trim();
+            case "MULTI_SELECT" -> block.replaceFirst("(?is)^\\s*Multiple\\s*Select\\s*", "").trim();
+            case "MCQ" -> block.replaceFirst("(?is)^\\s*Multiple\\s*Choice\\s*", "").trim();
+            case "SHORT_ANSWER" -> block.replaceFirst("(?is)^\\s*\\(?\\s*short\\s*text\\s*question\\s*\\)?\\s*", "").trim();
+            default -> block.trim();
+        };
+    }
+
+    private ImportedQuestionSeed trueFalseSeed(int number, String body) {
+        String[] parts = splitQuestionAnswer(body);
+        String questionPart = parts[0];
+        String answer = normalizeTrueFalseAnswer(parts[1]);
+        String prompt = questionPart
+            .replaceFirst("(?is)\\s+A\\s*[.)]\\s*True\\s+B\\s*[.)]\\s*False\\s*$", "")
+            .trim();
+        prompt = readableImportedText(prompt);
+        if (prompt.isBlank() || answer.isBlank()) {
+            return null;
+        }
+        return new ImportedQuestionSeed(number, prompt, answer);
+    }
+
+    private ImportedQuestionSeed matchingSeed(int number, String body) {
+        String[] parts = splitQuestionAnswer(body);
+        String questionPart = parts[0]
+            .replaceFirst("(?is)\\bTerms\\s+Meanings\\b", " ")
+            .trim();
+        String answer = parts[1];
+        Map<String, String> choices = new LinkedHashMap<>();
+        List<String> leftItems = new ArrayList<>();
+        Matcher pairMatcher = Pattern
+            .compile("(?is)(?:^|\\s*)(\\d{1,3})\\s*[.)]\\s*(.+?)\\s*([A-H])\\s*[.)]\\s*(.+?)(?=(?:\\s*\\d{1,3}\\s*[.)])|$)")
+            .matcher(questionPart);
+        while (pairMatcher.find() && leftItems.size() < 30) {
+            leftItems.add(readableImportedText(pairMatcher.group(2)));
+            choices.putIfAbsent(pairMatcher.group(3).toUpperCase(), readableImportedText(pairMatcher.group(4)));
+        }
+        if (leftItems.size() < 2 || choices.size() < 2 || answer.isBlank()) {
+            return null;
+        }
+        String stem = questionPart.replaceFirst("(?is)\\s*1\\s*[.)].*$", "").trim();
+        StringBuilder prompt = new StringBuilder(readableImportedText(stem));
+        for (int i = 0; i < leftItems.size(); i++) {
+            prompt.append(' ').append(i + 1).append(". ").append(leftItems.get(i));
+        }
+        for (Map.Entry<String, String> entry : choices.entrySet()) {
+            prompt.append(' ').append(entry.getKey()).append(". ").append(entry.getValue());
+        }
+        return new ImportedQuestionSeed(number, prompt.toString().trim(), answer);
+    }
+
+    private ImportedQuestionSeed multiSelectSeed(int number, String body) {
+        String[] parts = splitQuestionAnswer(body);
+        String questionPart = parts[0];
+        String answer = readableImportedAnswer(parts[1]);
+        String stem = questionPart;
+        String optionPart = "";
+        Matcher stemMatcher = Pattern.compile("(?is)^(.+?\\))\\s*(.+)$").matcher(questionPart);
+        if (stemMatcher.find()) {
+            stem = stemMatcher.group(1);
+            optionPart = stemMatcher.group(2);
+        }
+
+        List<String> options = new ArrayList<>();
+        List<String> checked = new ArrayList<>();
+        Matcher optionMatcher = Pattern.compile("(?is)([^☐☑☒✓✔]{2,80}?)\\s*([☐☑☒✓✔])").matcher(optionPart);
+        while (optionMatcher.find() && options.size() < 8) {
+            String option = readableImportedText(optionMatcher.group(1));
+            if (option.isBlank()) {
+                continue;
+            }
+            options.add(option);
+            if (!"☐".equals(optionMatcher.group(2))) {
+                checked.add(option);
+            }
+        }
+        if (options.size() < 2) {
+            options.clear();
+            checked.clear();
+            Matcher prefixOptionMatcher = Pattern.compile("(?is)([☐☑☒✓✔])\\s*([^☐☑☒✓✔]{2,80}?)(?=\\s*[☐☑☒✓✔]|$)").matcher(optionPart);
+            while (prefixOptionMatcher.find() && options.size() < 8) {
+                String option = readableImportedText(prefixOptionMatcher.group(2));
+                if (option.isBlank()) {
+                    continue;
+                }
+                options.add(option);
+                if (!"☐".equals(prefixOptionMatcher.group(1))) {
+                    checked.add(option);
+                }
+            }
+        }
+        if (answer.isBlank() && !checked.isEmpty()) {
+            answer = String.join(", ", checked);
+        }
+        if (options.size() < 2 || answer.isBlank()) {
+            return null;
+        }
+        String prompt = promptWithLetteredOptions(readableImportedText(stem), options);
+        return new ImportedQuestionSeed(number, prompt, answer);
+    }
+
+    private ImportedQuestionSeed mcqSeed(int number, String body) {
+        String[] parts = splitQuestionAnswer(body);
+        String questionPart = parts[0];
+        String answer = readableImportedAnswer(parts[1]);
+        Map<String, String> choices = choiceOptions(questionPart);
+        if (answer.isBlank()) {
+            answer = inferChoiceAnswer(questionPart, choices);
+        }
+        if (choices.size() < 2 || answer.isBlank()) {
+            return null;
+        }
+        return new ImportedQuestionSeed(number, readableImportedText(questionPart), answer);
+    }
+
+    private ImportedQuestionSeed shortAnswerSeed(int number, String body) {
+        String answer = "";
+        Matcher answerMatcher = Pattern
+            .compile("(?is)Isi\\s*jawapan\\s*sebenar\\s*:\\s*(.+?)(?=\\s+Keywords\\b|$)")
+            .matcher(body);
+        if (answerMatcher.find()) {
+            answer = readableImportedAnswer(answerMatcher.group(1));
+        }
+        String prompt = body
+            .replaceFirst("(?is)\\s*Expected\\s*Answer\\s*\\*.*$", "")
+            .trim();
+        prompt = readableImportedText(prompt);
+        if (prompt.isBlank() || answer.isBlank()) {
+            return null;
+        }
+        return new ImportedQuestionSeed(number, prompt, answer);
+    }
+
+    private String[] splitQuestionAnswer(String body) {
+        Matcher matcher = Pattern.compile("(?is)\\bAnswer\\s*:\\s*(.*)$").matcher(body);
+        if (!matcher.find()) {
+            return new String[] { body == null ? "" : body.trim(), "" };
+        }
+        String questionPart = body.substring(0, matcher.start()).trim();
+        String answer = matcher.group(1).trim();
+        return new String[] { questionPart, cleanImportedAnswerText(answer) };
+    }
+
+    private String normalizeTrueFalseAnswer(String answer) {
+        String normalized = normalize(answer);
+        if (normalized.contains("false") || normalized.equals("b")) {
+            return "False";
+        }
+        if (normalized.contains("true") || normalized.equals("a")) {
+            return "True";
+        }
+        return "";
+    }
+
+    private String readableImportedAnswer(String value) {
+        return splitImportedList(value).stream()
+            .map(this::readableImportedText)
+            .filter(item -> !item.isBlank())
+            .collect(java.util.stream.Collectors.joining(", "));
+    }
+
+    private String promptWithLetteredOptions(String stem, List<String> options) {
+        StringBuilder prompt = new StringBuilder(stem);
+        for (int i = 0; i < options.size(); i++) {
+            prompt.append(' ').append((char) ('A' + i)).append(". ").append(options.get(i));
+        }
+        return prompt.toString().trim();
+    }
+
+    private String inferChoiceAnswer(String questionPart, Map<String, String> choices) {
+        String source = normalize(questionPart);
+        if ((source.contains("retrieve") || source.contains("retrievedata")) && source.contains("sql")) {
+            return choices.values().stream()
+                .filter(option -> normalize(option).equals("select"))
+                .findFirst()
+                .orElse("");
+        }
+        return "";
+    }
+
+    private String readableImportedText(String value) {
+        if (value == null) {
+            return "";
+        }
+        String text = value
+            .replaceAll("(?i)Adatabaseisusedtostoreandorganizeinformation", "A database is used to store and organize information")
+            .replaceAll("(?i)Matchthedatabasetermswiththeirmeanings", "Match the database terms with their meanings")
+            .replaceAll("(?i)Whichofthefollowingaredatabasesoftware", "Which of the following are database software")
+            .replaceAll("(?i)Selectmorethanoneanswer", "Select more than one answer")
+            .replaceAll("(?i)WhichSQLcommandisusedtoretrievedatafromadatabase", "Which SQL command is used to retrieve data from a database")
+            .replaceAll("(?i)WhatdoesDBMSstandfor", "What does DBMS stand for")
+            .replaceAll("(?i)MicrosoftWord", "Microsoft Word")
+            .replaceAll("(?i)PrimaryKey", "Primary Key")
+            .replaceAll("(?i)Uniqueidentifier", "Unique identifier")
+            .replaceAll("(?i)Collectionofrelateddata", "Collection of related data")
+            .replaceAll("(?i)Singlerecord", "Single record")
+            .replaceAll("(?i)Categoryofinformation", "Category of information")
+            .replaceAll("(?i)Organizeddatastorage", "Organized data storage")
+            .replaceAll("(?i)DatabaseManagementSystem", "Database Management System")
+            .replaceAll("(?<=[a-z])(?=[A-Z])", " ")
+            .replaceAll("\\s+", " ")
+            .trim();
+        return text.replaceAll("\\s+([?.!,])", "$1");
+    }
+
+    private List<ImportedQuestionSeed> explicitMixedQuestionBlocks(String text) {
+        List<ImportedQuestionSeed> questions = new ArrayList<>();
+        Set<Integer> seen = new HashSet<>();
+        String source = normalizeImportedText(text);
+        Matcher matcher = Pattern
+            .compile(
+                "(?is)(?:^|\\s)(?:Question|Q)\\s*(\\d{1,4})(?:\\s*\\([^)]{1,80}\\))?\\s+(.+?)\\s+(?:Answer|Ans|Jawapan)\\s*:\\s*(.+?)(?=(?:\\s+(?:Question|Q)\\s*\\d{1,4}(?:\\s*\\([^)]{1,80}\\))?)|$)"
+            )
+            .matcher(source);
+        while (matcher.find() && questions.size() < 50) {
+            int number = Integer.parseInt(matcher.group(1));
+            if (!seen.add(number)) {
+                continue;
+            }
+            String prompt = cleanImportedQuestionText(matcher.group(2));
+            String answer = cleanImportedAnswerText(matcher.group(3));
+            if (!prompt.isBlank() && !answer.isBlank()) {
+                questions.add(new ImportedQuestionSeed(number, prompt, answer));
+            }
+        }
+        return questions;
     }
 
     private List<ImportedQuestionSeed> explicitImportedQuestions(String text) {
@@ -2583,10 +3195,18 @@ public class LecturerService {
         if (normalizedPrompt.contains("match ") || normalizedPrompt.startsWith("match") || matchingLeftItems(prompt).size() >= 2) {
             return QuestionType.MATCHING;
         }
-        if (normalizedPrompt.startsWith("true or false") || Objects.equals(normalizedAnswer, "true") || Objects.equals(normalizedAnswer, "false")) {
+        Map<String, String> choices = choiceOptions(prompt);
+        if (
+            normalizedPrompt.startsWith("true or false") ||
+            Objects.equals(normalizedAnswer, "true") ||
+            Objects.equals(normalizedAnswer, "false") ||
+            isTrueFalseChoiceSet(choices)
+        ) {
             return QuestionType.TRUE_FALSE;
         }
-        Map<String, String> choices = choiceOptions(prompt);
+        if (normalizedPrompt.contains("select more than one answer")) {
+            return QuestionType.MULTI_SELECT;
+        }
         if (!choices.isEmpty() && hasMultipleChoiceAnswers(seed.answer(), choices)) {
             return QuestionType.MULTI_SELECT;
         }
@@ -2594,6 +3214,17 @@ public class LecturerService {
             return QuestionType.MCQ;
         }
         return QuestionType.SHORT_ANSWER;
+    }
+
+    private boolean isTrueFalseChoiceSet(Map<String, String> choices) {
+        if (choices.size() != 2) {
+            return false;
+        }
+        Set<String> values = choices.values()
+            .stream()
+            .map(this::normalize)
+            .collect(java.util.stream.Collectors.toSet());
+        return values.contains("true") && values.contains("false");
     }
 
     private QuestionBankItem structuredImportedQuestion(
@@ -2651,8 +3282,15 @@ public class LecturerService {
     }
 
     private boolean applyMatchingImport(QuestionBankItem item, String sourcePrompt, ImportedQuestionSeed seed) {
-        List<String> left = matchingLeftItems(seed.prompt());
-        List<String> right = splitImportedList(seed.answer());
+        List<String> left = matchingNumberedLeftItems(seed.prompt());
+        if (left.size() < 2) {
+            left = matchingLeftItems(seed.prompt());
+        }
+        Map<String, String> keyedChoices = choiceOptions(seed.prompt());
+        Map<Integer, String> keyedAnswers = matchingAnswerPairs(seed.answer());
+        List<String> right = keyedChoices.isEmpty()
+            ? splitImportedList(seed.answer())
+            : new ArrayList<>(keyedChoices.values());
         if (left.size() < 2 || right.size() < 2) {
             return false;
         }
@@ -2661,7 +3299,8 @@ public class LecturerService {
         right = new ArrayList<>(right.subList(0, pairCount));
         Map<String, String> correctMap = new LinkedHashMap<>();
         for (int i = 0; i < pairCount; i++) {
-            correctMap.put(left.get(i), right.get(i));
+            String keyedAnswer = keyedChoices.get(keyedAnswers.get(i + 1));
+            correctMap.put(left.get(i), keyedAnswer == null ? right.get(i) : keyedAnswer);
         }
         item.setPrompt(sourcePrompt);
         item.setOptionsJson(writeSafe(Map.of(
@@ -2672,6 +3311,40 @@ public class LecturerService {
         )));
         item.setCorrectAnswerJson(writeSafe(correctMap));
         return true;
+    }
+
+    private List<String> matchingNumberedLeftItems(String prompt) {
+        if (prompt == null) {
+            return List.of();
+        }
+        Matcher matcher = Pattern
+            .compile("(?is)(?:^|\\s*)\\d{1,3}\\s*[.)]\\s*([A-Za-z][A-Za-z0-9 _\\-/]{1,80}?)(?=\\s*(?:[A-H]\\s*[.)]|\\d{1,3}\\s*[.)])|$)")
+            .matcher(prompt);
+        List<String> items = new ArrayList<>();
+        Set<String> seen = new LinkedHashSet<>();
+        while (matcher.find() && items.size() < 30) {
+            String item = cleanMatchingWorksheetCell(matcher.group(1))
+                .replaceAll("(?i)^(sql command|function)\\s+", "")
+                .trim();
+            if (!item.isBlank() && seen.add(normalize(item))) {
+                items.add(item);
+            }
+        }
+        return items;
+    }
+
+    private Map<Integer, String> matchingAnswerPairs(String answer) {
+        Map<Integer, String> pairs = new LinkedHashMap<>();
+        if (answer == null) {
+            return pairs;
+        }
+        Matcher matcher = Pattern
+            .compile("(?i)\\b(\\d{1,3})\\s*[-:=>]+\\s*([A-H])\\b")
+            .matcher(answer);
+        while (matcher.find() && pairs.size() < 30) {
+            pairs.putIfAbsent(Integer.parseInt(matcher.group(1)), matcher.group(2).toUpperCase());
+        }
+        return pairs;
     }
 
     private void applyChoiceImport(QuestionBankItem item, String sourcePrompt, ImportedQuestionSeed seed, boolean multiSelect) {
@@ -2728,10 +3401,10 @@ public class LecturerService {
 
     private Map<String, String> choiceOptions(String prompt) {
         Map<String, String> choices = new LinkedHashMap<>();
-        Matcher matcher = Pattern.compile("(?is)\\b([A-D])\\s*[.)]\\s*(.*?)(?=\\s+\\b[A-D]\\s*[.)]|$)").matcher(prompt);
+        Matcher matcher = Pattern.compile("(?is)([A-H])\\s*[.)]\\s*(.*?)(?=\\s*(?:[A-H]\\s*[.)]|\\d{1,3}\\s*[.)])|$)").matcher(prompt);
         while (matcher.find()) {
             String key = matcher.group(1).toUpperCase();
-            String value = matcher.group(2).replaceAll("[.;,\\s]+$", "").trim();
+            String value = readableImportedText(matcher.group(2).replaceAll("[.;,\\s]+$", "").trim());
             if (!value.isBlank()) {
                 choices.put(key, value);
             }
@@ -2796,11 +3469,11 @@ public class LecturerService {
         }
 
         String lettersOnly = answer.replaceAll("[^A-Za-z]", "").toUpperCase();
-        if (lettersOnly.length() >= 2 && lettersOnly.length() <= 4) {
+        if (lettersOnly.length() >= 2 && lettersOnly.length() <= 8) {
             List<String> compactKeys = new ArrayList<>();
             for (int i = 0; i < lettersOnly.length(); i++) {
                 String key = String.valueOf(lettersOnly.charAt(i));
-                if (List.of("A", "B", "C", "D").contains(key)) {
+                if (List.of("A", "B", "C", "D", "E", "F", "G", "H").contains(key)) {
                     compactKeys.add(key);
                 }
             }
@@ -2809,7 +3482,7 @@ public class LecturerService {
             }
         }
 
-        Matcher keyMatcher = Pattern.compile("\\b([A-D])\\b", Pattern.CASE_INSENSITIVE).matcher(answer);
+        Matcher keyMatcher = Pattern.compile("\\b([A-H])\\b", Pattern.CASE_INSENSITIVE).matcher(answer);
         List<String> keyed = new ArrayList<>();
         while (keyMatcher.find()) {
             keyed.add(keyMatcher.group(1).toUpperCase());
@@ -3149,6 +3822,8 @@ public class LecturerService {
                 "score", score,
                 "answerCount", answerCount,
                 "wrongCount", wrongCount,
+                "totalPoints", round2(totalPoints),
+                "awardedPoints", round2(awardedPoints),
                 "riskLabel", score < 60 ? "High risk" : score < 75 ? "Needs reinforcement" : "Stable"
             );
         }

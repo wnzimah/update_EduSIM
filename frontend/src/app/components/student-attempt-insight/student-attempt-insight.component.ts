@@ -243,6 +243,16 @@ export class StudentAttemptInsightComponent implements OnInit {
     return this.summary()?.submittedAt ?? "";
   }
 
+  formatDuration(seconds: unknown): string {
+    const total = Math.max(0, Math.round(Number(seconds) || 0));
+    const minutes = Math.floor(total / 60);
+    const remainingSeconds = total % 60;
+    if (minutes <= 0) {
+      return `${remainingSeconds} sec`;
+    }
+    return `${minutes} min ${remainingSeconds} sec`;
+  }
+
   completionStatusLabel(): string {
     if (!this.isReleased()) {
       return "Pending";

@@ -2092,3 +2092,158 @@
   display: none !important;
   content: none !important;
 }
+
+/* Final responsive guardrails for split-screen and small-device layouts. */
+.learning-page,
+.learning-page * {
+  box-sizing: border-box;
+}
+
+.learning-page,
+.learning-main,
+.learning-rail,
+.course-section,
+.study-hero-card,
+.course-catalog,
+.learning-card {
+  min-width: 0;
+  max-width: 100%;
+}
+
+.learning-title h1,
+.study-hero-card h2,
+.learning-card h3,
+.course-summary,
+.rail-panel h2,
+.assignment-list strong {
+  overflow-wrap: anywhere;
+}
+
+@media (max-width: 1180px) {
+  .learning-page {
+    min-height: auto;
+    grid-template-columns: 1fr;
+  }
+
+  .learning-main {
+    padding: 26px 20px 32px;
+    border-right: 0;
+  }
+
+  .learning-title {
+    align-items: flex-start;
+    margin-bottom: 20px;
+  }
+
+  .learning-title h1 {
+    font-size: 38px;
+    line-height: 1.05;
+  }
+
+  .study-hero-card {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 18px;
+    padding: 24px;
+  }
+
+  .hero-metrics {
+    min-width: 0;
+    width: 100%;
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .learning-filters {
+    grid-template-columns: minmax(0, 1.3fr) minmax(160px, 1fr) minmax(160px, 1fr) auto;
+    gap: 12px;
+  }
+
+  .learning-filters label {
+    min-width: 0;
+  }
+
+  .course-catalog {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    gap: 16px;
+  }
+
+  .learning-card {
+    width: 100%;
+    min-height: 0;
+  }
+
+  .learning-rail {
+    grid-template-columns: repeat(auto-fit, minmax(min(100%, 280px), 1fr));
+    padding: 0 20px 32px;
+    gap: 16px;
+  }
+}
+
+@media (max-width: 760px) {
+  .learning-main,
+  .learning-rail {
+    padding-left: 12px;
+    padding-right: 12px;
+  }
+
+  .learning-title {
+    gap: 10px;
+  }
+
+  .learning-title h1 {
+    font-size: 30px;
+  }
+
+  .learning-title p {
+    font-size: 14px;
+  }
+
+  .book-icon {
+    width: 42px;
+    height: 36px;
+  }
+
+  .study-hero-card {
+    padding: 18px;
+  }
+
+  .study-hero-card h2 {
+    font-size: 24px;
+  }
+
+  .learning-filters {
+    grid-template-columns: 1fr;
+  }
+
+  .learning-filters label {
+    grid-template-columns: 1fr;
+    gap: 7px;
+  }
+
+  .view-toggle {
+    width: 100%;
+  }
+
+  .view-toggle button {
+    flex: 1 1 0;
+  }
+}
+
+@media (max-width: 460px) {
+  .hero-metrics {
+    grid-template-columns: 1fr;
+  }
+
+  .section-heading {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .provider-row,
+  .progress-row,
+  .assignment-list li,
+  .planner-filter-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+}

@@ -23,6 +23,7 @@
 
       <div class="academy-links">
         @if (isLecturer()) {
+          <a routerLink="/lecturer/dashboard" routerLinkActive="active-link">Dashboard</a>
           <a routerLink="/lecturer/manage" routerLinkActive="active-link">My Courses</a>
           <a routerLink="/lecturer/student-attempts" routerLinkActive="active-link">Students</a>
           <a routerLink="/lecturer/quiz-performance" routerLinkActive="active-link">Reports</a>
@@ -125,18 +126,10 @@
                       <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
                       <span>Attempts</span>
                     </a>
-                    <a routerLink="/student/profile" [class.active-link]="isStudentMenuActive('profile')" (click)="closeMenus()">
-                      <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
-                      <span>Profile</span>
-                    </a>
                     <a routerLink="/student/history" [class.active-link]="isStudentMenuActive('messages')" (click)="closeMenus()">
                       <span class="sidebar-link-icon messages-icon" aria-hidden="true"></span>
                       <span>Messages</span>
                       <small class="main-menu-badge">3</small>
-                    </a>
-                    <a routerLink="/student/profile" [class.active-link]="isStudentMenuActive('settings')" (click)="closeMenus()">
-                      <span class="sidebar-link-icon settings-icon" aria-hidden="true"></span>
-                      <span>Settings</span>
                     </a>
                   </section>
                   <section class="main-menu-section main-menu-actions" aria-label="Quick actions">
@@ -148,10 +141,6 @@
                     <button type="button" (click)="openHelpTarget('history')">
                       <span class="quick-action-icon document-icon" aria-hidden="true"></span>
                       <span>View Attempts</span>
-                    </button>
-                    <button type="button" (click)="openHelpTarget('profile')">
-                      <span class="quick-action-icon settings-icon" aria-hidden="true"></span>
-                      <span>Update Profile</span>
                     </button>
                   </section>
                 }
@@ -266,10 +255,8 @@
                     <a routerLink="/student/history" (click)="closeMenus()">Attempts</a>
                   </section>
                   <section class="drawer-section">
-                    <h4>Profile</h4>
-                    <a routerLink="/student/profile" (click)="closeMenus()">Update Profile</a>
+                    <h4>Records</h4>
                     <a routerLink="/student/history" (click)="closeMenus()">Learning History</a>
-                    <a routerLink="/student/dashboard/grades" (click)="closeMenus()">Transcript</a>
                   </section>
                 }
 
@@ -366,10 +353,6 @@
           <a routerLink="/student/history" [class.active-link]="isStudentMenuActive('attempts')">
             <span class="sidebar-link-icon reports-icon" aria-hidden="true"></span>
             <span class="sidebar-link-text">Attempt History</span>
-          </a>
-          <a routerLink="/student/profile" [class.active-link]="isStudentMenuActive('profile')">
-            <span class="sidebar-link-icon students-icon" aria-hidden="true"></span>
-            <span class="sidebar-link-text">Profile</span>
           </a>
         </nav>
       }
